@@ -50,7 +50,7 @@ export function QNode({ id, data, selected }: NodeProps) {
           href={spec.paper.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="nodrag absolute -top-2 -left-2 w-5 h-5 rounded-full bg-surface border border-edge text-mute hover:text-accent hover:border-accent/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          className="nodrag absolute -top-2 -left-2 w-5 h-5 rounded-full bg-accent/20 border border-accent/70 text-accent hover:bg-accent/40 hover:border-accent hover:text-ink flex items-center justify-center shadow-sm transition-colors z-10"
           onClick={(e) => e.stopPropagation()}
           title={`Paper: ${spec.paper.title} (${spec.paper.venue})`}
           aria-label={`Open paper: ${spec.paper.title}`}
