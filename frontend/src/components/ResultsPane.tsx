@@ -1,21 +1,34 @@
 import { useApp } from "../lib/store";
 import type { StepResult } from "../lib/api";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
-import { AlertCircle, Check, CircleDot, Clock } from "lucide-react";
+import { AlertCircle, Check, ChevronRight, CircleDot, Clock } from "lucide-react";
 
-export function ResultsPane() {
+export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const run = useApp((s) => s.run);
   const running = useApp((s) => s.running);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-ink">Results</h3>
-        {run && (
-          <span className="chip">
-            {run.steps.length} step{run.steps.length === 1 ? "" : "s"}
-          </span>
-        )}
+      <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-ink truncate">Results</h3>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {run && (
+            <span className="chip">
+              {run.steps.length} step{run.steps.length === 1 ? "" : "s"}
+            </span>
+          )}
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="text-mute hover:text-ink rounded hover:bg-surfaceAlt p-0.5"
+              title="Collapse results pane"
+              aria-label="Collapse results pane"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
         {!run && !running && <EmptyHint />}

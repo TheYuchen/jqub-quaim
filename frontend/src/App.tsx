@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "./lib/api";
 import { useApp } from "./lib/store";
 import { TopBar } from "./components/TopBar";
@@ -17,8 +18,12 @@ const LEFT_MAX = 560;
 const RIGHT_DEFAULT = 400;
 const RIGHT_MIN = 300;
 const RIGHT_MAX = 720;
+const COLLAPSED_W = 32;
+
 const LS_LEFT = "jqub.leftPaneWidth";
 const LS_RIGHT = "jqub.rightPaneWidth";
+const LS_LEFT_COLLAPSED = "jqub.leftPaneCollapsed";
+const LS_RIGHT_COLLAPSED = "jqub.rightPaneCollapsed";
 
 function loadWidth(key: string, def: number, min: number, max: number): number {
   if (typeof window === "undefined") return def;
@@ -33,8 +38,20 @@ function loadWidth(key: string, def: number, min: number, max: number): number {
   }
 }
 
+function loadBool(key: string, def: boolean): boolean {
+  if (typeof window === "undefined") return def;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw == null) return def;
+    return raw === "1";
+  } catch {
+    return def;
+  }
+}
+
 export default function App() {
   const setHealth = useApp((s) => s.setHealth);
+  const running = useApp((s) => s.running);
   const [ready, setReady] = useState(false);
   const [tourOpen, setTourOpen] = useFirstVisitTour();
 
@@ -43,6 +60,12 @@ export default function App() {
   );
   const [rightW, setRightW] = useState<number>(() =>
     loadWidth(LS_RIGHT, RIGHT_DEFAULT, RIGHT_MIN, RIGHT_MAX),
+  );
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() =>
+    loadBool(LS_LEFT_COLLAPSED, false),
+  );
+  const [rightCollapsed, setRightCollapsed] = useState<boolean>(() =>
+    loadBool(LS_RIGHT_COLLAPSED, false),
   );
 
   // Persist user's preferred widths.
@@ -60,6 +83,35 @@ export default function App() {
       /* ignore quota errors */
     }
   }, [rightW]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LS_LEFT_COLLAPSED, leftCollapsed ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [leftCollapsed]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        LS_RIGHT_COLLAPSED,
+        rightCollapsed ? "1" : "0",
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [rightCollapsed]);
+
+  // Auto-expand the right pane when a pipeline run kicks off, so the user
+  // sees the "executing…" indicator and doesn't think the app is frozen.
+  // We only expand (never auto-collapse) and only on the false->true edge,
+  // so repeat runs while already expanded are a no-op.
+  const prevRunningRef = useRef(running);
+  useEffect(() => {
+    if (running && !prevRunningRef.current && rightCollapsed) {
+      setRightCollapsed(false);
+    }
+    prevRunningRef.current = running;
+  }, [running, rightCollapsed]);
 
   useEffect(() => {
     api
@@ -71,41 +123,68 @@ export default function App() {
       .catch(() => setReady(true));
   }, [setHealth]);
 
+  const leftWidth = leftCollapsed ? COLLAPSED_W : leftW;
+  const rightWidth = rightCollapsed ? COLLAPSED_W : rightW;
+
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
       <TopBar onOpenTour={() => setTourOpen(true)} />
       <div className="flex-1 flex min-h-0">
         <aside
-          style={{ width: leftW }}
-          className="shrink-0 border-r border-edge flex flex-col min-h-0 overflow-y-auto"
+          style={{ width: leftWidth }}
+          className={`shrink-0 border-r border-edge flex flex-col min-h-0 transition-[width] duration-150 ${
+            leftCollapsed ? "overflow-hidden" : "overflow-y-auto"
+          }`}
         >
-          <CircuitPicker />
+          {leftCollapsed ? (
+            <CollapsedStrip
+              label="Pipeline input"
+              side="left"
+              onExpand={() => setLeftCollapsed(false)}
+            />
+          ) : (
+            <CircuitPicker onCollapse={() => setLeftCollapsed(true)} />
+          )}
         </aside>
-        <PaneResizer
-          onResize={(dx) =>
-            setLeftW((w) => Math.min(LEFT_MAX, Math.max(LEFT_MIN, w + dx)))
-          }
-          onDoubleClick={() => setLeftW(LEFT_DEFAULT)}
-          ariaLabel="Resize pipeline input pane"
-        />
+        {!leftCollapsed && (
+          <PaneResizer
+            onResize={(dx) =>
+              setLeftW((w) => Math.min(LEFT_MAX, Math.max(LEFT_MIN, w + dx)))
+            }
+            onDoubleClick={() => setLeftW(LEFT_DEFAULT)}
+            ariaLabel="Resize pipeline input pane"
+          />
+        )}
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
           <NodePalette />
           <ReactFlowProvider>
             <FlowCanvas />
           </ReactFlowProvider>
         </main>
-        <PaneResizer
-          onResize={(dx) =>
-            setRightW((w) => Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, w - dx)))
-          }
-          onDoubleClick={() => setRightW(RIGHT_DEFAULT)}
-          ariaLabel="Resize results pane"
-        />
+        {!rightCollapsed && (
+          <PaneResizer
+            onResize={(dx) =>
+              setRightW((w) => Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, w - dx)))
+            }
+            onDoubleClick={() => setRightW(RIGHT_DEFAULT)}
+            ariaLabel="Resize results pane"
+          />
+        )}
         <aside
-          style={{ width: rightW }}
-          className="shrink-0 border-l border-edge flex flex-col min-h-0"
+          style={{ width: rightWidth }}
+          className={`shrink-0 border-l border-edge flex flex-col min-h-0 transition-[width] duration-150 ${
+            rightCollapsed ? "overflow-hidden" : ""
+          }`}
         >
-          <ResultsPane />
+          {rightCollapsed ? (
+            <CollapsedStrip
+              label="Results"
+              side="right"
+              onExpand={() => setRightCollapsed(false)}
+            />
+          ) : (
+            <ResultsPane onCollapse={() => setRightCollapsed(true)} />
+          )}
         </aside>
       </div>
       {!ready && (
@@ -115,6 +194,43 @@ export default function App() {
       )}
       <WelcomeTour open={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
+  );
+}
+
+/**
+ * Narrow vertical strip shown when an aside pane is collapsed.
+ *
+ * Clicking anywhere on it expands the pane. The chevron sits near the top
+ * and the label is rotated 90° to fill the strip. `side` controls which
+ * edge the chevron points towards — a left-side strip points right (come
+ * back out to the right) and a right-side strip points left.
+ */
+function CollapsedStrip({
+  label,
+  side,
+  onExpand,
+}: {
+  label: string;
+  side: "left" | "right";
+  onExpand: () => void;
+}) {
+  const Chevron = side === "left" ? ChevronRight : ChevronLeft;
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      title={`Expand ${label}`}
+      aria-label={`Expand ${label}`}
+      className="flex flex-col items-center gap-2 py-2 px-0 w-full h-full text-mute hover:text-ink hover:bg-surfaceAlt transition-colors"
+    >
+      <Chevron className="w-4 h-4 shrink-0" />
+      <span
+        className="text-[11px] uppercase tracking-wider whitespace-nowrap select-none"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        {label}
+      </span>
+    </button>
   );
 }
 

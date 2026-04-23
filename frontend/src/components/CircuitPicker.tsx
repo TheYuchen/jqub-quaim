@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, EyeOff, FileUp, Loader2 } from "lucide-react";
+import { ChevronLeft, Eye, EyeOff, FileUp, Loader2 } from "lucide-react";
 import { api, type CircuitInfo, type SampleCircuit } from "../lib/api";
 import { useApp } from "../lib/store";
 
-export function CircuitPicker() {
+export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) {
   const [samples, setSamples] = useState<SampleCircuit[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -47,12 +47,25 @@ export function CircuitPicker() {
 
   return (
     <div className="p-3 border-b border-edge">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-mute">
-          Pipeline input
-        </h3>
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center gap-1 min-w-0">
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="shrink-0 text-mute hover:text-ink rounded hover:bg-surfaceAlt p-0.5 -ml-0.5"
+              title="Collapse pipeline input pane"
+              aria-label="Collapse pipeline input pane"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-mute truncate">
+            Pipeline input
+          </h3>
+        </div>
         <button
-          className="btn-ghost"
+          className="btn-ghost shrink-0"
           onClick={() => fileRef.current?.click()}
           title="Upload your own .qpy (Qiskit) or .qasm (OpenQASM 2/3) file"
         >
