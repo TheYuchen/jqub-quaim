@@ -81,6 +81,14 @@ export interface RunRequest {
   circuit_id: string;
   nodes: FlowNodePayload[];
   edges: FlowEdgePayload[];
+  /**
+   * Opt-in: fetch fresh IBM Quantum Platform calibration instead of the
+   * shipped 14-day cache. The backend still enforces that the server has
+   * a token and ALLOW_LIVE_IBM=true; if not, passing `true` here will
+   * return a 400 — UI should only offer the toggle when health indicates
+   * both conditions are met.
+   */
+  use_live_ibm?: boolean;
 }
 
 async function json<T>(res: Response): Promise<T> {

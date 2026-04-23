@@ -61,6 +61,7 @@ export function FlowCanvas() {
   const setRun = useApp((s) => s.setRun);
   const running = useApp((s) => s.running);
   const setRunning = useApp((s) => s.setRunning);
+  const useLiveIbm = useApp((s) => s.useLiveIbm);
   const [error, setError] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
@@ -134,6 +135,7 @@ export function FlowCanvas() {
           data: (n.data as QNodeData).params ?? {},
         })),
         edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
+        use_live_ibm: useLiveIbm,
       };
       const res = await api.run(body);
       setRun(res);

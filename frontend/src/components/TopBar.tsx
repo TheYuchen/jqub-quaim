@@ -3,7 +3,37 @@ import { Activity, HelpCircle, Zap } from "lucide-react";
 
 export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
   const health = useApp((s) => s.health);
-  const liveOk = health?.live_ibm_allowed && health?.ibm_token_configured;
+  const useLiveIbm = useApp((s) => s.useLiveIbm);
+  const setUseLiveIbm = useApp((s) => s.setUseLiveIbm);
+
+  // Server can go live only when it has both the IBM token and the admin
+  // has flipped ALLOW_LIVE_IBM=true in env. If either is missing we grey
+  // the chip out and make it read-only.
+  const serverCanGoLive =
+    !!health?.live_ibm_allowed && !!health?.ibm_token_configured;
+  const effectiveLive = serverCanGoLive && useLiveIbm;
+
+  let chipLabel: string;
+  let chipClass: string;
+  let chipTitle: string;
+  if (!serverCanGoLive) {
+    chipLabel = "live ibm: unavailable";
+    chipClass = "!border-edge !text-mute opacity-70 cursor-not-allowed";
+    chipTitle =
+      "Server has no IBM Quantum Platform token configured, so QuBound is using the shipped 14-day calibration cache (real IBM Fez data, just not refreshed live). To enable live mode, set IBM_QUANTUM_TOKEN + ALLOW_LIVE_IBM=true in the HF Space secrets.";
+  } else if (effectiveLive) {
+    chipLabel = "live ibm: on";
+    chipClass =
+      "!border-warn/50 !text-warn cursor-pointer hover:!border-warn hover:!text-warn";
+    chipTitle =
+      "Live mode ON. QuBound will fetch fresh IBM Quantum Platform calibration on each run (+5-15s per run, counts against rate limits). Click to switch back to cache mode.";
+  } else {
+    chipLabel = "live ibm: off (using cache)";
+    chipClass =
+      "!border-edge !text-mute cursor-pointer hover:!text-ink hover:!border-accent/40";
+    chipTitle =
+      "Using the shipped 14-day IBM Fez calibration cache. This is fine for demos. Click to switch to live mode (fresh IBM calibration per run).";
+  }
 
   return (
     <header className="h-14 shrink-0 border-b border-edge px-5 flex items-center justify-between gap-4 bg-canvas/60 backdrop-blur">
@@ -25,18 +55,18 @@ export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
             ? `qiskit ${health.qiskit_version} · torch ${health.torch_version}`
             : "loading…"}
         </span>
-        <span
-          className={`chip ${
-            liveOk ? "!border-ok/50 !text-ok" : "!border-edge !text-mute"
-          }`}
-          title={
-            liveOk
-              ? "IBM Quantum Platform token detected; live noise lookups are enabled."
-              : "No IBM token / live lookups disabled; QuBound will use the shipped 14-day cache."
-          }
+        <button
+          type="button"
+          onClick={() => {
+            if (serverCanGoLive) setUseLiveIbm(!useLiveIbm);
+          }}
+          disabled={!serverCanGoLive}
+          aria-pressed={effectiveLive}
+          className={`chip transition-colors ${chipClass}`}
+          title={chipTitle}
         >
-          {liveOk ? "live ibm: on" : "live ibm: off (using cache)"}
-        </span>
+          {chipLabel}
+        </button>
         {onOpenTour && (
           <button
             onClick={onOpenTour}
