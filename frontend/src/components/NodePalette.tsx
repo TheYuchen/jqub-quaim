@@ -1,59 +1,55 @@
 import { NODE_CATALOG, type NodeSpec } from "../lib/nodeCatalog";
 
 /**
- * Two-row strip of draggable block tiles across the top of the canvas.
+ * Adaptive strip of draggable block tiles across the top of the canvas.
  *
- * Row 1 holds the "setup" blocks (input circuit + backends). Row 2 holds
- * the processing/algorithms, the fidelity metric, and the sink. The split
- * mirrors the natural pipeline flow (setup -> transform -> measure -> out)
- * and avoids horizontal overflow on narrower viewports.
+ * Rather than hard-coding one or two rows, the outer container uses
+ * flex-wrap and marks each family group as shrink-0. Consequences:
  *
- * Family separators remain inside each row; the drag hint sits to the
- * left and spans both rows vertically.
+ *   - On a wide canvas, all 8 tiles sit in a single row.
+ *   - When the canvas is squeezed (e.g. both side panes expanded on a
+ *     laptop screen), the last family that doesn't fit wraps to a new
+ *     row. Families never split mid-group, so "algorithm" stays together.
+ *   - No ResizeObserver, no JS breakpoint math — purely CSS. Responds
+ *     instantly to PaneResizer drags.
  */
-export function NodePalette() {
-  const row1: NodeSpec["family"][] = ["source", "backend"];
-  const row2: NodeSpec["family"][] = ["algorithm", "metric", "sink"];
+const FAMILIES: NodeSpec["family"][] = [
+  "source",
+  "backend",
+  "algorithm",
+  "metric",
+  "sink",
+];
 
+export function NodePalette() {
   return (
     <div className="shrink-0 border-b border-edge bg-surface/40">
-      <div className="px-3 py-2 flex items-stretch gap-2">
+      <div className="px-3 py-2 flex flex-wrap items-stretch gap-x-2 gap-y-1">
         <div className="flex items-center pr-1 shrink-0">
           <span className="text-[10px] uppercase tracking-wider text-mute/80 leading-tight">
             Drag a<br />block →
           </span>
         </div>
-        <div className="flex flex-col gap-1 min-w-0 overflow-hidden">
-          <PaletteRow families={row1} />
-          <PaletteRow families={row2} />
-        </div>
+        {FAMILIES.map((fam, famIdx) => {
+          const items = NODE_CATALOG.filter((n) => n.family === fam);
+          if (items.length === 0) return null;
+          return (
+            <div key={fam} className="flex items-center gap-1 shrink-0">
+              {items.map((n) => (
+                <PaletteTile key={n.kind} spec={n} />
+              ))}
+              {famIdx < FAMILIES.length - 1 && (
+                <div className="w-px self-stretch bg-edge mx-1" />
+              )}
+            </div>
+          );
+        })}
         <div className="hidden xl:flex items-center pl-2 text-[10px] text-mute/70 leading-tight shrink-0 max-w-[180px]">
           Drop onto the canvas below.
           <br />
           Hover a block to reveal its × delete button.
         </div>
       </div>
-    </div>
-  );
-}
-
-function PaletteRow({ families }: { families: NodeSpec["family"][] }) {
-  return (
-    <div className="flex items-stretch gap-1 overflow-x-auto">
-      {families.map((fam, famIdx) => {
-        const items = NODE_CATALOG.filter((n) => n.family === fam);
-        if (items.length === 0) return null;
-        return (
-          <div key={fam} className="flex items-center gap-1">
-            {items.map((n) => (
-              <PaletteTile key={n.kind} spec={n} />
-            ))}
-            {famIdx < families.length - 1 && (
-              <div className="w-px self-stretch bg-edge mx-1" />
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }
