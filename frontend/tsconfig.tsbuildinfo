@@ -1,1 +1,0 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/components/CircuitPicker.tsx","./src/components/FlowCanvas.tsx","./src/components/NodePalette.tsx","./src/components/QNode.tsx","./src/components/ResultsPane.tsx","./src/components/TopBar.tsx","./src/lib/api.ts","./src/lib/nodeCatalog.ts","./src/lib/store.ts"],"version":"5.9.3"}

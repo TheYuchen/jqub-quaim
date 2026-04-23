@@ -8,10 +8,12 @@ import { NodePalette } from "./components/NodePalette";
 import { FlowCanvas } from "./components/FlowCanvas";
 import { ResultsPane } from "./components/ResultsPane";
 import { CircuitPicker } from "./components/CircuitPicker";
+import { WelcomeTour, useFirstVisitTour } from "./components/WelcomeTour";
 
 export default function App() {
   const setHealth = useApp((s) => s.setHealth);
   const [ready, setReady] = useState(false);
+  const [tourOpen, setTourOpen] = useFirstVisitTour();
 
   useEffect(() => {
     api
@@ -25,7 +27,7 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
-      <TopBar />
+      <TopBar onOpenTour={() => setTourOpen(true)} />
       <div className="flex-1 flex min-h-0">
         <aside className="w-[280px] shrink-0 border-r border-edge flex flex-col min-h-0">
           <CircuitPicker />
@@ -45,6 +47,7 @@ export default function App() {
           <div className="text-mute text-sm">Connecting to quantum backend…</div>
         </div>
       )}
+      <WelcomeTour open={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }

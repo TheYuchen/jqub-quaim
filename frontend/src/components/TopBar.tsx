@@ -1,7 +1,7 @@
 import { useApp } from "../lib/store";
-import { Activity, Github, Zap } from "lucide-react";
+import { Activity, HelpCircle, Zap } from "lucide-react";
 
-export function TopBar() {
+export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
   const health = useApp((s) => s.health);
   const liveOk = health?.live_ibm_allowed && health?.ibm_token_configured;
 
@@ -37,15 +37,17 @@ export function TopBar() {
         >
           {liveOk ? "live ibm: on" : "live ibm: off (using cache)"}
         </span>
-        <a
-          href="https://github.com/"
-          target="_blank"
-          rel="noreferrer"
-          className="btn-ghost"
-          title="GitHub"
-        >
-          <Github className="w-3.5 h-3.5" />
-        </a>
+        {onOpenTour && (
+          <button
+            onClick={onOpenTour}
+            className="btn-ghost"
+            title="Show the intro tour"
+            aria-label="Show the intro tour"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tour</span>
+          </button>
+        )}
       </div>
     </header>
   );

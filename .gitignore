@@ -12,6 +12,7 @@ env/
 node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/tsconfig.tsbuildinfo
 .npm/
 .yarn/
 .pnp.*
