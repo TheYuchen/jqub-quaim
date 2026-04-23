@@ -1,3 +1,4 @@
+import { FileText } from "lucide-react";
 import { NODE_CATALOG, type NodeSpec } from "../lib/nodeCatalog";
 
 /**
@@ -64,9 +65,24 @@ function PaletteTile({ spec }: { spec: NodeSpec }) {
     <div
       draggable
       onDragStart={onDragStart}
-      className="group shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1.5 py-1.5"
+      className="group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1.5 py-1.5"
       title={spec.description}
     >
+      {spec.paper && (
+        <a
+          href={spec.paper.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          draggable={false}
+          onDragStart={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-1 right-1 w-4 h-4 rounded-full bg-accent/20 border border-accent/70 text-accent hover:bg-accent/40 hover:border-accent hover:text-ink flex items-center justify-center shadow-sm transition-colors z-10"
+          title={`Paper: ${spec.paper.title} (${spec.paper.venue})`}
+          aria-label={`Open paper: ${spec.paper.title}`}
+        >
+          <FileText className="w-2.5 h-2.5" strokeWidth={2} />
+        </a>
+      )}
       <span
         className={`w-6 h-6 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent}`}
       >
