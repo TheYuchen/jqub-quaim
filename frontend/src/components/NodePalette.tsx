@@ -1,44 +1,54 @@
 import { NODE_CATALOG, type NodeSpec } from "../lib/nodeCatalog";
 
 /**
- * Side panel of draggable node templates. Dragging onto the canvas
- * is handled by FlowCanvas via the dataTransfer "application/reactflow"
- * payload (we just put the node kind into it).
+ * Horizontal strip of draggable block tiles across the top of the canvas.
+ *
+ * Previously this lived as a vertical list in the left sidebar beneath
+ * CircuitPicker, but with a longer circuit list it was getting squeezed
+ * out. A horizontal strip also makes the "drag down onto canvas" motion
+ * feel natural.
  */
 export function NodePalette() {
+  const families: NodeSpec["family"][] = [
+    "source",
+    "backend",
+    "algorithm",
+    "metric",
+    "sink",
+  ];
+
   return (
-    <div className="flex-1 overflow-y-auto p-3 min-h-0">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-mute mb-2">
-        Blocks
-      </h3>
-      <div className="space-y-1.5">
-        {["source", "backend", "algorithm", "metric", "sink"].map((fam) => {
+    <div className="shrink-0 border-b border-edge bg-surface/40">
+      <div className="px-3 py-2 flex items-stretch gap-1 overflow-x-auto">
+        <div className="flex items-center pr-2 shrink-0">
+          <span className="text-[10px] uppercase tracking-wider text-mute/80 leading-tight">
+            Drag a<br />block →
+          </span>
+        </div>
+        {families.map((fam, famIdx) => {
           const items = NODE_CATALOG.filter((n) => n.family === fam);
           if (items.length === 0) return null;
           return (
-            <div key={fam}>
-              <div className="text-[10px] text-mute/70 uppercase tracking-wider pl-1 pt-2 pb-1">
-                {fam}
-              </div>
+            <div key={fam} className="flex items-center gap-1">
               {items.map((n) => (
-                <PaletteItem key={n.kind} spec={n} />
+                <PaletteTile key={n.kind} spec={n} />
               ))}
+              {famIdx < families.length - 1 && (
+                <div className="w-px self-stretch bg-edge mx-1" />
+              )}
             </div>
           );
         })}
+        <div className="hidden xl:flex items-center pl-2 text-[10px] text-mute/70 shrink-0 max-w-[220px]">
+          Drop below to add a block. Hover a block on the canvas for the{" "}
+          <span className="text-ink mx-1">×</span> delete button.
+        </div>
       </div>
-
-      <p className="text-[11px] text-mute/70 mt-4 leading-relaxed">
-        Drag a block onto the canvas. Connect right-handle to left-handle to define data
-        flow; run order is inferred by topological sort. Hover a block on the canvas and
-        click the <span className="text-ink">×</span> to remove it (or press{" "}
-        <span className="kbd">Backspace</span> with a block selected).
-      </p>
     </div>
   );
 }
 
-function PaletteItem({ spec }: { spec: NodeSpec }) {
+function PaletteTile({ spec }: { spec: NodeSpec }) {
   const Icon = spec.icon;
   function onDragStart(e: React.DragEvent) {
     e.dataTransfer.setData("application/reactflow", spec.kind);
@@ -48,18 +58,17 @@ function PaletteItem({ spec }: { spec: NodeSpec }) {
     <div
       draggable
       onDragStart={onDragStart}
-      className={`group cursor-grab active:cursor-grabbing flex items-center gap-2 px-2 py-1.5 rounded-md border border-transparent hover:border-edge hover:bg-surfaceAlt transition-colors`}
+      className="group shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[72px] h-[52px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1"
       title={spec.description}
     >
       <span
-        className={`w-7 h-7 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent} shrink-0`}
+        className={`w-6 h-6 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent}`}
       >
-        <Icon className="w-3.5 h-3.5" strokeWidth={2} />
+        <Icon className="w-3 h-3" strokeWidth={2} />
       </span>
-      <div className="min-w-0">
-        <div className="text-sm text-ink truncate">{spec.label}</div>
-        <div className="text-[10px] text-mute truncate">{spec.description}</div>
-      </div>
+      <span className="text-[10px] text-ink truncate max-w-full leading-tight">
+        {spec.label}
+      </span>
     </div>
   );
 }

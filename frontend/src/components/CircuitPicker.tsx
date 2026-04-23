@@ -48,7 +48,7 @@ export function CircuitPicker() {
     <div className="p-3 border-b border-edge">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-mute">
-          Circuit
+          Pipeline input
         </h3>
         <button
           className="btn-ghost"
@@ -69,6 +69,10 @@ export function CircuitPicker() {
       <ActiveCircuitCard info={circuit} />
 
       <div className="mt-3 space-y-1">
+        <div className="text-[11px] text-mute leading-snug mb-2">
+          Pick a sample circuit below. It becomes the{" "}
+          <span className="text-ink">Input circuit</span> block in your pipeline.
+        </div>
         <div className="text-[11px] text-mute uppercase tracking-wider mb-1">Samples</div>
         {samples.map((s) => {
           const active = circuit?.name === s.display_name;
@@ -123,6 +127,9 @@ function ActiveCircuitCard({ info }: { info: CircuitInfo | null }) {
   }
   return (
     <div className="panel-alt px-3 py-3">
+      <div className="text-[10px] uppercase tracking-wider text-mute/80 mb-0.5">
+        Loaded
+      </div>
       <div className="font-medium text-ink text-sm truncate">{info.name}</div>
       <div className="mt-1 flex flex-wrap gap-1">
         <span className="chip">{info.num_qubits}q</span>

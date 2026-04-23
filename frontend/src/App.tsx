@@ -29,11 +29,11 @@ export default function App() {
     <div className="h-screen w-screen flex flex-col overflow-hidden">
       <TopBar onOpenTour={() => setTourOpen(true)} />
       <div className="flex-1 flex min-h-0">
-        <aside className="w-[280px] shrink-0 border-r border-edge flex flex-col min-h-0">
+        <aside className="w-[280px] shrink-0 border-r border-edge flex flex-col min-h-0 overflow-y-auto">
           <CircuitPicker />
-          <NodePalette />
         </aside>
-        <main className="flex-1 min-w-0 flex flex-col">
+        <main className="flex-1 min-w-0 flex flex-col min-h-0">
+          <NodePalette />
           <ReactFlowProvider>
             <FlowCanvas />
           </ReactFlowProvider>

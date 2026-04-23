@@ -736,9 +736,14 @@ function TrySlide() {
             </span>
           </div>
           <ul className="text-[12px] text-mute space-y-1.5 leading-relaxed">
-            <li>Drag blocks from the left panel onto the canvas.</li>
+            <li>
+              Drag blocks from the strip at the top of the canvas.
+            </li>
             <li>Connect their handles left-to-right.</li>
-            <li>Click a block to edit its parameters inline.</li>
+            <li>
+              Hover a block to reveal the <span className="kbd">×</span>{" "}
+              delete button.
+            </li>
             <li>
               Upload your own <span className="kbd">.qpy</span> circuit via
               the <span className="text-ink">upload</span> link.
