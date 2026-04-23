@@ -1,8 +1,30 @@
 import { useApp } from "../lib/store";
-import { Activity, HelpCircle, Zap } from "lucide-react";
+import { Activity, HelpCircle, PanelLeft, PanelRight, Zap } from "lucide-react";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
-export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
+/**
+ * Top application bar.
+ *
+ * Desktop: renders the full status strip (qiskit/torch versions, live-IBM
+ * toggle, theme switcher, tour button).
+ *
+ * Mobile: the two side panes are swapped for drawers, so we surface two
+ * edge buttons (PanelLeft / PanelRight) for toggling them. The version
+ * chip is hidden (noisy on a 390px screen), the live-IBM toggle stays
+ * since users may actually want to flip it, and the theme switcher +
+ * tour button stay as compact icons.
+ */
+export function TopBar({
+  onOpenTour,
+  mobile = false,
+  onOpenLeftDrawer,
+  onOpenRightDrawer,
+}: {
+  onOpenTour?: () => void;
+  mobile?: boolean;
+  onOpenLeftDrawer?: () => void;
+  onOpenRightDrawer?: () => void;
+}) {
   const health = useApp((s) => s.health);
   const useLiveIbm = useApp((s) => s.useLiveIbm);
   const setUseLiveIbm = useApp((s) => s.setUseLiveIbm);
@@ -15,21 +37,25 @@ export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
   const effectiveLive = serverCanGoLive && useLiveIbm;
 
   let chipLabel: string;
+  let chipLabelShort: string;
   let chipClass: string;
   let chipTitle: string;
   if (!serverCanGoLive) {
     chipLabel = "live ibm: unavailable";
+    chipLabelShort = "ibm: n/a";
     chipClass = "!border-edge !text-mute opacity-70 cursor-not-allowed";
     chipTitle =
       "Server has no IBM Quantum Platform token configured, so QuBound is using the shipped 14-day calibration cache (real IBM Fez data, just not refreshed live). To enable live mode, set IBM_QUANTUM_TOKEN + ALLOW_LIVE_IBM=true in the HF Space secrets.";
   } else if (effectiveLive) {
     chipLabel = "live ibm: on";
+    chipLabelShort = "ibm: on";
     chipClass =
       "!border-warn/50 !text-warn cursor-pointer hover:!border-warn hover:!text-warn";
     chipTitle =
       "Live mode ON. QuBound will fetch fresh IBM Quantum Platform calibration on each run (+5-15s per run, counts against rate limits). Click to switch back to cache mode.";
   } else {
     chipLabel = "live ibm: off (using cache)";
+    chipLabelShort = "ibm: cache";
     chipClass =
       "!border-edge !text-mute cursor-pointer hover:!text-ink hover:!border-accent/40";
     chipTitle =
@@ -37,25 +63,41 @@ export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
   }
 
   return (
-    <header className="h-14 shrink-0 border-b border-edge px-5 flex items-center justify-between gap-4 bg-canvas/60 backdrop-blur">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent2 flex items-center justify-center shadow-glow">
+    <header className="h-14 shrink-0 border-b border-edge px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4 bg-canvas/60 backdrop-blur">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {mobile && onOpenLeftDrawer && (
+          <button
+            type="button"
+            onClick={onOpenLeftDrawer}
+            aria-label="Open pipeline input"
+            title="Pipeline input"
+            className="w-9 h-9 rounded-md border border-edge bg-surface/60 text-mute hover:text-ink hover:border-accent/40 flex items-center justify-center shrink-0"
+          >
+            <PanelLeft className="w-4 h-4" />
+          </button>
+        )}
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-accent2 flex items-center justify-center shadow-glow shrink-0">
           <Zap className="w-4 h-4 text-canvas" strokeWidth={2.5} />
         </div>
-        <div className="leading-tight">
-          <div className="text-ink font-semibold tracking-tight">JQub Quantum Flow</div>
-          <div className="text-mute text-xs">
+        <div className="leading-tight min-w-0">
+          <div className="text-ink font-semibold tracking-tight truncate">
+            JQub Quantum Flow
+          </div>
+          <div className="text-mute text-xs hidden sm:block truncate">
             Visual pipeline for noise-aware VQC experiments
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="chip">
-          <Activity className="w-3 h-3" />
-          {health
-            ? `qiskit ${health.qiskit_version} · torch ${health.torch_version}`
-            : "loading…"}
-        </span>
+      <div className="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0">
+        {/* qiskit/torch version chip — hidden on mobile to save room */}
+        {!mobile && (
+          <span className="chip">
+            <Activity className="w-3 h-3" />
+            {health
+              ? `qiskit ${health.qiskit_version} · torch ${health.torch_version}`
+              : "loading…"}
+          </span>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -66,7 +108,7 @@ export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
           className={`chip transition-colors ${chipClass}`}
           title={chipTitle}
         >
-          {chipLabel}
+          {mobile ? chipLabelShort : chipLabel}
         </button>
         <ThemeSwitcher />
         {onOpenTour && (
@@ -78,6 +120,17 @@ export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
           >
             <HelpCircle className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Tour</span>
+          </button>
+        )}
+        {mobile && onOpenRightDrawer && (
+          <button
+            type="button"
+            onClick={onOpenRightDrawer}
+            aria-label="Open results"
+            title="Results"
+            className="w-9 h-9 rounded-md border border-edge bg-surface/60 text-mute hover:text-ink hover:border-accent/40 flex items-center justify-center shrink-0"
+          >
+            <PanelRight className="w-4 h-4" />
           </button>
         )}
       </div>

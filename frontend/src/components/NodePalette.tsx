@@ -25,7 +25,14 @@ const FAMILIES: NodeSpec["family"][] = [
 export function NodePalette() {
   return (
     <div className="shrink-0 border-b border-edge bg-surface/40">
-      <div className="px-3 py-2 flex flex-wrap items-stretch gap-x-2 gap-y-1">
+      {/*
+       * Responsive layout:
+       *   - Mobile (<md): flex-nowrap + overflow-x-auto. All 8 tiles sit in
+       *     one horizontally-scrollable row so the palette stays one row tall.
+       *   - Desktop (≥md): flex-wrap so families reflow onto a second row
+       *     when the canvas gets squeezed between two expanded side panes.
+       */}
+      <div className="px-3 py-2 flex flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible items-stretch gap-x-2 gap-y-1">
         <div className="flex items-center pr-1 shrink-0">
           <span className="text-[10px] uppercase tracking-wider text-mute/80 leading-tight">
             Drag a<br />block →

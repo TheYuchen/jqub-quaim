@@ -4,11 +4,13 @@ import "@xyflow/react/dist/style.css";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "./lib/api";
 import { useApp } from "./lib/store";
+import { useIsDesktop } from "./lib/useMediaQuery";
 import { TopBar } from "./components/TopBar";
 import { NodePalette } from "./components/NodePalette";
 import { FlowCanvas } from "./components/FlowCanvas";
 import { ResultsPane } from "./components/ResultsPane";
 import { CircuitPicker } from "./components/CircuitPicker";
+import { MobileDrawer } from "./components/MobileDrawer";
 import { WelcomeTour, useFirstVisitTour } from "./components/WelcomeTour";
 
 // Default + clamp bounds for the two side panels. The middle canvas flexes.
@@ -54,7 +56,9 @@ export default function App() {
   const running = useApp((s) => s.running);
   const [ready, setReady] = useState(false);
   const [tourOpen, setTourOpen] = useFirstVisitTour();
+  const isDesktop = useIsDesktop();
 
+  // Desktop pane widths — unused on mobile (drawers take over there).
   const [leftW, setLeftW] = useState<number>(() =>
     loadWidth(LS_LEFT, LEFT_DEFAULT, LEFT_MIN, LEFT_MAX),
   );
@@ -68,7 +72,12 @@ export default function App() {
     loadBool(LS_RIGHT_COLLAPSED, false),
   );
 
-  // Persist user's preferred widths.
+  // Mobile drawer state — unused on desktop.
+  const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
+  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
+
+  // Persist user's preferred widths (desktop only; the values are loaded
+  // at mount either way so that toggling screen size restores them).
   useEffect(() => {
     try {
       window.localStorage.setItem(LS_LEFT, String(leftW));
@@ -101,17 +110,29 @@ export default function App() {
     }
   }, [rightCollapsed]);
 
-  // Auto-expand the right pane when a pipeline run kicks off, so the user
-  // sees the "executing…" indicator and doesn't think the app is frozen.
-  // We only expand (never auto-collapse) and only on the false->true edge,
-  // so repeat runs while already expanded are a no-op.
+  // Auto-expand the right pane (desktop) or pop the right drawer (mobile)
+  // when a pipeline run kicks off, so the user sees progress. Only on the
+  // false→true edge — repeat runs while already expanded are a no-op.
   const prevRunningRef = useRef(running);
   useEffect(() => {
-    if (running && !prevRunningRef.current && rightCollapsed) {
-      setRightCollapsed(false);
+    if (running && !prevRunningRef.current) {
+      if (isDesktop) {
+        if (rightCollapsed) setRightCollapsed(false);
+      } else {
+        setRightDrawerOpen(true);
+      }
     }
     prevRunningRef.current = running;
-  }, [running, rightCollapsed]);
+  }, [running, rightCollapsed, isDesktop]);
+
+  // Close any open drawer as soon as we leave mobile layout, so switching
+  // from portrait to landscape doesn't leave a floating panel hanging.
+  useEffect(() => {
+    if (isDesktop) {
+      setLeftDrawerOpen(false);
+      setRightDrawerOpen(false);
+    }
+  }, [isDesktop]);
 
   useEffect(() => {
     api
@@ -128,65 +149,101 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
-      <TopBar onOpenTour={() => setTourOpen(true)} />
-      <div className="flex-1 flex min-h-0">
-        <aside
-          style={{ width: leftWidth }}
-          className={`shrink-0 border-r border-edge flex flex-col min-h-0 transition-[width] duration-150 ${
-            leftCollapsed ? "overflow-hidden" : "overflow-y-auto"
-          }`}
-        >
-          {leftCollapsed ? (
-            <CollapsedStrip
-              label="Pipeline input"
-              side="left"
-              onExpand={() => setLeftCollapsed(false)}
+      <TopBar
+        onOpenTour={() => setTourOpen(true)}
+        mobile={!isDesktop}
+        onOpenLeftDrawer={() => setLeftDrawerOpen(true)}
+        onOpenRightDrawer={() => setRightDrawerOpen(true)}
+      />
+      {isDesktop ? (
+        /* =====================  Desktop  ===================== */
+        <div className="flex-1 flex min-h-0">
+          <aside
+            style={{ width: leftWidth }}
+            className={`shrink-0 border-r border-edge flex flex-col min-h-0 transition-[width] duration-150 ${
+              leftCollapsed ? "overflow-hidden" : "overflow-y-auto"
+            }`}
+          >
+            {leftCollapsed ? (
+              <CollapsedStrip
+                label="Pipeline input"
+                side="left"
+                onExpand={() => setLeftCollapsed(false)}
+              />
+            ) : (
+              <CircuitPicker onCollapse={() => setLeftCollapsed(true)} />
+            )}
+          </aside>
+          {!leftCollapsed && (
+            <PaneResizer
+              onResize={(dx) =>
+                setLeftW((w) => Math.min(LEFT_MAX, Math.max(LEFT_MIN, w + dx)))
+              }
+              onDoubleClick={() => setLeftW(LEFT_DEFAULT)}
+              ariaLabel="Resize pipeline input pane"
             />
-          ) : (
-            <CircuitPicker onCollapse={() => setLeftCollapsed(true)} />
           )}
-        </aside>
-        {!leftCollapsed && (
-          <PaneResizer
-            onResize={(dx) =>
-              setLeftW((w) => Math.min(LEFT_MAX, Math.max(LEFT_MIN, w + dx)))
-            }
-            onDoubleClick={() => setLeftW(LEFT_DEFAULT)}
-            ariaLabel="Resize pipeline input pane"
-          />
-        )}
-        <main className="flex-1 min-w-0 flex flex-col min-h-0">
-          <NodePalette />
-          <ReactFlowProvider>
-            <FlowCanvas />
-          </ReactFlowProvider>
-        </main>
-        {!rightCollapsed && (
-          <PaneResizer
-            onResize={(dx) =>
-              setRightW((w) => Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, w - dx)))
-            }
-            onDoubleClick={() => setRightW(RIGHT_DEFAULT)}
-            ariaLabel="Resize results pane"
-          />
-        )}
-        <aside
-          style={{ width: rightWidth }}
-          className={`shrink-0 border-l border-edge flex flex-col min-h-0 transition-[width] duration-150 ${
-            rightCollapsed ? "overflow-hidden" : ""
-          }`}
-        >
-          {rightCollapsed ? (
-            <CollapsedStrip
-              label="Results"
-              side="right"
-              onExpand={() => setRightCollapsed(false)}
+          <main className="flex-1 min-w-0 flex flex-col min-h-0">
+            <NodePalette />
+            <ReactFlowProvider>
+              <FlowCanvas />
+            </ReactFlowProvider>
+          </main>
+          {!rightCollapsed && (
+            <PaneResizer
+              onResize={(dx) =>
+                setRightW((w) =>
+                  Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, w - dx)),
+                )
+              }
+              onDoubleClick={() => setRightW(RIGHT_DEFAULT)}
+              ariaLabel="Resize results pane"
             />
-          ) : (
-            <ResultsPane onCollapse={() => setRightCollapsed(true)} />
           )}
-        </aside>
-      </div>
+          <aside
+            style={{ width: rightWidth }}
+            className={`shrink-0 border-l border-edge flex flex-col min-h-0 transition-[width] duration-150 ${
+              rightCollapsed ? "overflow-hidden" : ""
+            }`}
+          >
+            {rightCollapsed ? (
+              <CollapsedStrip
+                label="Results"
+                side="right"
+                onExpand={() => setRightCollapsed(false)}
+              />
+            ) : (
+              <ResultsPane onCollapse={() => setRightCollapsed(true)} />
+            )}
+          </aside>
+        </div>
+      ) : (
+        /* =====================  Mobile  ====================== */
+        <div className="flex-1 flex flex-col min-h-0">
+          <main className="flex-1 min-w-0 flex flex-col min-h-0">
+            <NodePalette />
+            <ReactFlowProvider>
+              <FlowCanvas />
+            </ReactFlowProvider>
+          </main>
+          <MobileDrawer
+            open={leftDrawerOpen}
+            onClose={() => setLeftDrawerOpen(false)}
+            side="left"
+            title="Pipeline input"
+          >
+            <CircuitPicker />
+          </MobileDrawer>
+          <MobileDrawer
+            open={rightDrawerOpen}
+            onClose={() => setRightDrawerOpen(false)}
+            side="right"
+            title="Results"
+          >
+            <ResultsPane />
+          </MobileDrawer>
+        </div>
+      )}
       {!ready && (
         <div className="absolute inset-0 bg-canvas/80 flex items-center justify-center backdrop-blur">
           <div className="text-mute text-sm">Connecting to quantum backend…</div>
