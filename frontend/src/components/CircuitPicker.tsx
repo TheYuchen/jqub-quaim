@@ -76,20 +76,33 @@ export function CircuitPicker() {
             <button
               key={s.key}
               onClick={() => pick(s.key)}
-              className={`w-full text-left px-2 py-1.5 rounded-md text-sm border transition-colors flex items-center justify-between gap-2 ${
+              className={`w-full text-left px-2 py-1.5 rounded-md border transition-colors ${
                 active
-                  ? "bg-accent/10 border-accent/50 text-ink"
-                  : "border-transparent hover:bg-surfaceAlt hover:border-edge text-mute hover:text-ink"
+                  ? "bg-accent/10 border-accent/50"
+                  : "border-transparent hover:bg-surfaceAlt hover:border-edge"
               }`}
               disabled={busy === s.key}
             >
-              <span className="truncate">{s.display_name}</span>
-              {busy === s.key ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : (
-                <span className="text-[10px] font-mono text-mute shrink-0">
-                  {s.num_qubits}q
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`truncate text-sm ${
+                    active ? "text-ink" : "text-ink/90"
+                  }`}
+                >
+                  {s.display_name}
                 </span>
+                {busy === s.key ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-mute" />
+                ) : (
+                  <span className="text-[10px] font-mono text-mute shrink-0">
+                    {s.num_qubits}q
+                  </span>
+                )}
+              </div>
+              {s.description && (
+                <div className="text-[11px] text-mute leading-snug mt-0.5">
+                  {s.description}
+                </div>
               )}
             </button>
           );

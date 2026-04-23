@@ -592,7 +592,7 @@ function PipelineSVG() {
       ))}
 
       <PipelineNode x={20} y={40} color="#4cc9f0" label="Circuit" sub="SOURCE" kind="circuit" />
-      <PipelineNode x={190} y={40} color="#4cc9f0" label="Fake backend" sub="BACKEND" kind="backend" />
+      <PipelineNode x={190} y={40} color="#4cc9f0" label="Noisy simulator" sub="BACKEND" kind="backend" />
       <PipelineNode x={360} y={40} color="#f72585" label="QuBound" sub="ALGORITHM" kind="algo" />
       <PipelineNode x={530} y={40} color="#e6ebff" label="Output" sub="SINK" kind="out" />
     </svg>
@@ -696,10 +696,11 @@ function TrySlide() {
           A default pipeline is already loaded.
         </h2>
         <p className="text-mute text-sm">
-          Pick one of the five sample circuits on the left, then hit{" "}
+          Pick one of the sample circuits on the left, then hit{" "}
           <span className="kbd">Run pipeline</span> in the canvas toolbar. The
-          first run trains an LSTM on 14 days of calibration — plan for a
-          minute on the shared HF CPU.
+          first run trains an LSTM on 14 days of calibration, so plan for
+          about two minutes on the shared HF CPU. Don't close the tab while
+          it's running.
         </p>
       </div>
 

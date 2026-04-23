@@ -1,4 +1,5 @@
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
+import { X } from "lucide-react";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
 
 export interface QNodeData extends Record<string, unknown> {
@@ -12,10 +13,14 @@ export interface QNodeData extends Record<string, unknown> {
  * We deliberately keep each node simple (icon + label + 1-2 param hints) — the
  * full parameter editor / results viewer lives in the ResultsPane on the
  * right. Noisy per-node inline editors make the graph hard to read.
+ *
+ * A small × button appears on hover so users can delete a node without
+ * knowing the Backspace shortcut.
  */
-export function QNode({ data, selected }: NodeProps) {
+export function QNode({ id, data, selected }: NodeProps) {
   const d = data as QNodeData;
   const spec = NODE_BY_KIND[d.kind];
+  const { deleteElements } = useReactFlow();
   if (!spec) return null;
   const Icon = spec.icon;
 
@@ -24,10 +29,22 @@ export function QNode({ data, selected }: NodeProps) {
 
   return (
     <div
-      className={`node-card transition-colors ${
+      className={`node-card group relative transition-colors ${
         selected ? "shadow-glow !border-accent/60" : ""
       } ${spec.accentRing}`}
     >
+      <button
+        type="button"
+        aria-label="Delete this block"
+        title="Delete this block"
+        className="nodrag absolute -top-2 -right-2 w-5 h-5 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        onClick={(e) => {
+          e.stopPropagation();
+          deleteElements({ nodes: [{ id }] });
+        }}
+      >
+        <X className="w-3 h-3" strokeWidth={2.5} />
+      </button>
       <div className="flex items-center gap-2">
         <span
           className={`w-7 h-7 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent} shrink-0`}

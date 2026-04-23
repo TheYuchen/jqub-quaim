@@ -48,9 +48,10 @@ export const NODE_CATALOG: NodeSpec[] = [
   },
   {
     kind: "fake_backend",
-    label: "Fake backend",
+    label: "Noisy simulator",
     family: "backend",
-    description: "Snapshot of IBM hardware calibration — deterministic, offline.",
+    description:
+      "Simulates a real IBM quantum chip with its measured noise. Runs locally, no IBM account needed.",
     icon: Server,
     accent: "text-accent",
     accentRing: "border-accent/40",

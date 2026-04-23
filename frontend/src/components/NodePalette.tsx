@@ -30,7 +30,9 @@ export function NodePalette() {
 
       <p className="text-[11px] text-mute/70 mt-4 leading-relaxed">
         Drag a block onto the canvas. Connect right-handle to left-handle to define data
-        flow; run order is inferred by topological sort.
+        flow; run order is inferred by topological sort. Hover a block on the canvas and
+        click the <span className="text-ink">×</span> to remove it (or press{" "}
+        <span className="kbd">Backspace</span> with a block selected).
       </p>
     </div>
   );

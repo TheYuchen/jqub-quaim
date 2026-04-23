@@ -26,8 +26,8 @@ sorted from the React-Flow edges.
 - **QuCAD**: ADMM-regularized, noise-aware VQC sparsification.
 - **QuBound**: LSTM trained on 14 days of real `ibm_fez` calibration data
   predicts today's error bound for your circuit. Ships with a pickled cache
-  of the calibration history, so the demo runs offline (~60 s LSTM training
-  on CPU). If an IBM Quantum Platform token is configured, it fetches fresh
+  of the calibration history, so the demo runs offline (plan for about
+  2 min of LSTM training on HF's shared CPU). If an IBM Quantum Platform token is configured, it fetches fresh
   noise history instead.
 - **CompressVQC**: QAOA-optimized lookup table for folding redundant
   parametric rotations on Heron-family hardware.

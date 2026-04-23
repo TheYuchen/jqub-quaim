@@ -54,7 +54,7 @@ def _default_label(node_type: str) -> str:
     return {
         "input_circuit": "Input circuit",
         "ibm_backend": "IBM backend",
-        "fake_backend": "Fake backend",
+        "fake_backend": "Noisy simulator",
         "qucad": "QuCAD",
         "qubound": "QuBound",
         "compvqc": "CompressVQC",
@@ -167,8 +167,8 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
 
     Default path: load 14-day ibm_fez calibration history from the offline
     pickle shipped in ``backend/cache/ibm_history/`` and train the LSTM
-    locally (~60s on CPU). This lets the demo work without any IBM
-    credentials or network access.
+    locally (~2 min on HF's shared CPU, a few seconds on a real GPU).
+    This lets the demo work without any IBM credentials or network access.
 
     Live path (``allow_live_ibm=True`` + token set): pull fresh history
     from the IBM Quantum Platform API — accurate-as-of-today but slower

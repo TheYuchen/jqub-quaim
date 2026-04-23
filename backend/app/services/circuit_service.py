@@ -95,6 +95,30 @@ def summarize(qc: QuantumCircuit, circuit_id: str) -> CircuitInfo:
 
 # ---------- Sample circuits ----------
 
+# Hand-written one-liners aimed at both beginners (what it's for) and
+# experts (what the structure is). Shown in the left-panel circuit picker.
+# Keep under ~90 chars so the sample button doesn't wrap into three lines.
+SAMPLE_DESCRIPTIONS: dict[str, str] = {
+    "bell_state": "The simplest entangled state: two qubits in a Bell pair.",
+    "ghz_3q": "Three qubits fully entangled (a GHZ state).",
+    "vqc_2q_small": "A tiny trainable quantum circuit with 2 tunable angles.",
+    "efficient_su2_4q": "A 4-qubit EfficientSU2 ansatz, a classic quantum-ML building block.",
+    "qaoa_maxcut_4": "QAOA solving Max-Cut on a 4-node ring graph.",
+    # Batch 2 circuits:
+    "w_state_3q": "Another way to entangle 3 qubits: a W state.",
+    "qft_3q": "3-qubit Quantum Fourier Transform, a core building block of many algorithms.",
+    "ry_chain_6q": "A 6-qubit parameterized RY chain with 12 tunable angles.",
+    "hardware_efficient_4q": "4-qubit hardware-efficient ansatz (3 layers of RY+RZ+CX).",
+}
+
+
+def _describe(qc: QuantumCircuit, key: str) -> str:
+    """Curated one-liner if we have one, else a brief auto-generated fallback."""
+    if key in SAMPLE_DESCRIPTIONS:
+        return SAMPLE_DESCRIPTIONS[key]
+    return f"{qc.num_qubits}-qubit circuit, depth {qc.depth()}."
+
+
 def discover_samples(sample_dir: Path = SAMPLE_CIRCUITS_DIR) -> list[SampleCircuit]:
     """Look up built-in demo circuits shipped in backend/sample_circuits/."""
     if not sample_dir.exists():
@@ -109,7 +133,7 @@ def discover_samples(sample_dir: Path = SAMPLE_CIRCUITS_DIR) -> list[SampleCircu
             SampleCircuit(
                 key=path.stem,
                 display_name=qc.name or path.stem,
-                description=f"{qc.num_qubits}-qubit circuit, depth {qc.depth()}",
+                description=_describe(qc, path.stem),
                 num_qubits=qc.num_qubits,
                 source="qpy",
             )

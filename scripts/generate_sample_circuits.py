@@ -91,12 +91,92 @@ def ghz_3q() -> QuantumCircuit:
     return qc
 
 
+def w_state_3q() -> QuantumCircuit:
+    """3-qubit W state.
+
+    W-state entanglement is robust to qubit loss; a didactic contrast to
+    GHZ. Built via the standard RY + controlled-RY + CX construction.
+    """
+    qc = QuantumCircuit(3, name="w_state_3q")
+    theta0 = 2.0 * np.arccos(1.0 / np.sqrt(3.0))
+    qc.ry(theta0, 0)
+    qc.x(0)
+    qc.cry(2.0 * np.arccos(1.0 / np.sqrt(2.0)), 0, 1)
+    qc.x(0)
+    qc.cx(1, 2)
+    qc.cx(0, 1)
+    qc.x(0)
+    return qc
+
+
+def qft_3q() -> QuantumCircuit:
+    """3-qubit Quantum Fourier Transform.
+
+    Core building block of Shor, phase estimation, and many quantum signal
+    algorithms. Non-parameterized, so CompressVQC + Fidelity show clear
+    before/after results on it.
+    """
+    qc = QuantumCircuit(3, name="qft_3q")
+    qc.h(0)
+    qc.cp(np.pi / 2, 0, 1)
+    qc.cp(np.pi / 4, 0, 2)
+    qc.h(1)
+    qc.cp(np.pi / 2, 1, 2)
+    qc.h(2)
+    qc.swap(0, 2)
+    return qc
+
+
+def ry_chain_6q() -> QuantumCircuit:
+    """6-qubit RY chain — a bigger VQC for QuCAD to sparsify.
+
+    Two RY layers (12 params total) and a linear CX chain between them.
+    Gives QuCAD enough parameters that its sparsity trace moves visibly
+    over the 3 default ADMM iterations.
+    """
+    qc = QuantumCircuit(6, name="ry_chain_6q")
+    params_a = [Parameter(f"a_{i}") for i in range(6)]
+    params_b = [Parameter(f"b_{i}") for i in range(6)]
+    for i, p in enumerate(params_a):
+        qc.ry(p, i)
+    for i in range(5):
+        qc.cx(i, i + 1)
+    for i, p in enumerate(params_b):
+        qc.ry(p, i)
+    return qc
+
+
+def hardware_efficient_4q() -> QuantumCircuit:
+    """4-qubit hardware-efficient ansatz.
+
+    Three layers of RY+RZ on each qubit, interleaved with linear CX
+    entanglers. A classic warm-start ansatz for VQE / VQC on
+    superconducting hardware.
+    """
+    qc = QuantumCircuit(4, name="hardware_efficient_4q")
+    layers = 3
+    for L in range(layers):
+        for q in range(4):
+            qc.ry(Parameter(f"ry_{L}_{q}"), q)
+            qc.rz(Parameter(f"rz_{L}_{q}"), q)
+        if L < layers - 1:
+            for i in range(3):
+                qc.cx(i, i + 1)
+    return qc
+
+
+# Ordered from smallest/simplest (top of list) to largest — this is the
+# order the circuit picker displays in the UI.
 BUILDERS = [
     bell_state,
     ghz_3q,
+    w_state_3q,
     vqc_2q_small,
-    vqc_efficient_su2_4q,
+    qft_3q,
     qaoa_maxcut_4,
+    vqc_efficient_su2_4q,
+    hardware_efficient_4q,
+    ry_chain_6q,
 ]
 
 
