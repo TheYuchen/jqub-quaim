@@ -15,8 +15,14 @@ import {
   type NodeTypes,
   type OnConnect,
 } from "@xyflow/react";
-import { Loader2, Play, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Play, Trash2 } from "lucide-react";
 import { NODE_BY_KIND, NODE_CATALOG, type NodeKind } from "../lib/nodeCatalog";
+import {
+  DEFAULT_PRESET_KEY,
+  PIPELINE_PRESETS,
+  PRESET_BY_KEY,
+  buildPresetGraph,
+} from "../lib/presets";
 import { useApp } from "../lib/store";
 import { api } from "../lib/api";
 import { QNode, type QNodeData } from "./QNode";
@@ -25,36 +31,14 @@ type RFNode = Node<QNodeData>;
 
 const nodeTypes: NodeTypes = { qnode: QNode as unknown as NodeTypes[string] };
 
-/** Initial pipeline when the app first loads — a sensible demo. */
-function makeInitialGraph(): { nodes: RFNode[]; edges: Edge[] } {
-  let y = 40;
-  const positions: Record<NodeKind, { x: number; y: number }> = {
-    input_circuit: { x: 80, y: (y += 0) },
-    fake_backend: { x: 380, y: y },
-    qubound: { x: 680, y: y },
-    output: { x: 980, y: y },
-    ibm_backend: { x: 0, y: 0 },
-    qucad: { x: 0, y: 0 },
-    compvqc: { x: 0, y: 0 },
-    fidelity: { x: 0, y: 0 },
-  };
-  const want: NodeKind[] = ["input_circuit", "fake_backend", "qubound", "output"];
-  const nodes: RFNode[] = want.map((kind, idx) => ({
-    id: `n${idx + 1}`,
-    type: "qnode",
-    position: positions[kind],
-    data: { kind, params: { ...(NODE_BY_KIND[kind].defaultData ?? {}) } },
-  }));
-  const edges: Edge[] = [
-    { id: "e1", source: "n1", target: "n2" },
-    { id: "e2", source: "n2", target: "n3" },
-    { id: "e3", source: "n3", target: "n4" },
-  ];
-  return { nodes, edges };
-}
-
 export function FlowCanvas() {
-  const initial = useMemo(() => makeInitialGraph(), []);
+  // Boot with the default preset. The picker in the header lets the user
+  // swap in any of the other presets at any time; that replaces the whole
+  // graph (same semantics as the old "Reset" button, just multi-option).
+  const initial = useMemo(
+    () => buildPresetGraph(PRESET_BY_KEY[DEFAULT_PRESET_KEY]),
+    [],
+  );
   const [nodes, setNodes, onNodesChange] = useNodesState<RFNode>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const circuit = useApp((s) => s.circuit);
@@ -64,7 +48,7 @@ export function FlowCanvas() {
   const useLiveIbm = useApp((s) => s.useLiveIbm);
   const [error, setError] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
 
   // Auto-load the first sample on boot so the canvas has something to chew on.
   useEffect(() => {
@@ -100,12 +84,19 @@ export function FlowCanvas() {
     [screenToFlowPosition, setNodes],
   );
 
-  const resetGraph = () => {
-    const g = makeInitialGraph();
+  const loadPreset = (key: string) => {
+    const preset = PRESET_BY_KEY[key];
+    if (!preset) return;
+    const g = buildPresetGraph(preset);
     setNodes(g.nodes);
     setEdges(g.edges);
     setRun(null);
     setError(null);
+    // Different presets have different widths; re-fit the view so the user
+    // sees the whole new chain instead of a zoomed-in slice.
+    requestAnimationFrame(() => {
+      fitView({ padding: 0.25, duration: 300 });
+    });
   };
 
   const clearGraph = () => {
@@ -156,9 +147,7 @@ export function FlowCanvas() {
           {error && <span className="text-danger ml-3">{error}</span>}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={resetGraph} className="btn" title="Reset to default demo pipeline">
-            <RotateCcw className="w-3.5 h-3.5" /> Reset
-          </button>
+          <PresetPicker onPick={loadPreset} />
           <button onClick={clearGraph} className="btn" title="Clear the canvas">
             <Trash2 className="w-3.5 h-3.5" /> Clear
           </button>
@@ -217,6 +206,69 @@ export function FlowCanvas() {
   );
 }
 
+/**
+ * "Load preset" button that opens a small popover listing the named
+ * pipelines from the preset registry. Dismissed on outside-click or
+ * Escape. Picking a preset replaces the whole graph.
+ */
+function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="btn"
+        title="Load a preset pipeline onto the canvas"
+      >
+        Load preset <ChevronDown className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 w-72 rounded-lg border border-edge bg-surface shadow-xl z-20 py-1"
+        >
+          {PIPELINE_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onPick(p.key);
+                setOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-surfaceAlt transition-colors"
+            >
+              <div className="text-sm text-ink font-medium">{p.label}</div>
+              <div className="text-[11px] text-mute leading-snug mt-0.5">
+                {p.tagline}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function colorForKind(kind: NodeKind): string {
   const map: Record<NodeKind, string> = {
     input_circuit: "#4cc9f0",
@@ -237,8 +289,8 @@ function EmptyCanvas() {
       <div className="panel px-6 py-5 pointer-events-auto text-center max-w-sm">
         <div className="text-ink font-medium mb-1">Canvas is empty</div>
         <div className="text-sm text-mute mb-3">
-          Drag blocks from the left panel, or hit <span className="kbd">Reset</span> to
-          load the default demo.
+          Drag blocks from the strip above, or pick a preset from{" "}
+          <span className="kbd">Load preset</span>.
         </div>
         <div className="flex flex-wrap gap-1 justify-center">
           {NODE_CATALOG.slice(0, 6).map((n) => (

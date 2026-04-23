@@ -37,6 +37,9 @@ export interface NodeSpec {
   accentRing: string;   // tailwind ring/border color
   defaultData?: Record<string, unknown>;
   defaultCount?: 0 | 1; // how many copies are auto-placed on canvas reset
+  /** Optional link to the paper this block implements. Surfaces as a small
+   *  external-link icon on the node card and palette tile. */
+  paper?: { url: string; title: string; venue: string };
 }
 
 export const NODE_CATALOG: NodeSpec[] = [
@@ -85,6 +88,12 @@ export const NODE_CATALOG: NodeSpec[] = [
     accent: "text-accent2",
     accentRing: "border-accent2/50",
     defaultData: { iterations: 3, lam: 0.005, rho: 500.0 },
+    paper: {
+      url: "https://arxiv.org/abs/2304.04666",
+      title:
+        "Battle Against Fluctuating Quantum Noise: Compression-Aided Framework to Enable Robust Quantum Neural Network",
+      venue: "ICCAD 2023",
+    },
   },
   {
     kind: "qubound",
@@ -96,6 +105,12 @@ export const NODE_CATALOG: NodeSpec[] = [
     accent: "text-accent3",
     accentRing: "border-accent3/50",
     defaultData: { cache_backend: "ibm_fez" },
+    paper: {
+      url: "https://arxiv.org/abs/2507.17043",
+      title:
+        "Computational Performance Bounds Prediction in Quantum Computing with Unstable Noise",
+      venue: "IEEE TCAD 2025",
+    },
   },
   {
     kind: "compvqc",
@@ -106,6 +121,11 @@ export const NODE_CATALOG: NodeSpec[] = [
     icon: Shrink,
     accent: "text-accent4",
     accentRing: "border-accent4/50",
+    paper: {
+      url: "https://arxiv.org/abs/2207.01578",
+      title: "Quantum Neural Network Compression",
+      venue: "ICCAD 2022",
+    },
   },
   {
     kind: "fidelity",

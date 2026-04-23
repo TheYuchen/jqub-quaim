@@ -1,5 +1,5 @@
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
-import { X } from "lucide-react";
+import { FileText, X } from "lucide-react";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
 
 export interface QNodeData extends Record<string, unknown> {
@@ -45,6 +45,19 @@ export function QNode({ id, data, selected }: NodeProps) {
       >
         <X className="w-3 h-3" strokeWidth={2.5} />
       </button>
+      {spec.paper && (
+        <a
+          href={spec.paper.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nodrag absolute -top-2 -left-2 w-5 h-5 rounded-full bg-surface border border-edge text-mute hover:text-accent hover:border-accent/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          onClick={(e) => e.stopPropagation()}
+          title={`Paper: ${spec.paper.title} (${spec.paper.venue})`}
+          aria-label={`Open paper: ${spec.paper.title}`}
+        >
+          <FileText className="w-3 h-3" strokeWidth={2} />
+        </a>
+      )}
       <div className="flex items-center gap-2">
         <span
           className={`w-7 h-7 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent} shrink-0`}

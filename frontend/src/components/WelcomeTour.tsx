@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDot,
+  FileText,
   LineChart,
   Play,
   Shrink,
@@ -19,6 +20,7 @@ import {
   Waypoints,
   X,
 } from "lucide-react";
+import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
 
 const TOUR_FLAG = "jqub-tour-seen-v1";
 
@@ -254,6 +256,7 @@ function AlgorithmsSlide() {
           bg="bg-accent2/5"
           icon={<Waypoints className="w-4 h-4" strokeWidth={2} />}
           name="QuCAD"
+          kind="qucad"
           oneLine="Noise-aware VQC sparsification."
           detail="Prunes parameters that don't survive hardware noise, via ADMM with a stochastic-mask regulariser. Fewer gates, same answer."
         >
@@ -265,6 +268,7 @@ function AlgorithmsSlide() {
           bg="bg-accent3/5"
           icon={<LineChart className="w-4 h-4" strokeWidth={2} />}
           name="QuBound"
+          kind="qubound"
           oneLine="Today's error bound, predicted."
           detail="Trains an LSTM on 14 days of real IBM Fez calibration data to predict a tight fidelity bound for your circuit, without running it."
         >
@@ -276,6 +280,7 @@ function AlgorithmsSlide() {
           bg="bg-accent4/5"
           icon={<Shrink className="w-4 h-4" strokeWidth={2} />}
           name="CompressVQC"
+          kind="compvqc"
           oneLine="QAOA-optimized circuit folding."
           detail="Builds a lookup table of equivalent gate sequences, then solves a QUBO to fold redundant rotations on Heron-family hardware."
         >
@@ -297,6 +302,7 @@ function AlgoCard({
   bg,
   icon,
   name,
+  kind,
   oneLine,
   detail,
   children,
@@ -306,10 +312,12 @@ function AlgoCard({
   bg: string;
   icon: React.ReactNode;
   name: string;
+  kind: NodeKind;
   oneLine: string;
   detail: string;
   children: React.ReactNode;
 }) {
+  const paper = NODE_BY_KIND[kind]?.paper;
   return (
     <div className={`panel-alt p-4 border ${border} ${bg} flex flex-col`}>
       <div className={`flex items-center gap-2 ${accent}`}>
@@ -322,6 +330,20 @@ function AlgoCard({
       </div>
       <div className="mt-2 text-[13px] text-ink">{oneLine}</div>
       <div className="mt-1 text-[11px] text-mute leading-relaxed">{detail}</div>
+      {paper && (
+        <a
+          href={paper.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-flex items-center gap-1 text-[11px] text-mute hover:text-ink transition-colors self-start"
+          title={paper.title}
+        >
+          <FileText className="w-3 h-3" strokeWidth={2} />
+          <span className="underline decoration-edge underline-offset-2 hover:decoration-accent">
+            {paper.venue}
+          </span>
+        </a>
+      )}
       <div className="mt-3 h-[84px] flex items-center justify-center">{children}</div>
     </div>
   );
