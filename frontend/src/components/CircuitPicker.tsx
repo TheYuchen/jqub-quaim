@@ -81,7 +81,19 @@ export function CircuitPicker() {
             upload your own
           </button>{" "}
           (Qiskit <span className="font-mono">.qpy</span> or OpenQASM{" "}
-          <span className="font-mono">.qasm</span>).
+          <span className="font-mono">.qasm</span>).{" "}
+          <span className="text-mute/70">
+            You can{" "}
+            <a
+              className="underline decoration-dotted hover:text-ink"
+              href="/api/circuits/samples/bell_state/download"
+              download="bell_state.qpy"
+              title="Downloads bell_state.qpy so you can try the upload flow with a known-good file."
+            >
+              download a sample .qpy
+            </a>{" "}
+            to try the upload flow.
+          </span>
         </div>
         <div className="text-[11px] text-mute uppercase tracking-wider mb-1">Samples</div>
         {samples.map((s) => {
