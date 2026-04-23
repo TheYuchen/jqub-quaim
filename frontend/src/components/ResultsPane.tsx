@@ -34,7 +34,7 @@ function EmptyHint() {
       <p>
         Pick a circuit on the left, arrange your pipeline, and hit{" "}
         <span className="kbd">Run pipeline</span>. Each block you traverse will render a
-        result card here — noise bounds, fidelity, compression stats, transpiled depth.
+        result card here: noise bounds, fidelity, compression stats, transpiled depth.
       </p>
       <p className="mt-2">
         QuBound takes about 2&nbsp;minutes on HF's shared CPU (training an LSTM
@@ -161,10 +161,10 @@ function QuBoundCard({ s }: { s: Record<string, unknown> }) {
             <div className="font-mono text-ink text-lg">{value.toFixed(4)}</div>
             <div className="text-[10px] text-mute">
               {value < 0.05
-                ? "very low — noise should barely matter"
+                ? "very low: noise should barely matter"
                 : value < 0.15
-                  ? "moderate — noise will visibly affect outputs"
-                  : "high — this circuit is likely noise-dominated on today's chip"}
+                  ? "moderate: noise will visibly affect outputs"
+                  : "high: this circuit is likely noise-dominated on today's chip"}
             </div>
           </div>
         </div>

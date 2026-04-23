@@ -160,7 +160,7 @@ function WelcomeSlide() {
           >
             JQub lab
           </a>{" "}
-          at George Mason University — QuCAD, QuBound, and CompressVQC —
+          at George Mason University (QuCAD, QuBound, and CompressVQC),
           applied to a quantum circuit of your choice.
         </p>
         <p className="text-sm text-mute leading-relaxed">
@@ -255,7 +255,7 @@ function AlgorithmsSlide() {
           icon={<Waypoints className="w-4 h-4" strokeWidth={2} />}
           name="QuCAD"
           oneLine="Noise-aware VQC sparsification."
-          detail="Prunes parameters that don't survive hardware noise — via ADMM with a stochastic-mask regulariser. Fewer gates, same answer."
+          detail="Prunes parameters that don't survive hardware noise, via ADMM with a stochastic-mask regulariser. Fewer gates, same answer."
         >
           <QuCADVisual />
         </AlgoCard>
@@ -266,7 +266,7 @@ function AlgorithmsSlide() {
           icon={<LineChart className="w-4 h-4" strokeWidth={2} />}
           name="QuBound"
           oneLine="Today's error bound, predicted."
-          detail="Trains an LSTM on 14 days of real IBM Fez calibration data to predict a tight fidelity bound for your circuit — without running it."
+          detail="Trains an LSTM on 14 days of real IBM Fez calibration data to predict a tight fidelity bound for your circuit, without running it."
         >
           <QuBoundVisual />
         </AlgoCard>
@@ -283,8 +283,9 @@ function AlgorithmsSlide() {
         </AlgoCard>
       </div>
       <div className="mt-5 panel-alt p-3 text-[12px] text-mute leading-relaxed">
-        These aren't toy demos — each block wraps the actual code from the lab's
-        research publications. Runs happen server-side with Qiskit + PyTorch.
+        These aren't toy demos. Each block wraps the actual code from the
+        lab's research publications. Runs happen server-side with Qiskit +
+        PyTorch.
       </div>
     </div>
   );
@@ -514,7 +515,7 @@ function PipelineSlide() {
           <div className="text-accent2 font-semibold mb-0.5">Edges you draw</div>
           <span className="text-mute">
             Connect block handles left-to-right. The runner topologically
-            sorts the graph — cycles are rejected before execution.
+            sorts the graph; cycles are rejected before execution.
           </span>
         </div>
         <div className="panel-alt p-3">
@@ -531,7 +532,7 @@ function PipelineSlide() {
             Offline by default
           </div>
           <span className="text-mute">
-            QuBound uses a 14-day cached calibration pickle — no IBM token
+            QuBound uses a 14-day cached calibration pickle; no IBM token
             needed. Flip <span className="kbd">ALLOW_LIVE_IBM</span> to fetch
             fresh history.
           </span>
@@ -591,7 +592,7 @@ function PipelineSVG() {
         </g>
       ))}
 
-      <PipelineNode x={20} y={40} color="#4cc9f0" label="Circuit" sub="SOURCE" kind="circuit" />
+      <PipelineNode x={20} y={40} color="#4cc9f0" label="Input circuit" sub="SOURCE" kind="circuit" />
       <PipelineNode x={190} y={40} color="#4cc9f0" label="Noisy simulator" sub="BACKEND" kind="backend" />
       <PipelineNode x={360} y={40} color="#f72585" label="QuBound" sub="ALGORITHM" kind="algo" />
       <PipelineNode x={530} y={40} color="#e6ebff" label="Output" sub="SINK" kind="out" />

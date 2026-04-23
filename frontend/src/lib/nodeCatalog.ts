@@ -38,9 +38,9 @@ export interface NodeSpec {
 export const NODE_CATALOG: NodeSpec[] = [
   {
     kind: "input_circuit",
-    label: "Circuit",
+    label: "Input circuit",
     family: "source",
-    description: "Parameterized QuantumCircuit — uploaded .qpy or a demo sample.",
+    description: "Parameterized QuantumCircuit: uploaded .qpy or a demo sample.",
     icon: Atom,
     accent: "text-accent",
     accentRing: "border-accent/50",

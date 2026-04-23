@@ -112,6 +112,22 @@ SAMPLE_DESCRIPTIONS: dict[str, str] = {
 }
 
 
+# Display order for the circuit picker. Chosen pedagogically: smallest and
+# most familiar circuits first, bigger parameterized ansatze last. Anything
+# not listed falls back to the alphabetical tail.
+SAMPLE_ORDER: list[str] = [
+    "bell_state",
+    "ghz_3q",
+    "w_state_3q",
+    "vqc_2q_small",
+    "qft_3q",
+    "qaoa_maxcut_4",
+    "efficient_su2_4q",
+    "hardware_efficient_4q",
+    "ry_chain_6q",
+]
+
+
 def _describe(qc: QuantumCircuit, key: str) -> str:
     """Curated one-liner if we have one, else a brief auto-generated fallback."""
     if key in SAMPLE_DESCRIPTIONS:
@@ -120,25 +136,34 @@ def _describe(qc: QuantumCircuit, key: str) -> str:
 
 
 def discover_samples(sample_dir: Path = SAMPLE_CIRCUITS_DIR) -> list[SampleCircuit]:
-    """Look up built-in demo circuits shipped in backend/sample_circuits/."""
+    """Look up built-in demo circuits shipped in backend/sample_circuits/.
+
+    Returns them in the pedagogical order defined by SAMPLE_ORDER (smallest
+    first); anything not in the list is appended alphabetically at the end.
+    """
     if not sample_dir.exists():
         return []
-    samples: list[SampleCircuit] = []
+    by_key: dict[str, SampleCircuit] = {}
     for path in sorted(sample_dir.glob("*.qpy")):
         try:
             qc = load_qpy_bytes(path.read_bytes())
         except Exception:
             continue
-        samples.append(
-            SampleCircuit(
-                key=path.stem,
-                display_name=qc.name or path.stem,
-                description=_describe(qc, path.stem),
-                num_qubits=qc.num_qubits,
-                source="qpy",
-            )
+        by_key[path.stem] = SampleCircuit(
+            key=path.stem,
+            display_name=qc.name or path.stem,
+            description=_describe(qc, path.stem),
+            num_qubits=qc.num_qubits,
+            source="qpy",
         )
-    return samples
+    ordered: list[SampleCircuit] = []
+    for key in SAMPLE_ORDER:
+        if key in by_key:
+            ordered.append(by_key.pop(key))
+    # Any unknowns keep alphabetical order at the tail.
+    for key in sorted(by_key):
+        ordered.append(by_key[key])
+    return ordered
 
 
 def load_sample(key: str, sample_dir: Path = SAMPLE_CIRCUITS_DIR) -> QuantumCircuit:

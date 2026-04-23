@@ -39,9 +39,10 @@ export function NodePalette() {
             </div>
           );
         })}
-        <div className="hidden xl:flex items-center pl-2 text-[10px] text-mute/70 shrink-0 max-w-[220px]">
-          Drop below to add a block. Hover a block on the canvas for the{" "}
-          <span className="text-ink mx-1">×</span> delete button.
+        <div className="hidden xl:flex items-center pl-2 text-[10px] text-mute/70 leading-tight shrink-0 max-w-[180px]">
+          Drop onto the canvas below.
+          <br />
+          Hover a block to reveal its × delete button.
         </div>
       </div>
     </div>
@@ -58,7 +59,7 @@ function PaletteTile({ spec }: { spec: NodeSpec }) {
     <div
       draggable
       onDragStart={onDragStart}
-      className="group shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[72px] h-[52px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1"
+      className="group shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[92px] h-[52px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1"
       title={spec.description}
     >
       <span

@@ -120,7 +120,7 @@ export function FlowCanvas() {
       return;
     }
     if (nodes.length === 0) {
-      setError("Canvas is empty — drag some blocks in.");
+      setError("Canvas is empty. Drag some blocks in.");
       return;
     }
     setRunning(true);
