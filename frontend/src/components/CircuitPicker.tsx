@@ -195,7 +195,10 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
 }
 
 function ActiveCircuitCard({ info }: { info: CircuitInfo | null }) {
-  const [showDiagram, setShowDiagram] = useState(false);
+  // Default the diagram visible — most of the time that's what the user
+  // wants to glance at after loading a circuit. They can still hide it if
+  // the ASCII art is cluttering the sidebar.
+  const [showDiagram, setShowDiagram] = useState(true);
   if (!info) {
     return (
       <div className="panel-alt px-3 py-3 text-xs text-mute leading-relaxed">
