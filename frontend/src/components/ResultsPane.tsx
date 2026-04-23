@@ -12,6 +12,14 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
       <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink truncate">Results</h3>
         <div className="flex items-center gap-1.5 shrink-0">
+          {run?.from_cache && (
+            <span
+              className="chip !border-accent/40 !text-accent"
+              title="Served from a precomputed cache (this circuit + pipeline combo was run ahead of time). Swap in your own circuit or tweak the graph to trigger a fresh run."
+            >
+              cached
+            </span>
+          )}
           {run && (
             <span className="chip">
               {run.steps.length} step{run.steps.length === 1 ? "" : "s"}

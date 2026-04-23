@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from app.config import get_settings
 from app.schemas import RunRequest, RunResponse
 from app.services.circuit_service import CircuitNotFoundError, circuit_store
+from app.services.run_cache import compute_cache_key, load_cached_response
 from app.services.workflow_service import run_pipeline
 
 router = APIRouter()
@@ -31,6 +32,16 @@ def run_workflow(req: RunRequest) -> RunResponse:
                 "Set IBM_QUANTUM_TOKEN and ALLOW_LIVE_IBM=true to enable."
             ),
         )
+
+    # Cache hit path: if the circuit + pipeline graph match something the
+    # precompute script already ran, return the shipped response instantly
+    # instead of spending 30-60s re-computing. Live IBM runs bypass the
+    # cache because calibration drifts; every live run should hit hardware.
+    if not req.use_live_ibm:
+        key = compute_cache_key(qc, req.nodes, req.edges, use_live_ibm=False)
+        cached = load_cached_response(key, circuit_id=req.circuit_id)
+        if cached is not None:
+            return cached
 
     steps = run_pipeline(
         circuit=qc,
