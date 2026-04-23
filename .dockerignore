@@ -1,0 +1,41 @@
+# Keep the docker build context small.
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+frontend/dist/       # rebuilt inside the image
+frontend/.vite/
+.npm/
+.yarn/
+.pnp.*
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Project
+backend/cache/*.pkl
+backend/cache/*.npz
+backend/_archive/
+*.log
+
+# Secrets
+.env
+.streamlit/secrets.toml
+*.local
+
+# Git
+.git/
+.gitignore

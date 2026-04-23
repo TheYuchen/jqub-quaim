@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.env
+*.pyc
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+.npm/
+.yarn/
+.pnp.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Project
+backend/cache/*.pkl
+backend/cache/*.npz
+# Keep the 14-day offline IBM history cache — required by QuBound for the demo.
+!backend/cache/ibm_history/*.pkl
+*.log
+.pytest_cache/
+
+# Secrets
+.streamlit/secrets.toml
+*.local

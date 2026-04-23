@@ -1,0 +1,24 @@
+# Backend dependencies for JQub Quantum Flow.
+# Versions mirror Jovin's validated combo for Qiskit 2.3.
+# Note: torch is installed separately from the PyTorch CPU index in the
+# Dockerfile to avoid pulling the 2+ GB CUDA wheel on HuggingFace Spaces.
+
+# Web layer
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.9.2
+python-multipart==0.0.12
+
+# Qiskit stack (Jovin's working combo for Qiskit 2.3)
+qiskit==2.3.0
+qiskit-aer==0.17.2
+qiskit-ibm-runtime==0.45.0
+qiskit-optimization==0.7.0
+qiskit-algorithms==0.4.0
+qiskit-qasm3-import==0.6.0
+
+# Scientific Python
+numpy<2.4
+pandas==2.2.3
+scipy==1.14.1
+scikit-learn==1.5.2
