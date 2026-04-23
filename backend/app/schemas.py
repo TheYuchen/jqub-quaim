@@ -30,6 +30,10 @@ class SampleCircuit(BaseModel):
     display_name: str
     description: str
     num_qubits: int
+    depth: int = 0
+    size: int = 0
+    num_parameters: int = 0
+    diagram_text: str = ""
     source: Literal["qpy", "builtin"] = "qpy"
 
 

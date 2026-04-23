@@ -154,6 +154,10 @@ def discover_samples(sample_dir: Path = SAMPLE_CIRCUITS_DIR) -> list[SampleCircu
             display_name=qc.name or path.stem,
             description=_describe(qc, path.stem),
             num_qubits=qc.num_qubits,
+            depth=qc.depth(),
+            size=qc.size(),
+            num_parameters=qc.num_parameters,
+            diagram_text=str(qc.draw(output="text", fold=80)),
             source="qpy",
         )
     ordered: list[SampleCircuit] = []

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FileUp, Loader2 } from "lucide-react";
+import { Eye, EyeOff, FileUp, Loader2 } from "lucide-react";
 import { api, type CircuitInfo, type SampleCircuit } from "../lib/api";
 import { useApp } from "../lib/store";
 
@@ -7,6 +7,7 @@ export function CircuitPicker() {
   const [samples, setSamples] = useState<SampleCircuit[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [openPreview, setOpenPreview] = useState<string | null>(null);
   const circuit = useApp((s) => s.circuit);
   const setCircuit = useApp((s) => s.setCircuit);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -53,14 +54,14 @@ export function CircuitPicker() {
         <button
           className="btn-ghost"
           onClick={() => fileRef.current?.click()}
-          title="Upload a .qpy / .qasm file"
+          title="Upload your own .qpy (Qiskit) or .qasm (OpenQASM 2/3) file"
         >
-          <FileUp className="w-3 h-3" /> upload
+          <FileUp className="w-3 h-3" /> upload .qpy / .qasm
         </button>
         <input
           ref={fileRef}
           type="file"
-          accept=".qpy,.qasm"
+          accept=".qpy,.qasm,.qasm2,.qasm3"
           hidden
           onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])}
         />
@@ -72,43 +73,94 @@ export function CircuitPicker() {
         <div className="text-[11px] text-mute leading-snug mb-2">
           Pick a sample circuit below. It becomes the{" "}
           <span className="text-ink">Input circuit</span> block in your pipeline.
+          Or <button
+            type="button"
+            className="underline decoration-dotted hover:text-ink"
+            onClick={() => fileRef.current?.click()}
+          >
+            upload your own
+          </button>{" "}
+          (Qiskit <span className="font-mono">.qpy</span> or OpenQASM{" "}
+          <span className="font-mono">.qasm</span>).
         </div>
         <div className="text-[11px] text-mute uppercase tracking-wider mb-1">Samples</div>
         {samples.map((s) => {
           const active = circuit?.name === s.display_name;
+          const previewOpen = openPreview === s.key;
           return (
-            <button
+            <div
               key={s.key}
-              onClick={() => pick(s.key)}
-              className={`w-full text-left px-2 py-1.5 rounded-md border transition-colors ${
+              className={`rounded-md border transition-colors ${
                 active
                   ? "bg-accent/10 border-accent/50"
                   : "border-transparent hover:bg-surfaceAlt hover:border-edge"
               }`}
-              disabled={busy === s.key}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className={`truncate text-sm ${
-                    active ? "text-ink" : "text-ink/90"
-                  }`}
+              <div className="flex items-stretch">
+                <button
+                  onClick={() => pick(s.key)}
+                  className="flex-1 text-left px-2 py-1.5 min-w-0"
+                  disabled={busy === s.key}
                 >
-                  {s.display_name}
-                </span>
-                {busy === s.key ? (
-                  <Loader2 className="w-3 h-3 animate-spin text-mute" />
-                ) : (
-                  <span className="text-[10px] font-mono text-mute shrink-0">
-                    {s.num_qubits}q
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`truncate text-sm ${
+                        active ? "text-ink" : "text-ink/90"
+                      }`}
+                    >
+                      {s.display_name}
+                    </span>
+                    {busy === s.key ? (
+                      <Loader2 className="w-3 h-3 animate-spin text-mute" />
+                    ) : (
+                      <span className="text-[10px] font-mono text-mute shrink-0">
+                        {s.num_qubits}q
+                      </span>
+                    )}
+                  </div>
+                  {s.description && (
+                    <div className="text-[11px] text-mute leading-snug mt-0.5">
+                      {s.description}
+                    </div>
+                  )}
+                </button>
+                {s.diagram_text && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenPreview(previewOpen ? null : s.key);
+                    }}
+                    className="shrink-0 px-2 text-mute hover:text-ink hover:bg-surfaceAlt/80 rounded-r-md border-l border-edge/40 flex items-center"
+                    title={previewOpen ? "Hide circuit diagram" : "Preview circuit diagram"}
+                    aria-label={previewOpen ? "Hide circuit diagram" : "Preview circuit diagram"}
+                  >
+                    {previewOpen ? (
+                      <EyeOff className="w-3.5 h-3.5" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5" />
+                    )}
+                  </button>
                 )}
               </div>
-              {s.description && (
-                <div className="text-[11px] text-mute leading-snug mt-0.5">
-                  {s.description}
+              {previewOpen && s.diagram_text && (
+                <div className="px-2 pb-2">
+                  <div className="flex items-center gap-1 mb-1 text-[10px] text-mute">
+                    <span className="chip">{s.num_qubits}q</span>
+                    <span className="chip">depth {s.depth}</span>
+                    <span className="chip">{s.size} gates</span>
+                    {s.num_parameters > 0 && (
+                      <span className="chip !border-accent2/40 !text-accent2">
+                        {s.num_parameters} params
+                      </span>
+                    )}
+                  </div>
+                  <pre className="text-[10px] font-mono text-ink/90 bg-surface/60 border border-edge/60 rounded p-2 overflow-x-auto leading-tight whitespace-pre">
+{s.diagram_text}
+                  </pre>
                 </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>
@@ -118,17 +170,53 @@ export function CircuitPicker() {
 }
 
 function ActiveCircuitCard({ info }: { info: CircuitInfo | null }) {
+  const [showDiagram, setShowDiagram] = useState(false);
   if (!info) {
     return (
-      <div className="panel-alt px-3 py-3 text-xs text-mute">
-        No circuit loaded. Pick a sample below or upload a .qpy file.
+      <div className="panel-alt px-3 py-3 text-xs text-mute leading-relaxed">
+        No circuit loaded. Pick a sample below, or upload your own Qiskit{" "}
+        <span className="font-mono">.qpy</span> / OpenQASM{" "}
+        <span className="font-mono">.qasm</span> file.
+        <div className="mt-1 text-[10px] text-mute/80">
+          Not sure what a <span className="font-mono">.qpy</span> looks like?
+          You can{" "}
+          <a
+            className="underline decoration-dotted hover:text-ink"
+            href="/api/circuits/samples/bell_state/download"
+            download="bell_state.qpy"
+          >
+            download a sample
+          </a>{" "}
+          and re-upload it as a sanity check.
+        </div>
       </div>
     );
   }
+  const hasDiagram = !!info.diagram_text;
   return (
     <div className="panel-alt px-3 py-3">
-      <div className="text-[10px] uppercase tracking-wider text-mute/80 mb-0.5">
-        Loaded
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-wider text-mute/80 mb-0.5">
+          Loaded
+        </div>
+        {hasDiagram && (
+          <button
+            type="button"
+            onClick={() => setShowDiagram((v) => !v)}
+            className="text-[10px] text-mute hover:text-ink flex items-center gap-1"
+            title={showDiagram ? "Hide circuit diagram" : "Show circuit diagram"}
+          >
+            {showDiagram ? (
+              <>
+                <EyeOff className="w-3 h-3" /> hide diagram
+              </>
+            ) : (
+              <>
+                <Eye className="w-3 h-3" /> show diagram
+              </>
+            )}
+          </button>
+        )}
       </div>
       <div className="font-medium text-ink text-sm truncate">{info.name}</div>
       <div className="mt-1 flex flex-wrap gap-1">
@@ -141,6 +229,11 @@ function ActiveCircuitCard({ info }: { info: CircuitInfo | null }) {
           </span>
         )}
       </div>
+      {showDiagram && hasDiagram && (
+        <pre className="mt-2 text-[10px] font-mono text-ink/90 bg-surface/60 border border-edge/60 rounded p-2 overflow-x-auto leading-tight whitespace-pre">
+{info.diagram_text}
+        </pre>
+      )}
     </div>
   );
 }

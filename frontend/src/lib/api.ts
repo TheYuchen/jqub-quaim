@@ -25,6 +25,10 @@ export interface SampleCircuit {
   display_name: string;
   description: string;
   num_qubits: number;
+  depth: number;
+  size: number;
+  num_parameters: number;
+  diagram_text: string;
   source: string;
 }
 

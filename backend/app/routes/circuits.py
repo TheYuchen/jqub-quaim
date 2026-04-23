@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 
+from app.config import SAMPLE_CIRCUITS_DIR
 from app.schemas import CircuitInfo, SampleCircuit
 from app.services.circuit_service import (
     CircuitNotFoundError,
@@ -30,6 +32,22 @@ def load_sample_circuit(key: str) -> CircuitInfo:
         raise HTTPException(status_code=404, detail=f"No sample circuit named {key!r}") from None
     circuit_id = circuit_store.put(qc)
     return summarize(qc, circuit_id)
+
+
+@router.get("/circuits/samples/{key}/download")
+def download_sample_qpy(key: str):
+    """Serve the raw .qpy file for a built-in sample so users can try the
+    upload flow with a known-good file without writing Qiskit code."""
+    # Only allow bare filenames to avoid path traversal.
+    safe = key.replace("/", "").replace("\\", "").replace("..", "")
+    path = SAMPLE_CIRCUITS_DIR / f"{safe}.qpy"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"No sample circuit named {key!r}")
+    return FileResponse(
+        path,
+        media_type="application/octet-stream",
+        filename=f"{safe}.qpy",
+    )
 
 
 @router.post("/circuits/upload", response_model=CircuitInfo)

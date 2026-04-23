@@ -58,6 +58,12 @@ export function QNode({ id, data, selected }: NodeProps) {
           </div>
         </div>
       </div>
+      <div
+        className="mt-1.5 text-[10px] text-mute leading-snug line-clamp-2"
+        title={spec.description}
+      >
+        {spec.tagline}
+      </div>
       {d.params && Object.keys(d.params).length > 0 && (
         <div className="mt-2 pt-2 border-t border-edge/60 space-y-0.5">
           {Object.entries(d.params).map(([k, v]) => (

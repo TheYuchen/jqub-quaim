@@ -59,7 +59,7 @@ function PaletteTile({ spec }: { spec: NodeSpec }) {
     <div
       draggable
       onDragStart={onDragStart}
-      className="group shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[92px] h-[52px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1"
+      className="group shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[68px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1.5 py-1"
       title={spec.description}
     >
       <span
@@ -69,6 +69,9 @@ function PaletteTile({ spec }: { spec: NodeSpec }) {
       </span>
       <span className="text-[10px] text-ink truncate max-w-full leading-tight">
         {spec.label}
+      </span>
+      <span className="text-[9px] text-mute/80 leading-tight max-w-full line-clamp-2">
+        {spec.tagline}
       </span>
     </div>
   );

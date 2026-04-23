@@ -27,6 +27,10 @@ export interface NodeSpec {
   kind: NodeKind;
   label: string;
   family: "source" | "backend" | "algorithm" | "metric" | "sink";
+  /** Short human-friendly caption (~3-5 words) shown under the label. */
+  tagline: string;
+  /** Long-form description: hover tooltip on the palette tile and
+   *  subtitle text on the canvas node. */
   description: string;
   icon: LucideIcon;
   accent: string;       // tailwind text color
@@ -40,7 +44,8 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "input_circuit",
     label: "Input circuit",
     family: "source",
-    description: "Parameterized QuantumCircuit: uploaded .qpy or a demo sample.",
+    tagline: "your quantum program",
+    description: "Parameterized QuantumCircuit (uploaded .qpy or a demo sample).",
     icon: Atom,
     accent: "text-accent",
     accentRing: "border-accent/50",
@@ -50,6 +55,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "fake_backend",
     label: "Noisy simulator",
     family: "backend",
+    tagline: "local IBM-chip simulator",
     description:
       "Simulates a real IBM quantum chip with its measured noise. Runs locally, no IBM account needed.",
     icon: Server,
@@ -62,6 +68,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "ibm_backend",
     label: "IBM live backend",
     family: "backend",
+    tagline: "live IBM hardware",
     description: "Fresh calibration from the IBM Quantum Platform (requires token).",
     icon: Cpu,
     accent: "text-warn",
@@ -72,7 +79,8 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "qucad",
     label: "QuCAD",
     family: "algorithm",
-    description: "ADMM-based noise-aware VQC sparsification (weights → 0 under target noise).",
+    tagline: "noise-aware pruning",
+    description: "ADMM-based noise-aware VQC sparsification (weights pushed to 0 under target noise).",
     icon: Waypoints,
     accent: "text-accent2",
     accentRing: "border-accent2/50",
@@ -82,7 +90,8 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "qubound",
     label: "QuBound",
     family: "algorithm",
-    description: "LSTM over 14-day calibration history → predicts today's error bound.",
+    tagline: "predict fidelity bound",
+    description: "LSTM over 14 days of calibration history; predicts today's error bound.",
     icon: LineChart,
     accent: "text-accent3",
     accentRing: "border-accent3/50",
@@ -92,6 +101,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "compvqc",
     label: "CompressVQC",
     family: "algorithm",
+    tagline: "fold redundant gates",
     description: "QAOA-optimized lookup table that folds redundant parametric gates.",
     icon: Shrink,
     accent: "text-accent4",
@@ -101,6 +111,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "fidelity",
     label: "Fidelity",
     family: "metric",
+    tagline: "statevector vs noisy",
     description: "Quick statevector-vs-noisy fidelity estimate (bound-parameter circuits only).",
     icon: Gauge,
     accent: "text-ok",
@@ -110,6 +121,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "output",
     label: "Output",
     family: "sink",
+    tagline: "final metrics & diagram",
     description: "Final circuit, transpiled gate counts, and aggregated metrics.",
     icon: PackageCheck,
     accent: "text-ink",
