@@ -1,4 +1,10 @@
 /** @type {import('tailwindcss').Config} */
+// Color tokens are CSS variables so themes can swap them at runtime without
+// re-building Tailwind. The variable values are `R G B` triplets (no commas,
+// no rgb() wrapper) so Tailwind's `/ <alpha-value>` slash syntax still works
+// — e.g. `bg-canvas/80` compiles to `rgb(var(--color-canvas) / 0.8)`.
+// Default (dark) values live in `index.css :root`; `[data-theme="light"]`
+// and `[data-theme="gmu"]` override them.
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -8,23 +14,22 @@ export default {
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
-        // Modern quantum-ish palette: deep navy + electric cyan accents
-        canvas: "#0b1020",        // app background
-        surface: "#111830",       // panel background
-        surfaceAlt: "#151d38",    // card background
-        edge: "#1f2a4a",          // borders
-        mute: "#8492c7",          // secondary text
-        ink: "#e6ebff",           // primary text
-        accent: "#4cc9f0",        // cyan — primary action
-        accent2: "#7b5cff",       // violet — QuCAD
-        accent3: "#f72585",       // magenta — QuBound
-        accent4: "#06d6a0",       // teal — CompressVQC
-        warn: "#f4a261",
-        danger: "#ef476f",
-        ok: "#2dd4bf",
+        canvas: "rgb(var(--color-canvas) / <alpha-value>)",
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        surfaceAlt: "rgb(var(--color-surfaceAlt) / <alpha-value>)",
+        edge: "rgb(var(--color-edge) / <alpha-value>)",
+        mute: "rgb(var(--color-mute) / <alpha-value>)",
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        accent: "rgb(var(--color-accent) / <alpha-value>)",
+        accent2: "rgb(var(--color-accent2) / <alpha-value>)",
+        accent3: "rgb(var(--color-accent3) / <alpha-value>)",
+        accent4: "rgb(var(--color-accent4) / <alpha-value>)",
+        warn: "rgb(var(--color-warn) / <alpha-value>)",
+        danger: "rgb(var(--color-danger) / <alpha-value>)",
+        ok: "rgb(var(--color-ok) / <alpha-value>)",
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(76,201,240,0.35), 0 8px 24px -6px rgba(76,201,240,0.25)",
+        glow: "0 0 0 1px rgb(var(--color-accent) / 0.35), 0 8px 24px -6px rgb(var(--color-accent) / 0.25)",
         card: "0 1px 0 rgba(255,255,255,0.04) inset, 0 10px 30px -10px rgba(0,0,0,0.55)",
       },
     },

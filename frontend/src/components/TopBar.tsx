@@ -1,5 +1,6 @@
 import { useApp } from "../lib/store";
 import { Activity, HelpCircle, Zap } from "lucide-react";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 
 export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
   const health = useApp((s) => s.health);
@@ -67,6 +68,7 @@ export function TopBar({ onOpenTour }: { onOpenTour?: () => void }) {
         >
           {chipLabel}
         </button>
+        <ThemeSwitcher />
         {onOpenTour && (
           <button
             onClick={onOpenTour}

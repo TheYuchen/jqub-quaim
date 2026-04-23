@@ -2,24 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+ * Theme tokens
+ *
+ * Default is "dark" (the original navy + cyan palette).
+ *   data-theme="light" : paper-style white background, deep accents
+ *   data-theme="gmu"   : GMU Mason green canvas + Mason gold primary
+ *
+ * Values are `R G B` triplets so Tailwind's `/ <alpha-value>` syntax
+ * works uniformly: `bg-canvas/80` → rgb(var(--color-canvas) / 0.8).
+ * ============================================================ */
 @layer base {
   :root {
     color-scheme: dark;
+    /* DARK (default) */
+    --color-canvas: 11 16 32;
+    --color-surface: 17 24 48;
+    --color-surfaceAlt: 21 29 56;
+    --color-edge: 31 42 74;
+    --color-mute: 132 146 199;
+    --color-ink: 230 235 255;
+    --color-accent: 76 201 240;
+    --color-accent2: 123 92 255;
+    --color-accent3: 247 37 133;
+    --color-accent4: 6 214 160;
+    --color-warn: 244 162 97;
+    --color-danger: 239 71 111;
+    --color-ok: 45 212 191;
+    /* Body bg gradient and scrollbar colors are theme-specific too */
+    --body-bg:
+      radial-gradient(1200px 600px at 80% -10%, rgb(123 92 255 / 0.12), transparent 70%),
+      radial-gradient(1000px 500px at 0% 110%, rgb(76 201 240 / 0.10), transparent 70%),
+      rgb(var(--color-canvas));
+    --scrollbar-thumb: rgb(var(--color-edge));
+    --rf-edge-stroke: 74 90 138;      /* #4a5a8a */
+    --rf-edge-selected: var(--color-accent);
   }
+
+  [data-theme="light"] {
+    color-scheme: light;
+    --color-canvas: 246 247 251;
+    --color-surface: 255 255 255;
+    --color-surfaceAlt: 240 243 249;
+    --color-edge: 216 222 232;
+    --color-mute: 100 116 139;
+    --color-ink: 15 23 42;
+    --color-accent: 2 132 199;
+    --color-accent2: 124 58 237;
+    --color-accent3: 219 39 119;
+    --color-accent4: 5 150 105;
+    --color-warn: 217 119 6;
+    --color-danger: 220 38 38;
+    --color-ok: 5 150 105;
+    --body-bg:
+      radial-gradient(1200px 600px at 80% -10%, rgb(124 58 237 / 0.08), transparent 70%),
+      radial-gradient(1000px 500px at 0% 110%, rgb(2 132 199 / 0.08), transparent 70%),
+      rgb(var(--color-canvas));
+    --scrollbar-thumb: rgb(var(--color-edge));
+    --rf-edge-stroke: 148 163 184;     /* slate-400 */
+    --rf-edge-selected: var(--color-accent);
+  }
+
+  [data-theme="gmu"] {
+    color-scheme: dark;
+    /* Mason Green canvas + Mason Gold primary accent */
+    --color-canvas: 10 24 18;
+    --color-surface: 19 46 31;
+    --color-surfaceAlt: 26 61 40;
+    --color-edge: 43 89 57;
+    --color-mute: 137 178 154;
+    --color-ink: 255 248 225;
+    --color-accent: 255 199 44;      /* Mason Gold #FFC72C */
+    --color-accent2: 0 163 81;       /* bright Mason Green */
+    --color-accent3: 232 74 95;      /* warm contrast red */
+    --color-accent4: 109 195 213;    /* soft Patriot teal */
+    --color-warn: 255 152 0;
+    --color-danger: 229 57 53;
+    --color-ok: 0 200 83;
+    --body-bg:
+      radial-gradient(1200px 600px at 80% -10%, rgb(255 199 44 / 0.10), transparent 70%),
+      radial-gradient(1000px 500px at 0% 110%, rgb(0 102 51 / 0.14), transparent 70%),
+      rgb(var(--color-canvas));
+    --scrollbar-thumb: rgb(var(--color-edge));
+    --rf-edge-stroke: 90 130 100;
+    --rf-edge-selected: var(--color-accent);
+  }
+
   html, body, #root {
     height: 100%;
   }
   body {
-    background: radial-gradient(1200px 600px at 80% -10%, rgba(123,92,255,0.12), transparent 70%),
-                radial-gradient(1000px 500px at 0% 110%, rgba(76,201,240,0.10), transparent 70%),
-                #0b1020;
+    background: var(--body-bg);
   }
   *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   *::-webkit-scrollbar-thumb {
-    background: #1f2a4a;
+    background: var(--scrollbar-thumb);
     border-radius: 5px;
   }
   *::-webkit-scrollbar-track {
@@ -56,7 +136,8 @@
   }
 }
 
-/* React Flow dark theme overrides */
+/* React Flow overrides — read from theme variables so colors travel with
+   the active theme. Hex values used to be hard-coded here. */
 .react-flow__background {
   background-color: transparent;
 }
@@ -64,43 +145,43 @@
   cursor: default;
 }
 .react-flow__edge-path {
-  stroke: #4a5a8a;
+  stroke: rgb(var(--rf-edge-stroke));
   stroke-width: 1.5;
 }
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #4cc9f0;
+  stroke: rgb(var(--color-accent));
 }
 .react-flow__arrowhead {
-  fill: #4a5a8a;
+  fill: rgb(var(--rf-edge-stroke));
 }
 .react-flow__handle {
-  background: #4cc9f0;
-  border: 2px solid #0b1020;
+  background: rgb(var(--color-accent));
+  border: 2px solid rgb(var(--color-canvas));
   width: 10px;
   height: 10px;
 }
 .react-flow__controls {
-  background: #151d38;
-  border: 1px solid #1f2a4a;
+  background: rgb(var(--color-surfaceAlt));
+  border: 1px solid rgb(var(--color-edge));
   border-radius: 8px;
   overflow: hidden;
 }
 .react-flow__controls-button {
   background: transparent !important;
-  color: #8492c7 !important;
-  border-bottom: 1px solid #1f2a4a !important;
+  color: rgb(var(--color-mute)) !important;
+  border-bottom: 1px solid rgb(var(--color-edge)) !important;
 }
 .react-flow__controls-button:hover {
-  background: #1f2a4a !important;
-  color: #e6ebff !important;
+  background: rgb(var(--color-edge)) !important;
+  color: rgb(var(--color-ink)) !important;
 }
 .react-flow__minimap {
-  background: #151d38 !important;
-  border: 1px solid #1f2a4a !important;
+  background: rgb(var(--color-surfaceAlt)) !important;
+  border: 1px solid rgb(var(--color-edge)) !important;
   border-radius: 8px !important;
 }
 .react-flow__attribution {
   background: transparent !important;
-  color: #4a5a8a !important;
+  color: rgb(var(--rf-edge-stroke)) !important;
   font-size: 10px !important;
 }

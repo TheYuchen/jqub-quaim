@@ -187,7 +187,7 @@ export function FlowCanvas() {
             variant={BackgroundVariant.Dots}
             gap={24}
             size={1}
-            color="#1f2a4a"
+            color="rgb(var(--color-edge))"
           />
           <Controls showInteractive={false} />
           <MiniMap
@@ -197,7 +197,7 @@ export function FlowCanvas() {
               const kind = (n.data as QNodeData).kind;
               return colorForKind(kind);
             }}
-            maskColor="rgba(11, 16, 32, 0.65)"
+            maskColor="rgb(var(--color-canvas) / 0.65)"
           />
         </ReactFlow>
         {nodes.length === 0 && <EmptyCanvas />}
@@ -269,18 +269,20 @@ function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
   );
 }
 
+// MiniMap node colors keyed to theme variables so they shift alongside the
+// rest of the palette instead of clashing in light or GMU themes.
 function colorForKind(kind: NodeKind): string {
   const map: Record<NodeKind, string> = {
-    input_circuit: "#4cc9f0",
-    fake_backend: "#4cc9f0",
-    ibm_backend: "#f4a261",
-    qucad: "#7b5cff",
-    qubound: "#f72585",
-    compvqc: "#06d6a0",
-    fidelity: "#2dd4bf",
-    output: "#e6ebff",
+    input_circuit: "rgb(var(--color-accent))",
+    fake_backend: "rgb(var(--color-accent))",
+    ibm_backend: "rgb(var(--color-warn))",
+    qucad: "rgb(var(--color-accent2))",
+    qubound: "rgb(var(--color-accent3))",
+    compvqc: "rgb(var(--color-accent4))",
+    fidelity: "rgb(var(--color-ok))",
+    output: "rgb(var(--color-ink))",
   };
-  return map[kind] ?? "#8492c7";
+  return map[kind] ?? "rgb(var(--color-mute))";
 }
 
 function EmptyCanvas() {
