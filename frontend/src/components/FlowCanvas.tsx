@@ -236,7 +236,7 @@ function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="btn"
+        className="btn-secondary"
         title="Load a preset pipeline onto the canvas"
       >
         Load preset <ChevronDown className="w-3.5 h-3.5" />
@@ -244,7 +244,7 @@ function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-20 p-2 flex gap-2"
+          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-20 p-1.5 flex flex-col gap-0.5 w-64"
         >
           {PIPELINE_PRESETS.map((p) => (
             <button
@@ -255,7 +255,7 @@ function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
                 onPick(p.key);
                 setOpen(false);
               }}
-              className="w-44 text-left px-3 py-2 rounded-md hover:bg-surfaceAlt transition-colors border border-transparent hover:border-edge/60"
+              className="w-full text-left px-3 py-2 rounded-md hover:bg-surfaceAlt transition-colors border border-transparent hover:border-edge/60"
             >
               <div className="text-sm text-ink font-medium">{p.label}</div>
               <div className="text-[11px] text-mute leading-snug mt-0.5">

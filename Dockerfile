@@ -68,4 +68,9 @@ ENV PORT=7860
 
 # FastAPI app lives in backend/app/main.py
 WORKDIR ${APP_HOME}/backend
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# --proxy-headers + --forwarded-allow-ips='*' so FastAPI trusts HF Space's
+# edge nginx when it sets X-Forwarded-Proto: https. Without this, FastAPI's
+# automatic trailing-slash redirects and any request.url_for() calls come
+# back as http:// and get mixed-content-blocked by the browser on an https
+# page. HF's reverse proxy IP isn't stable, so we accept any.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips=*"]

@@ -125,6 +125,14 @@
            bg-gradient-to-r from-accent/90 to-accent2/90 text-canvas shadow-glow
            hover:from-accent hover:to-accent2 transition;
   }
+  /* Secondary filled button. Tinted accent2 background so it reads as a
+     discoverable action next to the subtle outline `btn`, but is clearly
+     not the primary `btn-primary` (which owns the Run-pipeline gradient). */
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+           bg-accent2/15 border border-accent2/50 text-accent2
+           hover:bg-accent2/25 hover:border-accent2 transition-colors;
+  }
   .btn-ghost {
     @apply inline-flex items-center gap-2 px-2 py-1 rounded-md text-xs text-mute hover:text-ink hover:bg-surfaceAlt transition-colors;
   }
