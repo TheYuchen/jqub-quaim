@@ -1,0 +1,45 @@
+{
+  "circuit_id": "precomputed_ry_chain_6q_compvqc",
+  "ok": false,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930409.2221887,
+      "finished_at": 1776930409.2221897,
+      "summary": {
+        "num_qubits": 6,
+        "depth": 7,
+        "num_parameters": 12
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930409.222193,
+      "finished_at": 1776930409.2230248,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "error",
+      "started_at": 1776930409.3694034,
+      "finished_at": 1776930409.3694077,
+      "summary": {},
+      "message": "ValueError: array is too big; `arr.size * arr.dtype.itemsize` is larger than the maximum possible size."
+    }
+  ],
+  "final_metrics": {}
+}

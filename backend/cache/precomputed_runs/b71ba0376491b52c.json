@@ -1,0 +1,103 @@
+{
+  "circuit_id": "precomputed_qft_3q_qucad",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930262.267662,
+      "finished_at": 1776930262.2676628,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 6,
+        "num_parameters": 0
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930262.267667,
+      "finished_at": 1776930262.268367,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qucad",
+      "label": "QuCAD",
+      "status": "ok",
+      "started_at": 1776930262.2683709,
+      "finished_at": 1776930264.956032,
+      "summary": {
+        "iterations": 3,
+        "original_parameters": 0,
+        "kept_parameters": 0,
+        "final_loss": 1.942890293094024e-16,
+        "sparsity_trace": [
+          0,
+          0,
+          0
+        ]
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1776930264.9574041,
+      "finished_at": 1776930264.958846,
+      "summary": {
+        "fidelity": 0.12499999999999994
+      },
+      "message": null
+    },
+    {
+      "node_id": "n5",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776930264.958856,
+      "finished_at": 1776930264.9697764,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 6,
+        "size": 7,
+        "ops": {
+          "h": 3,
+          "cp": 3,
+          "swap": 1
+        },
+        "diagram_text": "     ┌───┐                                        \nq_0: ┤ H ├─■────────■───────────────────────────X─\n     └───┘ │P(π/2)  │       ┌───┐               │ \nq_1: ──────■────────┼───────┤ H ├─■─────────────┼─\n                    │P(π/4) └───┘ │P(π/2) ┌───┐ │ \nq_2: ───────────────■─────────────■───────┤ H ├─X─\n                                          └───┘   ",
+        "transpiled_depth": 35,
+        "transpiled_size": 44,
+        "fidelity": 0.12499999999999994
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 3,
+    "depth": 6,
+    "size": 7,
+    "ops": {
+      "h": 3,
+      "cp": 3,
+      "swap": 1
+    },
+    "diagram_text": "     ┌───┐                                        \nq_0: ┤ H ├─■────────■───────────────────────────X─\n     └───┘ │P(π/2)  │       ┌───┐               │ \nq_1: ──────■────────┼───────┤ H ├─■─────────────┼─\n                    │P(π/4) └───┘ │P(π/2) ┌───┐ │ \nq_2: ───────────────■─────────────■───────┤ H ├─X─\n                                          └───┘   ",
+    "transpiled_depth": 35,
+    "transpiled_size": 44,
+    "fidelity": 0.12499999999999994
+  }
+}

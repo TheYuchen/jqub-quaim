@@ -1,0 +1,137 @@
+{
+  "circuit_id": "precomputed_qft_3q_full",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930265.0707498,
+      "finished_at": 1776930265.0707505,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 6,
+        "num_parameters": 0
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930265.0707538,
+      "finished_at": 1776930265.071456,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qucad",
+      "label": "QuCAD",
+      "status": "ok",
+      "started_at": 1776930265.0714614,
+      "finished_at": 1776930267.6358886,
+      "summary": {
+        "iterations": 3,
+        "original_parameters": 0,
+        "kept_parameters": 0,
+        "final_loss": 1.942890293094024e-16,
+        "sparsity_trace": [
+          0,
+          0,
+          0
+        ]
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "skipped",
+      "started_at": 1776930267.6370337,
+      "finished_at": 1776930267.6370363,
+      "summary": {
+        "num_parameters": 0
+      },
+      "message": "CompressVQC only acts on parameterized rotation gates; this circuit has 0 parameters."
+    },
+    {
+      "node_id": "n5",
+      "node_type": "qubound",
+      "label": "QuBound",
+      "status": "ok",
+      "started_at": 1776930267.6370602,
+      "finished_at": 1776930336.6376712,
+      "summary": {
+        "predicted_error_bound": 0.05074078589677811,
+        "source": "cached_ibm_history",
+        "cached_backend": "ibm_fez",
+        "history_window": "2026-04-09 → 2026-04-22",
+        "num_days": 14
+      },
+      "message": null
+    },
+    {
+      "node_id": "n6",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1776930336.6379652,
+      "finished_at": 1776930336.6398501,
+      "summary": {
+        "fidelity": 0.12499999999999994
+      },
+      "message": null
+    },
+    {
+      "node_id": "n7",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776930336.6398559,
+      "finished_at": 1776930336.6511629,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 7,
+        "size": 10,
+        "ops": {
+          "h": 3,
+          "cp": 3,
+          "measure": 3,
+          "swap": 1,
+          "barrier": 1
+        },
+        "diagram_text": "        ┌───┐                                         ░ ┌─┐      \n   q_0: ┤ H ├─■────────■───────────────────────────X──░─┤M├──────\n        └───┘ │P(π/2)  │       ┌───┐               │  ░ └╥┘┌─┐   \n   q_1: ──────■────────┼───────┤ H ├─■─────────────┼──░──╫─┤M├───\n                       │P(π/4) └───┘ │P(π/2) ┌───┐ │  ░  ║ └╥┘┌─┐\n   q_2: ───────────────■─────────────■───────┤ H ├─X──░──╫──╫─┤M├\n                                             └───┘    ░  ║  ║ └╥┘\nmeas: 3/═════════════════════════════════════════════════╩══╩══╩═\n                                                         0  1  2 ",
+        "transpiled_depth": 37,
+        "transpiled_size": 49,
+        "fidelity": 0.12499999999999994,
+        "qubound_error_bound": 0.05074078589677811
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 3,
+    "depth": 7,
+    "size": 10,
+    "ops": {
+      "h": 3,
+      "cp": 3,
+      "measure": 3,
+      "swap": 1,
+      "barrier": 1
+    },
+    "diagram_text": "        ┌───┐                                         ░ ┌─┐      \n   q_0: ┤ H ├─■────────■───────────────────────────X──░─┤M├──────\n        └───┘ │P(π/2)  │       ┌───┐               │  ░ └╥┘┌─┐   \n   q_1: ──────■────────┼───────┤ H ├─■─────────────┼──░──╫─┤M├───\n                       │P(π/4) └───┘ │P(π/2) ┌───┐ │  ░  ║ └╥┘┌─┐\n   q_2: ───────────────■─────────────■───────┤ H ├─X──░──╫──╫─┤M├\n                                             └───┘    ░  ║  ║ └╥┘\nmeas: 3/═════════════════════════════════════════════════╩══╩══╩═\n                                                         0  1  2 ",
+    "transpiled_depth": 37,
+    "transpiled_size": 49,
+    "fidelity": 0.12499999999999994,
+    "qubound_error_bound": 0.05074078589677811
+  }
+}

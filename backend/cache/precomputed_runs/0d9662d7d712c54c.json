@@ -1,0 +1,101 @@
+{
+  "circuit_id": "precomputed_ghz_3q_qucad",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776929830.603091,
+      "finished_at": 1776929830.6030917,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 3,
+        "num_parameters": 0
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776929830.6030972,
+      "finished_at": 1776929830.6039722,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qucad",
+      "label": "QuCAD",
+      "status": "ok",
+      "started_at": 1776929830.603977,
+      "finished_at": 1776929833.1417608,
+      "summary": {
+        "iterations": 3,
+        "original_parameters": 0,
+        "kept_parameters": 0,
+        "final_loss": 0.0,
+        "sparsity_trace": [
+          0,
+          0,
+          0
+        ]
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1776929833.143085,
+      "finished_at": 1776929833.1440926,
+      "summary": {
+        "fidelity": 0.4999999999999999
+      },
+      "message": null
+    },
+    {
+      "node_id": "n5",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776929833.144101,
+      "finished_at": 1776929833.1531296,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 3,
+        "size": 3,
+        "ops": {
+          "cx": 2,
+          "h": 1
+        },
+        "diagram_text": "     ┌───┐          \nq_0: ┤ H ├──■───────\n     └───┘┌─┴─┐     \nq_1: ─────┤ X ├──■──\n          └───┘┌─┴─┐\nq_2: ──────────┤ X ├\n               └───┘",
+        "transpiled_depth": 9,
+        "transpiled_size": 15,
+        "fidelity": 0.4999999999999999
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 3,
+    "depth": 3,
+    "size": 3,
+    "ops": {
+      "cx": 2,
+      "h": 1
+    },
+    "diagram_text": "     ┌───┐          \nq_0: ┤ H ├──■───────\n     └───┘┌─┴─┐     \nq_1: ─────┤ X ├──■──\n          └───┘┌─┴─┐\nq_2: ──────────┤ X ├\n               └───┘",
+    "transpiled_depth": 9,
+    "transpiled_size": 15,
+    "fidelity": 0.4999999999999999
+  }
+}

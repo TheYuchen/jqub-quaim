@@ -1,0 +1,93 @@
+{
+  "circuit_id": "precomputed_w_state_3q_qubound",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930667.5899599,
+      "finished_at": 1776930667.5899603,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 6,
+        "num_parameters": 0
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930667.58997,
+      "finished_at": 1776930667.5906568,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qubound",
+      "label": "QuBound",
+      "status": "ok",
+      "started_at": 1776930667.590661,
+      "finished_at": 1776930737.7891028,
+      "summary": {
+        "predicted_error_bound": 0.10355153679847717,
+        "source": "cached_ibm_history",
+        "cached_backend": "ibm_fez",
+        "history_window": "2026-04-09 → 2026-04-22",
+        "num_days": 14
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776930737.7901263,
+      "finished_at": 1776930737.8015673,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 7,
+        "size": 10,
+        "ops": {
+          "x": 3,
+          "measure": 3,
+          "cx": 2,
+          "ry": 1,
+          "cry": 1,
+          "barrier": 1
+        },
+        "diagram_text": "        ┌────────────┐┌───┐           ┌───┐     ┌───┐ ░ ┌─┐      \n   q_0: ┤ Ry(1.9106) ├┤ X ├─────■─────┤ X ├──■──┤ X ├─░─┤M├──────\n        └────────────┘└───┘┌────┴────┐└───┘┌─┴─┐└───┘ ░ └╥┘┌─┐   \n   q_1: ───────────────────┤ Ry(π/2) ├──■──┤ X ├──────░──╫─┤M├───\n                           └─────────┘┌─┴─┐└───┘      ░  ║ └╥┘┌─┐\n   q_2: ──────────────────────────────┤ X ├───────────░──╫──╫─┤M├\n                                      └───┘           ░  ║  ║ └╥┘\nmeas: 3/═════════════════════════════════════════════════╩══╩══╩═\n                                                         0  1  2 ",
+        "transpiled_depth": 17,
+        "transpiled_size": 31,
+        "qubound_error_bound": 0.10355153679847717
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 3,
+    "depth": 7,
+    "size": 10,
+    "ops": {
+      "x": 3,
+      "measure": 3,
+      "cx": 2,
+      "ry": 1,
+      "cry": 1,
+      "barrier": 1
+    },
+    "diagram_text": "        ┌────────────┐┌───┐           ┌───┐     ┌───┐ ░ ┌─┐      \n   q_0: ┤ Ry(1.9106) ├┤ X ├─────■─────┤ X ├──■──┤ X ├─░─┤M├──────\n        └────────────┘└───┘┌────┴────┐└───┘┌─┴─┐└───┘ ░ └╥┘┌─┐   \n   q_1: ───────────────────┤ Ry(π/2) ├──■──┤ X ├──────░──╫─┤M├───\n                           └─────────┘┌─┴─┐└───┘      ░  ║ └╥┘┌─┐\n   q_2: ──────────────────────────────┤ X ├───────────░──╫──╫─┤M├\n                                      └───┘           ░  ║  ║ └╥┘\nmeas: 3/═════════════════════════════════════════════════╩══╩══╩═\n                                                         0  1  2 ",
+    "transpiled_depth": 17,
+    "transpiled_size": 31,
+    "qubound_error_bound": 0.10355153679847717
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "circuit_id": "precomputed_vqc_2q_small_compvqc",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930554.1299539,
+      "finished_at": 1776930554.1299546,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "num_parameters": 2
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930554.1299582,
+      "finished_at": 1776930554.1305816,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "ok",
+      "started_at": 1776930554.1305852,
+      "finished_at": 1776930596.435685,
+      "summary": {
+        "original_depth": 2,
+        "compressed_depth": 2,
+        "gates_removed": 0,
+        "lut_candidates": 1
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1776930596.435703,
+      "finished_at": 1776930596.4364464,
+      "summary": {
+        "fidelity": 0.4998981633981524
+      },
+      "message": null
+    },
+    {
+      "node_id": "n5",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776930596.436452,
+      "finished_at": 1776930596.442581,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 3,
+        "ops": {
+          "ry": 2,
+          "cx": 1
+        },
+        "diagram_text": "     ┌───────────┐     \nq_0: ┤ Ry(1.571) ├──■──\n     └─┬───────┬─┘┌─┴─┐\nq_1: ──┤ Ry(0) ├──┤ X ├\n       └───────┘  └───┘",
+        "transpiled_depth": 7,
+        "transpiled_size": 10,
+        "fidelity": 0.4998981633981524
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 2,
+    "depth": 2,
+    "size": 3,
+    "ops": {
+      "ry": 2,
+      "cx": 1
+    },
+    "diagram_text": "     ┌───────────┐     \nq_0: ┤ Ry(1.571) ├──■──\n     └─┬───────┬─┘┌─┴─┐\nq_1: ──┤ Ry(0) ├──┤ X ├\n       └───────┘  └───┘",
+    "transpiled_depth": 7,
+    "transpiled_size": 10,
+    "fidelity": 0.4998981633981524
+  }
+}

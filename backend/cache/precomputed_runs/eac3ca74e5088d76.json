@@ -1,0 +1,93 @@
+{
+  "circuit_id": "precomputed_bell_state_compvqc",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776929543.1017594,
+      "finished_at": 1776929543.1017601,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "num_parameters": 0
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776929543.1017644,
+      "finished_at": 1776929543.1027074,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "skipped",
+      "started_at": 1776929543.102712,
+      "finished_at": 1776929543.1027133,
+      "summary": {
+        "num_parameters": 0
+      },
+      "message": "CompressVQC only acts on parameterized rotation gates; this circuit has 0 parameters."
+    },
+    {
+      "node_id": "n4",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1776929543.1027155,
+      "finished_at": 1776929543.103334,
+      "summary": {
+        "fidelity": 0.4999999999999999
+      },
+      "message": null
+    },
+    {
+      "node_id": "n5",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776929543.103338,
+      "finished_at": 1776929543.1979172,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 2,
+        "ops": {
+          "h": 1,
+          "cx": 1
+        },
+        "diagram_text": "     ┌───┐     \nq_0: ┤ H ├──■──\n     └───┘┌─┴─┐\nq_1: ─────┤ X ├\n          └───┘",
+        "transpiled_depth": 6,
+        "transpiled_size": 9,
+        "fidelity": 0.4999999999999999
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 2,
+    "depth": 2,
+    "size": 2,
+    "ops": {
+      "h": 1,
+      "cx": 1
+    },
+    "diagram_text": "     ┌───┐     \nq_0: ┤ H ├──■──\n     └───┘┌─┴─┐\nq_1: ─────┤ X ├\n          └───┘",
+    "transpiled_depth": 6,
+    "transpiled_size": 9,
+    "fidelity": 0.4999999999999999
+  }
+}

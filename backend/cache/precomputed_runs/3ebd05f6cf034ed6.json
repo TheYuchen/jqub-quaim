@@ -1,0 +1,139 @@
+{
+  "circuit_id": "precomputed_w_state_3q_full",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930740.715154,
+      "finished_at": 1776930740.7151546,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 6,
+        "num_parameters": 0
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930740.7151587,
+      "finished_at": 1776930740.7160077,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qucad",
+      "label": "QuCAD",
+      "status": "ok",
+      "started_at": 1776930740.716012,
+      "finished_at": 1776930743.2350292,
+      "summary": {
+        "iterations": 3,
+        "original_parameters": 0,
+        "kept_parameters": 0,
+        "final_loss": 0.6666666666666665,
+        "sparsity_trace": [
+          0,
+          0,
+          0
+        ]
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "skipped",
+      "started_at": 1776930743.2363064,
+      "finished_at": 1776930743.2363095,
+      "summary": {
+        "num_parameters": 0
+      },
+      "message": "CompressVQC only acts on parameterized rotation gates; this circuit has 0 parameters."
+    },
+    {
+      "node_id": "n5",
+      "node_type": "qubound",
+      "label": "QuBound",
+      "status": "ok",
+      "started_at": 1776930743.236337,
+      "finished_at": 1776930812.4924889,
+      "summary": {
+        "predicted_error_bound": 0.12110963463783264,
+        "source": "cached_ibm_history",
+        "cached_backend": "ibm_fez",
+        "history_window": "2026-04-09 → 2026-04-22",
+        "num_days": 14
+      },
+      "message": null
+    },
+    {
+      "node_id": "n6",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1776930812.4928994,
+      "finished_at": 1776930812.4946136,
+      "summary": {
+        "fidelity": 0.0
+      },
+      "message": null
+    },
+    {
+      "node_id": "n7",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776930812.49462,
+      "finished_at": 1776930812.5053742,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 7,
+        "size": 10,
+        "ops": {
+          "x": 3,
+          "measure": 3,
+          "cx": 2,
+          "ry": 1,
+          "cry": 1,
+          "barrier": 1
+        },
+        "diagram_text": "        ┌────────────┐┌───┐           ┌───┐     ┌───┐ ░ ┌─┐      \n   q_0: ┤ Ry(1.9106) ├┤ X ├─────■─────┤ X ├──■──┤ X ├─░─┤M├──────\n        └────────────┘└───┘┌────┴────┐└───┘┌─┴─┐└───┘ ░ └╥┘┌─┐   \n   q_1: ───────────────────┤ Ry(π/2) ├──■──┤ X ├──────░──╫─┤M├───\n                           └─────────┘┌─┴─┐└───┘      ░  ║ └╥┘┌─┐\n   q_2: ──────────────────────────────┤ X ├───────────░──╫──╫─┤M├\n                                      └───┘           ░  ║  ║ └╥┘\nmeas: 3/═════════════════════════════════════════════════╩══╩══╩═\n                                                         0  1  2 ",
+        "transpiled_depth": 17,
+        "transpiled_size": 31,
+        "fidelity": 0.0,
+        "qubound_error_bound": 0.12110963463783264
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 3,
+    "depth": 7,
+    "size": 10,
+    "ops": {
+      "x": 3,
+      "measure": 3,
+      "cx": 2,
+      "ry": 1,
+      "cry": 1,
+      "barrier": 1
+    },
+    "diagram_text": "        ┌────────────┐┌───┐           ┌───┐     ┌───┐ ░ ┌─┐      \n   q_0: ┤ Ry(1.9106) ├┤ X ├─────■─────┤ X ├──■──┤ X ├─░─┤M├──────\n        └────────────┘└───┘┌────┴────┐└───┘┌─┴─┐└───┘ ░ └╥┘┌─┐   \n   q_1: ───────────────────┤ Ry(π/2) ├──■──┤ X ├──────░──╫─┤M├───\n                           └─────────┘┌─┴─┐└───┘      ░  ║ └╥┘┌─┐\n   q_2: ──────────────────────────────┤ X ├───────────░──╫──╫─┤M├\n                                      └───┘           ░  ║  ║ └╥┘\nmeas: 3/═════════════════════════════════════════════════╩══╩══╩═\n                                                         0  1  2 ",
+    "transpiled_depth": 17,
+    "transpiled_size": 31,
+    "fidelity": 0.0,
+    "qubound_error_bound": 0.12110963463783264
+  }
+}

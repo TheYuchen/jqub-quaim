@@ -1,0 +1,45 @@
+{
+  "circuit_id": "precomputed_qaoa_maxcut_4_compvqc",
+  "ok": false,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930122.0790014,
+      "finished_at": 1776930122.0790021,
+      "summary": {
+        "num_qubits": 4,
+        "depth": 14,
+        "num_parameters": 2
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930122.079006,
+      "finished_at": 1776930122.0797513,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "error",
+      "started_at": 1776930122.2307503,
+      "finished_at": 1776930122.2307544,
+      "summary": {},
+      "message": "MemoryError: Unable to allocate 16.0 TiB for an array with shape (1099511627776,) and data type complex128"
+    }
+  ],
+  "final_metrics": {}
+}

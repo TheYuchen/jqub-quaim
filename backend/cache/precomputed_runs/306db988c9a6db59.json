@@ -1,0 +1,85 @@
+{
+  "circuit_id": "precomputed_vqc_2q_small_qubound",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930480.7149634,
+      "finished_at": 1776930480.714964,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "num_parameters": 2
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930480.7149763,
+      "finished_at": 1776930480.7156951,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qubound",
+      "label": "QuBound",
+      "status": "ok",
+      "started_at": 1776930480.715699,
+      "finished_at": 1776930551.309673,
+      "summary": {
+        "predicted_error_bound": 0.08335672318935394,
+        "source": "cached_ibm_history",
+        "cached_backend": "ibm_fez",
+        "history_window": "2026-04-09 → 2026-04-22",
+        "num_days": 14
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776930551.3101425,
+      "finished_at": 1776930551.3197267,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 3,
+        "ops": {
+          "ry": 2,
+          "cx": 1
+        },
+        "diagram_text": "     ┌─────────────┐     \nq_0: ┤ Ry(theta_0) ├──■──\n     ├─────────────┤┌─┴─┐\nq_1: ┤ Ry(theta_1) ├┤ X ├\n     └─────────────┘└───┘",
+        "transpiled_depth": 8,
+        "transpiled_size": 12,
+        "qubound_error_bound": 0.08335672318935394
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 2,
+    "depth": 2,
+    "size": 3,
+    "ops": {
+      "ry": 2,
+      "cx": 1
+    },
+    "diagram_text": "     ┌─────────────┐     \nq_0: ┤ Ry(theta_0) ├──■──\n     ├─────────────┤┌─┴─┐\nq_1: ┤ Ry(theta_1) ├┤ X ├\n     └─────────────┘└───┘",
+    "transpiled_depth": 8,
+    "transpiled_size": 12,
+    "qubound_error_bound": 0.08335672318935394
+  }
+}

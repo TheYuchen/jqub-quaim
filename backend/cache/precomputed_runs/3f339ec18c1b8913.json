@@ -1,0 +1,89 @@
+{
+  "circuit_id": "precomputed_bell_state_qubound",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776929467.5766108,
+      "finished_at": 1776929467.5766118,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "num_parameters": 0
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776929467.5766177,
+      "finished_at": 1776929467.7487888,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qubound",
+      "label": "QuBound",
+      "status": "ok",
+      "started_at": 1776929467.7488027,
+      "finished_at": 1776929540.6553562,
+      "summary": {
+        "predicted_error_bound": 0.07499071210622787,
+        "source": "cached_ibm_history",
+        "cached_backend": "ibm_fez",
+        "history_window": "2026-04-09 → 2026-04-22",
+        "num_days": 14
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776929540.6557302,
+      "finished_at": 1776929540.6709626,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 3,
+        "size": 4,
+        "ops": {
+          "measure": 2,
+          "h": 1,
+          "cx": 1,
+          "barrier": 1
+        },
+        "diagram_text": "        ┌───┐      ░ ┌─┐   \n   q_0: ┤ H ├──■───░─┤M├───\n        └───┘┌─┴─┐ ░ └╥┘┌─┐\n   q_1: ─────┤ X ├─░──╫─┤M├\n             └───┘ ░  ║ └╥┘\nmeas: 2/══════════════╩══╩═\n                      0  1 ",
+        "transpiled_depth": 7,
+        "transpiled_size": 11,
+        "qubound_error_bound": 0.07499071210622787
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 2,
+    "depth": 3,
+    "size": 4,
+    "ops": {
+      "measure": 2,
+      "h": 1,
+      "cx": 1,
+      "barrier": 1
+    },
+    "diagram_text": "        ┌───┐      ░ ┌─┐   \n   q_0: ┤ H ├──■───░─┤M├───\n        └───┘┌─┴─┐ ░ └╥┘┌─┐\n   q_1: ─────┤ X ├─░──╫─┤M├\n             └───┘ ░  ║ └╥┘\nmeas: 2/══════════════╩══╩═\n                      0  1 ",
+    "transpiled_depth": 7,
+    "transpiled_size": 11,
+    "qubound_error_bound": 0.07499071210622787
+  }
+}

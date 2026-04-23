@@ -1,0 +1,135 @@
+{
+  "circuit_id": "precomputed_vqc_2q_small_full",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1776930596.444033,
+      "finished_at": 1776930596.4440339,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "num_parameters": 2
+      },
+      "message": null
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1776930596.4440374,
+      "finished_at": 1776930596.4447377,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156
+      },
+      "message": null
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qucad",
+      "label": "QuCAD",
+      "status": "ok",
+      "started_at": 1776930596.4447422,
+      "finished_at": 1776930598.9583094,
+      "summary": {
+        "iterations": 3,
+        "original_parameters": 2,
+        "kept_parameters": 2,
+        "final_loss": 0.999870468221307,
+        "sparsity_trace": [
+          2,
+          2,
+          2
+        ]
+      },
+      "message": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "skipped",
+      "started_at": 1776930598.959634,
+      "finished_at": 1776930598.9596455,
+      "summary": {
+        "num_parameters": 0
+      },
+      "message": "CompressVQC only acts on parameterized rotation gates; this circuit has 0 parameters."
+    },
+    {
+      "node_id": "n5",
+      "node_type": "qubound",
+      "label": "QuBound",
+      "status": "ok",
+      "started_at": 1776930598.9598935,
+      "finished_at": 1776930667.5776346,
+      "summary": {
+        "predicted_error_bound": 0.057003363966941833,
+        "source": "cached_ibm_history",
+        "cached_backend": "ibm_fez",
+        "history_window": "2026-04-09 → 2026-04-22",
+        "num_days": 14
+      },
+      "message": null
+    },
+    {
+      "node_id": "n6",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1776930667.5785215,
+      "finished_at": 1776930667.5794773,
+      "summary": {
+        "fidelity": 0.9999352330997922
+      },
+      "message": null
+    },
+    {
+      "node_id": "n7",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1776930667.579483,
+      "finished_at": 1776930667.5886197,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 3,
+        "size": 5,
+        "ops": {
+          "ry": 2,
+          "measure": 2,
+          "cx": 1,
+          "barrier": 1
+        },
+        "diagram_text": "         ┌──────────────┐      ░ ┌─┐   \n   q_0: ─┤ Ry(0.010243) ├──■───░─┤M├───\n        ┌┴──────────────┤┌─┴─┐ ░ └╥┘┌─┐\n   q_1: ┤ Ry(-0.012416) ├┤ X ├─░──╫─┤M├\n        └───────────────┘└───┘ ░  ║ └╥┘\nmeas: 2/══════════════════════════╩══╩═\n                                  0  1 ",
+        "transpiled_depth": 9,
+        "transpiled_size": 13,
+        "fidelity": 0.9999352330997922,
+        "qubound_error_bound": 0.057003363966941833
+      },
+      "message": null
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 2,
+    "depth": 3,
+    "size": 5,
+    "ops": {
+      "ry": 2,
+      "measure": 2,
+      "cx": 1,
+      "barrier": 1
+    },
+    "diagram_text": "         ┌──────────────┐      ░ ┌─┐   \n   q_0: ─┤ Ry(0.010243) ├──■───░─┤M├───\n        ┌┴──────────────┤┌─┴─┐ ░ └╥┘┌─┐\n   q_1: ┤ Ry(-0.012416) ├┤ X ├─░──╫─┤M├\n        └───────────────┘└───┘ ░  ║ └╥┘\nmeas: 2/══════════════════════════╩══╩═\n                                  0  1 ",
+    "transpiled_depth": 9,
+    "transpiled_size": 13,
+    "fidelity": 0.9999352330997922,
+    "qubound_error_bound": 0.057003363966941833
+  }
+}
