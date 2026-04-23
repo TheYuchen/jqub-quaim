@@ -145,16 +145,23 @@ function WelcomeSlide() {
     <div className="p-8 sm:p-10 flex flex-col sm:flex-row gap-8 items-center">
       <div className="flex-1 min-w-0">
         <div className="chip mb-3 !text-accent !border-accent/40">
-          <Sparkles className="w-3 h-3" /> JQub · NSF demo
+          <Sparkles className="w-3 h-3" /> JQub Lab · GMU ECE
         </div>
         <h1 className="text-3xl sm:text-4xl font-semibold text-ink leading-tight mb-3">
           Welcome to <span className="bg-gradient-to-r from-accent via-accent2 to-accent3 bg-clip-text text-transparent">JQub Quantum Flow</span>
         </h1>
         <p className="text-mute leading-relaxed mb-4">
           A visual playground for three research algorithms from the{" "}
-          <span className="text-ink">JQub (Jiaqi Gu Quantum)</span> lab at
-          Georgia Tech — QuCAD, QuBound, and CompressVQC — applied to a
-          quantum circuit of your choice.
+          <a
+            href="https://jqub.ece.gmu.edu/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-ink underline decoration-accent/40 underline-offset-2 hover:decoration-accent"
+          >
+            JQub lab
+          </a>{" "}
+          at George Mason University — QuCAD, QuBound, and CompressVQC —
+          applied to a quantum circuit of your choice.
         </p>
         <p className="text-sm text-mute leading-relaxed">
           Build a pipeline by dragging blocks, hit <span className="kbd">Run</span>,

@@ -11,8 +11,9 @@ short_description: Interactive quantum circuit workflow builder for JQub lab.
 
 # JQub Quantum Flow
 
-Interactive web demo for the JQub (Jiaqi Gu Quantum) lab showcasing
-QuCAD, QuBound, and CompressVQC on configurable quantum pipelines.
+Interactive web demo for the [JQub lab](https://jqub.ece.gmu.edu/) at
+George Mason University, showcasing QuCAD, QuBound, and CompressVQC on
+configurable quantum pipelines.
 
 ## What it does
 
