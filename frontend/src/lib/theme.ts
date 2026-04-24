@@ -28,8 +28,8 @@ export const THEMES: ThemeSpec[] = [
   },
   {
     key: "light",
-    label: "Paper",
-    tagline: "White background · print-ready",
+    label: "Light",
+    tagline: "White background · soft accents",
     swatch: ["#f6f7fb", "#0284c7"],
   },
   {

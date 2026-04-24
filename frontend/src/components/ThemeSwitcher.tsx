@@ -66,7 +66,7 @@ export function ThemeSwitcher() {
       {open && (
         // On mobile (<md) the Theme button sits near the middle of the
         // header, so a right-anchored 230px dropdown ends up straddling the
-        // palette strip and clips the longest tagline ("print-ready").
+        // palette strip and clips the longest tagline.
         // Anchor right-0 on both sizes (button is right-of-center), but size
         // the popover to viewport width minus a small margin on mobile so
         // long taglines don't truncate.

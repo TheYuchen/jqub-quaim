@@ -6,7 +6,7 @@
  * Theme tokens
  *
  * Default is "dark" (the original navy + cyan palette).
- *   data-theme="light" : paper-style white background, deep accents
+ *   data-theme="light" : white background with soft accents
  *   data-theme="gmu"   : GMU Mason green canvas + Mason gold primary
  *
  * Values are `R G B` triplets so Tailwind's `/ <alpha-value>` syntax
