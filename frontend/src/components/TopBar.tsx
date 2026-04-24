@@ -90,7 +90,7 @@ export function TopBar({
         </div>
         <div className="leading-tight min-w-0">
           <div className="text-ink font-semibold tracking-tight truncate">
-            JQub Quantum Flow
+            QuAIM
           </div>
           <div className="text-mute text-xs hidden sm:block truncate">
             Visual pipeline for noise-aware VQC experiments

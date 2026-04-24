@@ -1,4 +1,4 @@
-"""Runtime configuration for the JQub Quantum Flow backend."""
+"""Runtime configuration for the QuAIM backend."""
 
 from __future__ import annotations
 

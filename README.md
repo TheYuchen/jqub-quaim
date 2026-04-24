@@ -1,17 +1,17 @@
 ---
-title: JQub Quantum Flow
+title: QuAIM
 emoji: ⚛️
 colorFrom: indigo
 colorTo: purple
 sdk: docker
 app_port: 7860
 pinned: false
-short_description: Interactive quantum circuit workflow builder for JQub lab.
+short_description: Interactive quantum circuit workflow builder from the JQub lab.
 ---
 
-# JQub Quantum Flow
+# QuAIM
 
-Interactive web demo for the [JQub lab](https://jqub.ece.gmu.edu/) at
+Interactive web demo from the [JQub lab](https://jqub.ece.gmu.edu/) at
 George Mason University, showcasing QuCAD, QuBound, and CompressVQC on
 configurable quantum pipelines.
 

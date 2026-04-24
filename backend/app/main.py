@@ -33,16 +33,16 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
     logger.info(
-        "JQub Quantum Flow booting (ibm_token=%s, live_ibm=%s)",
+        "QuAIM booting (ibm_token=%s, live_ibm=%s)",
         "set" if settings.has_ibm_token else "missing",
         settings.allow_live_ibm,
     )
     yield
-    logger.info("JQub Quantum Flow shutting down")
+    logger.info("QuAIM shutting down")
 
 
 app = FastAPI(
-    title="JQub Quantum Flow",
+    title="QuAIM",
     description="Interactive pipeline over QuCAD / QuBound / CompressVQC.",
     version="0.1.0",
     lifespan=lifespan,

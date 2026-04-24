@@ -12,7 +12,7 @@ export function WelcomeSlide() {
         <h1 className="text-3xl sm:text-4xl font-semibold text-ink leading-tight mb-3">
           Welcome to{" "}
           <span className="bg-gradient-to-r from-accent via-accent2 to-accent3 bg-clip-text text-transparent">
-            JQub Quantum Flow
+            QuAIM
           </span>
         </h1>
         <p className="text-mute leading-relaxed mb-4">
