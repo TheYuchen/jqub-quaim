@@ -117,11 +117,18 @@
   .chip {
     @apply inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border border-edge bg-surfaceAlt text-mute;
   }
+  /* All four button variants carry `whitespace-nowrap` so their labels
+     (e.g. "Auto-connect", "Load preset", "Run pipeline") never wrap onto
+     a second line when a sibling element — typically a long status
+     message in the toolbar — squeezes the button container. If the
+     surrounding layout runs out of horizontal room, the button keeps
+     its single-line label and it is the label's `hidden sm:inline` wrap
+     in the component that drops the text to icon-only instead. */
   .btn {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-edge bg-surfaceAlt text-ink hover:border-accent/60 hover:text-accent transition-colors text-sm;
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-edge bg-surfaceAlt text-ink hover:border-accent/60 hover:text-accent transition-colors text-sm whitespace-nowrap;
   }
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm whitespace-nowrap
            bg-gradient-to-r from-accent/90 to-accent2/90 text-canvas shadow-glow
            hover:from-accent hover:to-accent2 transition;
   }
@@ -129,12 +136,12 @@
      discoverable action next to the subtle outline `btn`, but is clearly
      not the primary `btn-primary` (which owns the Run-pipeline gradient). */
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap
            bg-accent2/15 border border-accent2/50 text-accent2
            hover:bg-accent2/25 hover:border-accent2 transition-colors;
   }
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-2 py-1 rounded-md text-xs text-mute hover:text-ink hover:bg-surfaceAlt transition-colors;
+    @apply inline-flex items-center gap-2 px-2 py-1 rounded-md text-xs text-mute hover:text-ink hover:bg-surfaceAlt transition-colors whitespace-nowrap;
   }
   .node-card {
     @apply panel-alt px-3 py-2 min-w-[180px] text-sm;

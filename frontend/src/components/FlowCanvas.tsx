@@ -32,8 +32,15 @@ import { ShareButton } from "./ShareButton";
 import { EmptyCanvas } from "./EmptyCanvas";
 
 /** Transient status line next to the block/link counter.
- *  `danger` tone is used for runner errors; `warn`/`ok` for auto-connect feedback. */
-type Notice = { text: string; tone: "danger" | "warn" | "ok" } | null;
+ *  `danger` tone is used for runner errors; `warn`/`ok` for auto-connect feedback.
+ *  `detail`, when present, is rendered as the hover tooltip so `text` can stay
+ *  short enough to fit in the header's flex slot without pushing the toolbar
+ *  buttons around. */
+type Notice = {
+  text: string;
+  tone: "danger" | "warn" | "ok";
+  detail?: string;
+} | null;
 
 type RFNode = Node<QNodeData>;
 
@@ -185,15 +192,25 @@ export function FlowCanvas() {
       return;
     }
     setEdges(result.edges);
-    // Summary line: pick the tone off whether there were caveats.
-    const base = result.replacedCount > 0
-      ? `Replaced ${result.replacedCount} link${result.replacedCount > 1 ? "s" : ""}; connected ${result.edges.length + 1} blocks.`
-      : `Connected ${result.edges.length + 1} blocks.`;
-    if (result.warnings.length > 0) {
-      setNotice({ text: `${base} ${result.warnings.join(" ")}`, tone: "warn" });
-    } else {
+    const blockCount = result.edges.length + 1;
+    const base =
+      result.replacedCount > 0
+        ? `Replaced ${result.replacedCount} link${result.replacedCount > 1 ? "s" : ""}; connected ${blockCount} blocks.`
+        : `Connected ${blockCount} blocks.`;
+    if (result.warnings.length === 0) {
       setNotice({ text: base, tone: "ok" });
+      return;
     }
+    // Keep the visible notice short so long advisory text can't push the
+    // toolbar buttons around. Parked the full list in `detail` so users
+    // can hover to read every warning.
+    const n = result.warnings.length;
+    const hint = n === 1 ? "hover for 1 note" : `hover for ${n} notes`;
+    setNotice({
+      text: `${base} (${hint})`,
+      tone: "warn",
+      detail: [base, ...result.warnings].join("\n"),
+    });
   };
 
   const runPipeline = async () => {
@@ -229,27 +246,32 @@ export function FlowCanvas() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs text-mute min-w-0">
+      <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between gap-4">
+        {/* Left cluster owns the remaining flex space so the notice slot
+            can shrink-and-truncate without crowding the right-side toolbar.
+            `flex-1 min-w-0` is required for the inner `truncate` to work:
+            Tailwind's truncate = `overflow: hidden` + `text-overflow: ellipsis`,
+            which only engages when the element has a definite max width. */}
+        <div className="flex items-center gap-2 text-xs text-mute flex-1 min-w-0">
           <span className="shrink-0">{nodes.length} blocks</span>
           <span className="text-edge shrink-0">·</span>
           <span className="shrink-0">{edges.length} links</span>
           {notice && (
             <span
-              className={`ml-3 truncate ${
+              className={`ml-3 truncate min-w-0 ${
                 notice.tone === "danger"
                   ? "text-danger"
                   : notice.tone === "warn"
                     ? "text-warn"
                     : "text-ok"
               }`}
-              title={notice.text}
+              title={notice.detail ?? notice.text}
             >
               {notice.text}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <PresetPicker onPick={loadPreset} />
           <button
             onClick={runAutoConnect}
