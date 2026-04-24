@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Layers } from "lucide-react";
 import { PIPELINE_PRESETS } from "../lib/presets";
 
 /**
@@ -34,8 +34,11 @@ export function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
         onClick={() => setOpen((v) => !v)}
         className="btn-secondary"
         title="Load a preset pipeline onto the canvas"
+        aria-label="Load a preset pipeline"
       >
-        Load preset <ChevronDown className="w-3.5 h-3.5" />
+        <Layers className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Load preset</span>
+        <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
         // Anchor on mobile vs desktop differs so the popover never clips:

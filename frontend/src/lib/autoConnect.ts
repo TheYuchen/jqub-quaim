@@ -172,15 +172,41 @@ export function autoConnect(
   }
 
   // ---- string into a single main chain ----
+  //
+  // Most edges represent the actual data flow (circuit / metrics moving
+  // downstream). The one exception is backend → algorithm: the backend
+  // node doesn't hand a circuit to the algorithm, it seeds `ctx["backend"]`
+  // so the algorithm can read the noise model. That's a side-channel, not
+  // a pipeline step. Mark it visually with a dashed stroke + small label
+  // so readers of the graph can tell "this block feeds calibration data,
+  // not a transformed circuit" at a glance. Inspired by Jovin's original
+  // flowChartProto, which dashed the same edge.
   const edges: Edge[] = [];
   for (let i = 0; i < chain.length - 1; i++) {
     const src = chain[i];
     const dst = chain[i + 1];
+    const srcFamily = NODE_BY_KIND[src.data.kind]?.family;
+    const dstFamily = NODE_BY_KIND[dst.data.kind]?.family;
+    const isNoiseSidechain =
+      srcFamily === "backend" && dstFamily === "algorithm";
     edges.push({
       id: `auto-${src.id}-${dst.id}`,
       source: src.id,
       target: dst.id,
       animated: true,
+      ...(isNoiseSidechain && {
+        label: "noise profile",
+        // SVG `fill` accepts `rgb(var(--name))` so the label + background
+        // follow the active theme (dark / light / GMU) automatically.
+        labelStyle: { fontSize: 10, fill: "rgb(var(--color-mute))" },
+        labelBgStyle: {
+          fill: "rgb(var(--color-surface))",
+          fillOpacity: 0.92,
+        },
+        labelBgPadding: [6, 3] as [number, number],
+        labelBgBorderRadius: 3,
+        style: { strokeDasharray: "4 3" },
+      }),
     });
   }
 

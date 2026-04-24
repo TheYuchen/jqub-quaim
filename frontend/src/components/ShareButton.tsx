@@ -15,10 +15,19 @@ export function ShareButton({
   nodes,
   edges,
   sampleKey,
+  className = "",
+  labelBreakpoint = "sm",
 }: {
   nodes: Node<QNodeData>[];
   edges: Edge[];
   sampleKey: string | null;
+  /** Extra classes on the wrapper button — used by the parent toolbar
+   *  for responsive visibility (e.g. `hidden md:inline-flex`). */
+  className?: string;
+  /** Tailwind breakpoint above which the "Share" / "Copied" label shows.
+   *  The parent toolbar uses `lg` to hide the label at medium widths; the
+   *  default stays at `sm` for standalone usage. */
+  labelBreakpoint?: "sm" | "md" | "lg";
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -38,11 +47,19 @@ export function ShareButton({
     window.setTimeout(() => setCopied(false), 1500);
   };
 
+  // Map the `labelBreakpoint` prop to the matching Tailwind `hidden <bp>:inline`
+  // literal (must be spelled out — Tailwind's JIT can't see variable classes).
+  const labelVisibility = {
+    sm: "hidden sm:inline",
+    md: "hidden md:inline",
+    lg: "hidden lg:inline",
+  }[labelBreakpoint];
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="btn"
+      className={`btn ${className}`}
       title={
         sampleKey
           ? "Copy a link that restores this pipeline"
@@ -53,12 +70,12 @@ export function ShareButton({
       {copied ? (
         <>
           <Check className="w-3.5 h-3.5 text-ok" />
-          <span className="hidden sm:inline">Copied</span>
+          <span className={labelVisibility}>Copied</span>
         </>
       ) : (
         <>
           <LinkIcon className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Share</span>
+          <span className={labelVisibility}>Share</span>
         </>
       )}
     </button>

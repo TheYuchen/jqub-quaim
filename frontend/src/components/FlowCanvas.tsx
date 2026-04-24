@@ -19,12 +19,15 @@ import {
   AlertCircle,
   AlertTriangle,
   Check,
+  Link as LinkIcon,
   Loader2,
+  MoreHorizontal,
   Play,
   Trash2,
   Wand2,
   X,
 } from "lucide-react";
+import { copyToClipboard } from "../lib/clipboard";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
 import {
   DEFAULT_PRESET_KEY,
@@ -34,7 +37,12 @@ import {
 import { autoConnect } from "../lib/autoConnect";
 import { useApp } from "../lib/store";
 import { api } from "../lib/api";
-import { readHashPayload, type SharePayload } from "../lib/share";
+import {
+  buildSharePayload,
+  buildShareUrl,
+  readHashPayload,
+  type SharePayload,
+} from "../lib/share";
 import { QNode, type QNodeData } from "./QNode";
 import { PresetPicker } from "./PresetPicker";
 import { ShareButton } from "./ShareButton";
@@ -200,6 +208,25 @@ export function FlowCanvas() {
     setNotice(null);
   };
 
+  // Share flow used by the mobile More menu. The desktop ShareButton owns
+  // its own inline "Copied" tick; on mobile the menu closes on click, so
+  // we surface the feedback as a canvas toast instead.
+  const handleShareFromMenu = async () => {
+    const payload = buildSharePayload(nodes, edges, sampleKey);
+    const url = buildShareUrl(payload);
+    const ok = await copyToClipboard(url);
+    if (!ok) {
+      setNotice({ text: "Could not copy link to clipboard.", tone: "warn" });
+      return;
+    }
+    try {
+      window.history.replaceState(null, "", url);
+    } catch {
+      /* some embedded iframes block this; ignore */
+    }
+    setNotice({ text: "Share link copied to clipboard.", tone: "ok" });
+  };
+
   const runAutoConnect = () => {
     const result = autoConnect(nodes, edges);
     if (!result.connected) {
@@ -260,43 +287,82 @@ export function FlowCanvas() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs text-mute shrink-0">
-          <span>{nodes.length} blocks</span>
-          <span className="text-edge">·</span>
-          <span>{edges.length} links</span>
+      <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4">
+        {/* Status counter. Full form on ≥sm, compact "N·M" on <sm so the
+            toolbar still fits a 390px iPhone viewport. */}
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-mute shrink-0">
+          <span className="hidden sm:inline">{nodes.length} blocks</span>
+          <span className="hidden sm:inline text-edge">·</span>
+          <span className="hidden sm:inline">{edges.length} links</span>
+          <span className="sm:hidden font-mono" aria-label={`${nodes.length} blocks, ${edges.length} links`}>
+            {nodes.length}·{edges.length}
+          </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <PresetPicker onPick={loadPreset} />
+
+          {/* ≥ md: individual action buttons. Labels show at ≥ lg only —
+              between md and lg the buttons collapse to icon-only so four
+              items still fit comfortably alongside the preset button and
+              Run pipeline. */}
           <button
             onClick={runAutoConnect}
             disabled={nodes.length < 2}
-            className="btn disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn hidden md:inline-flex disabled:opacity-40 disabled:cursor-not-allowed"
             title={
               edges.length > 0
                 ? "Re-wire all blocks into a source→backend→algorithm→metric→sink chain (replaces existing links)"
                 : "Wire all blocks into a source→backend→algorithm→metric→sink chain"
             }
+            aria-label="Auto-connect all blocks"
           >
             <Wand2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Auto-connect</span>
+            <span className="hidden lg:inline">Auto-connect</span>
           </button>
-          <ShareButton nodes={nodes} edges={edges} sampleKey={sampleKey} />
-          <button onClick={clearGraph} className="btn" title="Clear the canvas">
-            <Trash2 className="w-3.5 h-3.5" /> Clear
+          <ShareButton
+            nodes={nodes}
+            edges={edges}
+            sampleKey={sampleKey}
+            className="hidden md:inline-flex"
+            labelBreakpoint="lg"
+          />
+          <button
+            onClick={clearGraph}
+            className="btn hidden md:inline-flex"
+            title="Clear the canvas"
+            aria-label="Clear canvas"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">Clear</span>
           </button>
+
+          {/* < md: everything but PresetPicker and Run folds into a single
+              "More" menu. Keeps the toolbar to 3 visible controls on phones. */}
+          <MoreMenu
+            className="md:hidden"
+            canAutoConnect={nodes.length >= 2}
+            hasEdgesToReplace={edges.length > 0}
+            canClear={nodes.length > 0 || edges.length > 0}
+            onAutoConnect={runAutoConnect}
+            onShare={handleShareFromMenu}
+            onClear={clearGraph}
+          />
+
           <button
             onClick={runPipeline}
             disabled={running || !circuit}
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label={running ? "Running" : "Run pipeline"}
           >
             {running ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Running…
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span className="hidden sm:inline">Running…</span>
               </>
             ) : (
               <>
-                <Play className="w-3.5 h-3.5" /> Run pipeline
+                <Play className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Run pipeline</span>
               </>
             )}
           </button>
@@ -339,6 +405,144 @@ export function FlowCanvas() {
           <CanvasToast notice={notice} onDismiss={() => setNotice(null)} />
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Mobile-only overflow menu. Bundles Auto-connect / Share / Clear into a
+ * single "⋮" dropdown so narrow viewports (< md) keep the toolbar at three
+ * visible controls (Load preset, More, Run pipeline) instead of five.
+ * Desktop renders each action as its own toolbar button and hides this
+ * component via `md:hidden` on the wrapper.
+ */
+function MoreMenu({
+  className = "",
+  canAutoConnect,
+  hasEdgesToReplace,
+  canClear,
+  onAutoConnect,
+  onShare,
+  onClear,
+}: {
+  className?: string;
+  canAutoConnect: boolean;
+  hasEdgesToReplace: boolean;
+  canClear: boolean;
+  onAutoConnect: () => void;
+  onShare: () => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const items: {
+    key: string;
+    icon: React.ReactNode;
+    label: string;
+    sub?: string;
+    disabled?: boolean;
+    tone?: "default" | "danger";
+    onClick: () => void;
+  }[] = [
+    {
+      key: "auto",
+      icon: <Wand2 className="w-4 h-4" />,
+      label: "Auto-connect",
+      sub: hasEdgesToReplace
+        ? "Re-wire all blocks (replaces existing links)"
+        : "Wire all blocks into a sensible chain",
+      disabled: !canAutoConnect,
+      onClick: onAutoConnect,
+    },
+    {
+      key: "share",
+      icon: <LinkIcon className="w-4 h-4" />,
+      label: "Copy share link",
+      sub: "Copies a URL that restores this pipeline",
+      onClick: onShare,
+    },
+    {
+      key: "clear",
+      icon: <Trash2 className="w-4 h-4" />,
+      label: "Clear canvas",
+      sub: "Remove every block and link",
+      disabled: !canClear,
+      tone: "danger",
+      onClick: onClear,
+    },
+  ];
+
+  return (
+    <div ref={rootRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="btn"
+        title="More actions"
+        aria-label="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-1.5 flex flex-col gap-0.5 w-[min(18rem,calc(100vw-1.5rem))]"
+        >
+          {items.map((it) => (
+            <button
+              key={it.key}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              onClick={() => {
+                if (it.disabled) return;
+                it.onClick();
+                setOpen(false);
+              }}
+              className={`flex items-start gap-3 px-3 py-2 rounded-md text-left transition-colors border border-transparent disabled:opacity-40 disabled:cursor-not-allowed ${
+                it.tone === "danger"
+                  ? "hover:bg-danger/10 hover:border-danger/40 text-ink"
+                  : "hover:bg-surfaceAlt hover:border-edge/60 text-ink"
+              }`}
+            >
+              <span
+                className={`shrink-0 mt-0.5 ${
+                  it.tone === "danger" ? "text-danger" : "text-mute"
+                }`}
+              >
+                {it.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{it.label}</span>
+                {it.sub && (
+                  <span className="block text-[11px] text-mute leading-snug mt-0.5">
+                    {it.sub}
+                  </span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
