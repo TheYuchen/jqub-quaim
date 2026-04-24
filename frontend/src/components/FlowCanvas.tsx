@@ -15,7 +15,16 @@ import {
   type NodeTypes,
   type OnConnect,
 } from "@xyflow/react";
-import { Loader2, Play, Trash2, Wand2 } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  Check,
+  Loader2,
+  Play,
+  Trash2,
+  Wand2,
+  X,
+} from "lucide-react";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
 import {
   DEFAULT_PRESET_KEY,
@@ -31,11 +40,15 @@ import { PresetPicker } from "./PresetPicker";
 import { ShareButton } from "./ShareButton";
 import { EmptyCanvas } from "./EmptyCanvas";
 
-/** Transient status line next to the block/link counter.
- *  `danger` tone is used for runner errors; `warn`/`ok` for auto-connect feedback.
- *  `detail`, when present, is rendered as the hover tooltip so `text` can stay
- *  short enough to fit in the header's flex slot without pushing the toolbar
- *  buttons around. */
+/** One-shot feedback surfaced as a toast at the bottom of the canvas.
+ *
+ *  - `tone: "danger"` is runner errors; stays until explicitly dismissed.
+ *  - `tone: "warn"` / `"ok"` come from Auto-connect; auto-dismiss after a
+ *    few seconds.
+ *  - `detail`, when present, is rendered underneath `text` in the toast
+ *    body (one warning per line), so long advisories no longer have to
+ *    fit on a single truncated header line.
+ */
 type Notice = {
   text: string;
   tone: "danger" | "warn" | "ok";
@@ -109,11 +122,15 @@ export function FlowCanvas() {
   const setRunning = useApp((s) => s.setRunning);
   const useLiveIbm = useApp((s) => s.useLiveIbm);
   const [notice, setNotice] = useState<Notice>(null);
-  // Non-danger notices auto-fade so they don't linger in the header.
-  // Errors stay put until cleared by the next action (Run, Clear, preset).
+  // Non-danger toasts auto-fade; success is quick, warnings linger a bit
+  // longer so the user has time to read every bullet. Runner errors stay
+  // put until the next action (Run, Clear, preset change) clears them —
+  // losing a stack trace to a 6-second fade is a much worse UX than a
+  // sticky notice you can dismiss with ×.
   useEffect(() => {
     if (!notice || notice.tone === "danger") return;
-    const t = window.setTimeout(() => setNotice(null), 6000);
+    const ms = notice.tone === "ok" ? 4000 : 8000;
+    const t = window.setTimeout(() => setNotice(null), ms);
     return () => window.clearTimeout(t);
   }, [notice]);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -201,15 +218,12 @@ export function FlowCanvas() {
       setNotice({ text: base, tone: "ok" });
       return;
     }
-    // Keep the visible notice short so long advisory text can't push the
-    // toolbar buttons around. Parked the full list in `detail` so users
-    // can hover to read every warning.
-    const n = result.warnings.length;
-    const hint = n === 1 ? "hover for 1 note" : `hover for ${n} notes`;
+    // Toast renders `detail` as a bulleted list under `text`, so we can
+    // just hand the raw warnings through — no truncation, no hover hint.
     setNotice({
-      text: `${base} (${hint})`,
+      text: base,
       tone: "warn",
-      detail: [base, ...result.warnings].join("\n"),
+      detail: result.warnings.join("\n"),
     });
   };
 
@@ -247,29 +261,10 @@ export function FlowCanvas() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between gap-4">
-        {/* Left cluster owns the remaining flex space so the notice slot
-            can shrink-and-truncate without crowding the right-side toolbar.
-            `flex-1 min-w-0` is required for the inner `truncate` to work:
-            Tailwind's truncate = `overflow: hidden` + `text-overflow: ellipsis`,
-            which only engages when the element has a definite max width. */}
-        <div className="flex items-center gap-2 text-xs text-mute flex-1 min-w-0">
-          <span className="shrink-0">{nodes.length} blocks</span>
-          <span className="text-edge shrink-0">·</span>
-          <span className="shrink-0">{edges.length} links</span>
-          {notice && (
-            <span
-              className={`ml-3 truncate min-w-0 ${
-                notice.tone === "danger"
-                  ? "text-danger"
-                  : notice.tone === "warn"
-                    ? "text-warn"
-                    : "text-ok"
-              }`}
-              title={notice.detail ?? notice.text}
-            >
-              {notice.text}
-            </span>
-          )}
+        <div className="flex items-center gap-2 text-xs text-mute shrink-0">
+          <span>{nodes.length} blocks</span>
+          <span className="text-edge">·</span>
+          <span>{edges.length} links</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <PresetPicker onPick={loadPreset} />
@@ -340,7 +335,71 @@ export function FlowCanvas() {
           />
         </ReactFlow>
         {nodes.length === 0 && <EmptyCanvas />}
+        {notice && (
+          <CanvasToast notice={notice} onDismiss={() => setNotice(null)} />
+        )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Absolute-positioned toast pinned to the bottom-center of the canvas.
+ * Handles Auto-connect summaries, Auto-connect warnings (multi-line via
+ * `notice.detail`), and runner errors. Sits above React Flow's controls
+ * (z-30) and caps at a readable width regardless of canvas size.
+ */
+function CanvasToast({
+  notice,
+  onDismiss,
+}: {
+  notice: NonNullable<Notice>;
+  onDismiss: () => void;
+}) {
+  const palette = {
+    ok: {
+      border: "border-ok/40",
+      bg: "bg-ok/10",
+      icon: <Check className="w-4 h-4 text-ok" />,
+    },
+    warn: {
+      border: "border-warn/40",
+      bg: "bg-warn/10",
+      icon: <AlertTriangle className="w-4 h-4 text-warn" />,
+    },
+    danger: {
+      border: "border-danger/40",
+      bg: "bg-danger/10",
+      icon: <AlertCircle className="w-4 h-4 text-danger" />,
+    },
+  }[notice.tone];
+  const warnings = notice.detail ? notice.detail.split("\n") : [];
+
+  return (
+    <div
+      role={notice.tone === "danger" ? "alert" : "status"}
+      aria-live={notice.tone === "danger" ? "assertive" : "polite"}
+      className={`absolute left-1/2 -translate-x-1/2 bottom-4 z-30 w-[min(36rem,calc(100%-2rem))] rounded-lg border ${palette.border} ${palette.bg} bg-surface/95 backdrop-blur-sm shadow-xl px-4 py-3 flex items-start gap-3`}
+    >
+      <div className="shrink-0 mt-0.5">{palette.icon}</div>
+      <div className="flex-1 min-w-0 text-sm text-ink">
+        <div className="leading-snug">{notice.text}</div>
+        {warnings.length > 0 && (
+          <ul className="mt-1.5 space-y-0.5 text-xs text-mute list-disc pl-4 leading-relaxed">
+            {warnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="shrink-0 text-mute hover:text-ink transition-colors"
+      >
+        <X className="w-4 h-4" />
+      </button>
     </div>
   );
 }
