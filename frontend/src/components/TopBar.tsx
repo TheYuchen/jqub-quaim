@@ -74,7 +74,7 @@ export function TopBar({
   }
 
   return (
-    <header className="h-14 shrink-0 border-b border-edge px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4 bg-canvas/60 backdrop-blur">
+    <header className="relative z-20 h-14 shrink-0 border-b border-edge px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4 bg-canvas/60 backdrop-blur">
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {mobile && onOpenLeftDrawer && (
           <button
