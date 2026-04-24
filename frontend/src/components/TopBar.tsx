@@ -236,16 +236,18 @@ function PapersPopover() {
         <span className="hidden sm:inline">Papers</span>
       </button>
       {open && (
-        // Same positioning strategy as ThemeSwitcher: absolute right-0
-        // of the button so the menu tracks with the header cluster, and
-        // `w-[min(22rem,100vw-1.5rem)]` caps the width on narrow screens
-        // so it can't overflow the viewport's right edge. We do NOT use
-        // `position: fixed` here — fixed+z-index creates a new stacking
-        // context that can land behind the React Flow canvas in the
-        // backdrop-blur header's layer.
+        // Mobile (<sm): Papers button sits mid-header, so anchoring
+        // `absolute right-0` to the button pushes the 22rem popover
+        // off-screen on the left. Pin the popover to the viewport's
+        // right edge with `fixed right-3 top-14` so it always stays
+        // visible. The header itself is `z-20`, so a `fixed` child
+        // with z-index stacks above the canvas without trouble.
+        //
+        // Desktop (≥sm): back to anchor-to-button behaviour so the
+        // popover tracks with the Papers button in the header cluster.
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-0.5 w-[min(22rem,calc(100vw-1.5rem))]"
+          className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-0.5 w-[min(22rem,calc(100vw-1.5rem))]"
         >
           {papers.map((p) => (
             <a
