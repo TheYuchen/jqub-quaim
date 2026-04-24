@@ -4,11 +4,11 @@ import { NODE_CATALOG } from "../lib/nodeCatalog";
 import { copyToClipboard } from "../lib/clipboard";
 
 /**
- * Popover listing the three algorithm papers. Data is pulled from
- * nodeCatalog so there's a single source of truth: each algorithm block
- * already carries its own paper metadata (title, venue, arxiv URL), and
- * this popover just surfaces all of them at once. Same open/close UX as
- * the other popovers in the app (outside-click + Escape).
+ * Popover listing the algorithm papers. Data is pulled from nodeCatalog
+ * so there's a single source of truth: each algorithm block already
+ * carries its own paper metadata (title, venue, arxiv URL), and this
+ * popover just surfaces all of them at once. Same open/close UX as the
+ * other popovers in the app (outside-click + Escape).
  */
 export function PapersPopover() {
   const [open, setOpen] = useState(false);

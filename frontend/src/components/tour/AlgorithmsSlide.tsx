@@ -1,4 +1,9 @@
-// Tour slide 2: the three algorithms as cards with inline SVG visuals.
+// Tour slide 2: the algorithm blocks as cards with inline SVG visuals.
+//
+// Kicker and heading avoid a fixed count ("three") — the cards below are
+// currently QuCAD, QuBound, CompressVQC, but the lab ships new modules
+// regularly. When you add a fourth block, also bump the md:grid-cols
+// breakpoint so the cards don't get squeezed.
 
 import { FileText, LineChart, Shrink, Waypoints } from "lucide-react";
 import { NODE_BY_KIND, type NodeKind } from "../../lib/nodeCatalog";
@@ -8,10 +13,10 @@ export function AlgorithmsSlide() {
     <div className="p-6 sm:p-8">
       <div className="mb-5">
         <div className="text-xs uppercase tracking-wider text-mute mb-1">
-          The three algorithms
+          The algorithm blocks
         </div>
         <h2 className="text-xl font-semibold text-ink">
-          One block each. Chain them any way you like.
+          One block per algorithm. Chain them any way you like.
         </h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

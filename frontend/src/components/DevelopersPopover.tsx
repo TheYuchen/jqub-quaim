@@ -24,14 +24,14 @@ interface Person {
 
 const PEOPLE: Person[] = [
   {
-    name: "Yuchen Yuan",
-    url: "https://theyuchen.github.io/",
-    linkLabel: "theyuchen.github.io",
-  },
-  {
     name: "Jovin Antony Maria",
     url: "https://www.linkedin.com/in/jovin-antony-maria-987262348/",
     linkLabel: "LinkedIn",
+  },
+  {
+    name: "Yuchen Yuan",
+    url: "https://theyuchen.github.io/",
+    linkLabel: "theyuchen.github.io",
   },
 ];
 

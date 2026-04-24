@@ -17,11 +17,11 @@ configurable quantum pipelines.
 
 ## What it does
 
-Drag-and-drop visual pipeline over three research algorithms from the JQub
-lab — QuCAD, QuBound, CompressVQC — applied to a quantum circuit of your
-choice (upload a `.qpy` or pick a built-in sample). Each block in the graph
-becomes a stage of a FastAPI-side pipeline; run order is topologically
-sorted from the React-Flow edges.
+Drag-and-drop visual pipeline over research algorithms from the JQub lab —
+currently QuCAD, QuBound, and CompressVQC, with more to come — applied to
+a quantum circuit of your choice (upload a `.qpy` or pick a built-in
+sample). Each block in the graph becomes a stage of a FastAPI-side
+pipeline; run order is topologically sorted from the React-Flow edges.
 
 - **QuCAD**: ADMM-regularized, noise-aware VQC sparsification.
 - **QuBound**: LSTM over 14 days of real `ibm_fez` calibration data
@@ -80,7 +80,3 @@ When neither env var is set the app silently falls back to the offline
 IBM_QUANTUM_TOKEN=... python scripts/fetch_ibm_history.py --backend ibm_fez --days 14
 ```
 
-## Credits
-
-Quantum algorithms (`backend/qlib/`) by Jovin Antony Maria (JQub).
-Web refactor and pipeline scaffold by Yuchen Yuan.
