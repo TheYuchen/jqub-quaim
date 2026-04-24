@@ -15,24 +15,20 @@ import {
   type NodeTypes,
   type OnConnect,
 } from "@xyflow/react";
-import { Check, ChevronDown, Link as LinkIcon, Loader2, Play, Trash2 } from "lucide-react";
-import { NODE_BY_KIND, NODE_CATALOG, type NodeKind } from "../lib/nodeCatalog";
+import { Loader2, Play, Trash2 } from "lucide-react";
+import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
 import {
   DEFAULT_PRESET_KEY,
-  PIPELINE_PRESETS,
   PRESET_BY_KEY,
   buildPresetGraph,
 } from "../lib/presets";
 import { useApp } from "../lib/store";
 import { api } from "../lib/api";
-import {
-  buildSharePayload,
-  buildShareUrl,
-  readHashPayload,
-  type SharePayload,
-} from "../lib/share";
-import { copyToClipboard } from "../lib/clipboard";
+import { readHashPayload, type SharePayload } from "../lib/share";
 import { QNode, type QNodeData } from "./QNode";
+import { PresetPicker } from "./PresetPicker";
+import { ShareButton } from "./ShareButton";
+import { EmptyCanvas } from "./EmptyCanvas";
 
 type RFNode = Node<QNodeData>;
 
@@ -269,76 +265,6 @@ export function FlowCanvas() {
   );
 }
 
-/**
- * "Load preset" button that opens a small popover listing the named
- * pipelines from the preset registry. Dismissed on outside-click or
- * Escape. Picking a preset replaces the whole graph.
- */
-function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="btn-secondary"
-        title="Load a preset pipeline onto the canvas"
-      >
-        Load preset <ChevronDown className="w-3.5 h-3.5" />
-      </button>
-      {open && (
-        // Anchor on mobile vs desktop differs so the popover never clips:
-        //   - Mobile (<md): `left-0` — popover extends rightwards from the
-        //     button's left edge. On a ~390px iPhone, that keeps the full
-        //     256px popover inside the viewport.
-        //   - Desktop (≥md): `md:right-0` — popover aligns to the button's
-        //     right edge and extends leftwards, staying flush with the
-        //     right-hand cluster (Clear / Run pipeline).
-        <div
-          role="menu"
-          className="absolute top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-20 p-1.5 flex flex-col gap-0.5 left-0 md:left-auto md:right-0 w-[min(16rem,calc(100vw-1.5rem))]"
-        >
-          {PIPELINE_PRESETS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onPick(p.key);
-                setOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 rounded-md hover:bg-surfaceAlt transition-colors border border-transparent hover:border-edge/60"
-            >
-              <div className="text-sm text-ink font-medium">{p.label}</div>
-              <div className="text-[11px] text-mute leading-snug mt-0.5">
-                {p.tagline}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // MiniMap node colors keyed to theme variables so they shift alongside the
 // rest of the palette instead of clashing in light or GMU themes.
 function colorForKind(kind: NodeKind): string {
@@ -355,83 +281,3 @@ function colorForKind(kind: NodeKind): string {
   return map[kind] ?? "rgb(var(--color-mute))";
 }
 
-/**
- * "Share" button: copies a URL carrying the current canvas state on its
- * fragment. Shows a short "Copied" confirmation so the user knows it
- * landed; no modal, no toast, no dropdown — this is a one-click action.
- * Clipboard quirks are handled by `lib/clipboard.ts`.
- */
-function ShareButton({
-  nodes,
-  edges,
-  sampleKey,
-}: {
-  nodes: Node<QNodeData>[];
-  edges: Edge[];
-  sampleKey: string | null;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const onClick = async () => {
-    const payload = buildSharePayload(nodes, edges, sampleKey);
-    const url = buildShareUrl(payload);
-    const ok = await copyToClipboard(url);
-    if (!ok) return;
-    // Also reflect the new hash in the address bar so a refresh works
-    // and the user can bookmark the link directly.
-    try {
-      window.history.replaceState(null, "", url);
-    } catch {
-      /* some embedded iframes block this; ignore */
-    }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="btn"
-      title={
-        sampleKey
-          ? "Copy a link that restores this pipeline"
-          : "Copy a link that restores this pipeline (uploaded circuit will fall back to the default sample for recipients)"
-      }
-      aria-label="Copy share link"
-    >
-      {copied ? (
-        <>
-          <Check className="w-3.5 h-3.5 text-ok" />
-          <span className="hidden sm:inline">Copied</span>
-        </>
-      ) : (
-        <>
-          <LinkIcon className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Share</span>
-        </>
-      )}
-    </button>
-  );
-}
-
-function EmptyCanvas() {
-  return (
-    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-      <div className="panel px-6 py-5 pointer-events-auto text-center max-w-sm">
-        <div className="text-ink font-medium mb-1">Canvas is empty</div>
-        <div className="text-sm text-mute mb-3">
-          Drag blocks from the strip above, or pick a preset from{" "}
-          <span className="kbd">Load preset</span>.
-        </div>
-        <div className="flex flex-wrap gap-1 justify-center">
-          {NODE_CATALOG.slice(0, 6).map((n) => (
-            <span key={n.kind} className="chip">
-              {n.label}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
