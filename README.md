@@ -6,7 +6,7 @@ colorTo: purple
 sdk: docker
 app_port: 7860
 pinned: false
-short_description: Interactive quantum circuit workflow builder from the JQub lab.
+short_description: Interactive quantum pipeline builder from JQub lab.
 ---
 
 # QuAIM
