@@ -57,10 +57,11 @@ function EmptyHint() {
         <span className="kbd">Run pipeline</span>. Each block you traverse will render a
         result card here: noise bounds, fidelity, compression stats, transpiled depth.
       </p>
-      <p className="mt-2">
-        QuBound takes about 2&nbsp;minutes on HF's shared CPU (training an LSTM
-        over 14 days of real IBM Fez calibration data). Other blocks are
-        near-instant.
+      <p className="mt-2 text-[11px]">
+        Default pipelines on the built-in samples hit a precomputed cache and
+        return instantly. A cold <span className="text-ink">QuBound</span> run
+        trains an LSTM on the shared HF CPU and can take about 2&nbsp;minutes;
+        every other block finishes within seconds.
       </p>
     </div>
   );
@@ -74,8 +75,9 @@ function RunningHint() {
         Executing pipeline…
       </div>
       <div className="mt-2 text-[11px] leading-relaxed">
-        QuBound training can take about 2&nbsp;minutes on HF's shared CPU.
-        Please don't close the tab.
+        Most runs finish within a few seconds. A cold{" "}
+        <span className="text-ink">QuBound</span> run can take up to about
+        2&nbsp;minutes on HF's shared CPU — please don't close the tab.
       </div>
     </div>
   );

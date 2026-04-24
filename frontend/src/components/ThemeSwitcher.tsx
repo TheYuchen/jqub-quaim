@@ -64,10 +64,19 @@ export function ThemeSwitcher() {
         <span className="hidden sm:inline">Theme</span>
       </button>
       {open && (
+        // On mobile (<md) the Theme button sits near the middle of the
+        // header, so a right-anchored 230px dropdown ends up straddling the
+        // palette strip and clips the longest tagline ("print-ready").
+        // Anchor right-0 on both sizes (button is right-of-center), but size
+        // the popover to viewport width minus a small margin on mobile so
+        // long taglines don't truncate.
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-1 w-[230px]"
+          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-1 w-[min(17rem,calc(100vw-1.5rem))]"
         >
+          {/* w- is viewport-aware: 17rem (272px) on wide screens, else
+              capped at viewport minus 24px so it stays flush with the
+              right edge and never overruns the left edge of the screen. */}
           {THEMES.map((t) => {
             const active = t.key === theme;
             return (

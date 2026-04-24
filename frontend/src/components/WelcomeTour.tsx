@@ -166,9 +166,9 @@ function WelcomeSlide() {
           applied to a quantum circuit of your choice.
         </p>
         <p className="text-sm text-mute leading-relaxed">
-          Build a pipeline by dragging blocks, hit <span className="kbd">Run</span>,
-          and see what happens when each algorithm meets real IBM hardware
-          noise.
+          Build a pipeline by dragging blocks, hit{" "}
+          <span className="kbd">Run pipeline</span>, and see what happens when
+          each algorithm meets real IBM hardware noise.
         </p>
       </div>
       <div className="shrink-0">
@@ -526,7 +526,7 @@ function PipelineSlide() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px] leading-relaxed">
         <div className="panel-alt p-3">
-          <div className="text-accent font-semibold mb-0.5">Nodes you drag</div>
+          <div className="text-accent font-semibold mb-0.5">Blocks you drag</div>
           <span className="text-mute">
             Each block wraps one stage: a circuit source, a backend, an
             algorithm, a metric, or a sink. Parameters are editable on the
@@ -534,7 +534,7 @@ function PipelineSlide() {
           </span>
         </div>
         <div className="panel-alt p-3">
-          <div className="text-accent2 font-semibold mb-0.5">Edges you draw</div>
+          <div className="text-accent2 font-semibold mb-0.5">Links you draw</div>
           <span className="text-mute">
             Connect block handles left-to-right. The runner topologically
             sorts the graph; cycles are rejected before execution.
@@ -616,7 +616,7 @@ function PipelineSVG() {
 
       <PipelineNode x={20} y={40} color="#4cc9f0" label="Input circuit" sub="SOURCE" kind="circuit" />
       <PipelineNode x={190} y={40} color="#4cc9f0" label="Noisy simulator" sub="BACKEND" kind="backend" />
-      <PipelineNode x={360} y={40} color="#f72585" label="QuBound" sub="ALGORITHM" kind="algo" />
+      <PipelineNode x={360} y={40} color="#7b5cff" label="QuCAD" sub="ALGORITHM" kind="algo" />
       <PipelineNode x={530} y={40} color="#e6ebff" label="Output" sub="SINK" kind="out" />
     </svg>
   );
@@ -720,10 +720,11 @@ function TrySlide() {
         </h2>
         <p className="text-mute text-sm">
           Pick one of the sample circuits on the left, then hit{" "}
-          <span className="kbd">Run pipeline</span> in the canvas toolbar. The
-          first run trains an LSTM on 14 days of calibration, so plan for
-          about two minutes on the shared HF CPU. Don't close the tab while
-          it's running.
+          <span className="kbd">Run pipeline</span> in the canvas toolbar.
+          Default pipelines on the built-in samples hit a precomputed cache
+          and return instantly. Switch in <span className="text-ink">QuBound</span>{" "}
+          with a cache miss and the run can take about two minutes on HF's
+          shared CPU while it trains the LSTM — don't close the tab.
         </p>
       </div>
 
@@ -737,12 +738,13 @@ function TrySlide() {
           </div>
           <ul className="text-[12px] text-mute space-y-1.5 leading-relaxed">
             <li>
-              <span className="text-ink">bell_state</span> + QuBound →
-              fast, shows the noise-bound predictor end-to-end.
+              <span className="text-ink">bell_state</span> + QuCAD →
+              instant (precomputed), shows noise-aware parameter pruning
+              end-to-end.
             </li>
             <li>
-              <span className="text-ink">efficient_su2_4q</span> + QuCAD →
-              watch sparsity climb over ADMM iterations.
+              <span className="text-ink">efficient_su2_4q</span> + QuBound →
+              see the LSTM-predicted error bound fall out.
             </li>
             <li>
               <span className="text-ink">qaoa_maxcut_4</span> + CompressVQC →
@@ -768,8 +770,9 @@ function TrySlide() {
               delete button.
             </li>
             <li>
-              Upload your own <span className="kbd">.qpy</span> circuit via
-              the <span className="text-ink">upload</span> link.
+              Upload your own Qiskit <span className="kbd">.qpy</span> or
+              OpenQASM <span className="kbd">.qasm</span> circuit via the{" "}
+              <span className="text-ink">upload</span> link.
             </li>
           </ul>
         </div>
