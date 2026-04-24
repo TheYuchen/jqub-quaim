@@ -32,6 +32,11 @@ scikit-learn>=1.5,<1.8
 # pylatexenc — lets Qiskit's MatplotlibDrawer render circuit diagrams
 #   with proper LaTeX gate labels; without it the Qshot card's
 #   "Circuit Diagram" section falls back to a plain-text rendering.
+# matplotlib / networkx — Qshot's top-level imports. Used by the
+#   diagnostic plotter (recommend_shots_v4.plot_recommendation) and by
+#   the QASM→DAG graph conversion (show_dag.py).
 hdbscan>=0.8.41,<0.9
 torch-geometric>=2.6,<2.8
 pylatexenc>=2.10
+matplotlib>=3.8,<4
+networkx>=3.1,<4
