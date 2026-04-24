@@ -15,13 +15,14 @@ import {
   type NodeTypes,
   type OnConnect,
 } from "@xyflow/react";
-import { Loader2, Play, Trash2 } from "lucide-react";
+import { Loader2, Play, Trash2, Wand2 } from "lucide-react";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
 import {
   DEFAULT_PRESET_KEY,
   PRESET_BY_KEY,
   buildPresetGraph,
 } from "../lib/presets";
+import { autoConnect } from "../lib/autoConnect";
 import { useApp } from "../lib/store";
 import { api } from "../lib/api";
 import { readHashPayload, type SharePayload } from "../lib/share";
@@ -29,6 +30,10 @@ import { QNode, type QNodeData } from "./QNode";
 import { PresetPicker } from "./PresetPicker";
 import { ShareButton } from "./ShareButton";
 import { EmptyCanvas } from "./EmptyCanvas";
+
+/** Transient status line next to the block/link counter.
+ *  `danger` tone is used for runner errors; `warn`/`ok` for auto-connect feedback. */
+type Notice = { text: string; tone: "danger" | "warn" | "ok" } | null;
 
 type RFNode = Node<QNodeData>;
 
@@ -96,7 +101,14 @@ export function FlowCanvas() {
   const running = useApp((s) => s.running);
   const setRunning = useApp((s) => s.setRunning);
   const useLiveIbm = useApp((s) => s.useLiveIbm);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
+  // Non-danger notices auto-fade so they don't linger in the header.
+  // Errors stay put until cleared by the next action (Run, Clear, preset).
+  useEffect(() => {
+    if (!notice || notice.tone === "danger") return;
+    const t = window.setTimeout(() => setNotice(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
 
@@ -149,7 +161,7 @@ export function FlowCanvas() {
     setNodes(g.nodes);
     setEdges(g.edges);
     setRun(null);
-    setError(null);
+    setNotice(null);
     // Different presets have different widths; re-fit the view so the user
     // sees the whole new chain instead of a zoomed-in slice.
     requestAnimationFrame(() => {
@@ -161,20 +173,40 @@ export function FlowCanvas() {
     setNodes([]);
     setEdges([]);
     setRun(null);
-    setError(null);
+    setNotice(null);
+  };
+
+  const runAutoConnect = () => {
+    const result = autoConnect(nodes, edges);
+    if (!result.connected) {
+      // Nothing to wire (empty/single/all-unknown canvas): just surface
+      // the advisory without touching the edges.
+      setNotice({ text: result.warnings[0] ?? "Nothing to connect.", tone: "warn" });
+      return;
+    }
+    setEdges(result.edges);
+    // Summary line: pick the tone off whether there were caveats.
+    const base = result.replacedCount > 0
+      ? `Replaced ${result.replacedCount} link${result.replacedCount > 1 ? "s" : ""}; connected ${result.edges.length + 1} blocks.`
+      : `Connected ${result.edges.length + 1} blocks.`;
+    if (result.warnings.length > 0) {
+      setNotice({ text: `${base} ${result.warnings.join(" ")}`, tone: "warn" });
+    } else {
+      setNotice({ text: base, tone: "ok" });
+    }
   };
 
   const runPipeline = async () => {
     if (!circuit) {
-      setError("Please pick or upload a circuit first.");
+      setNotice({ text: "Please pick or upload a circuit first.", tone: "danger" });
       return;
     }
     if (nodes.length === 0) {
-      setError("Canvas is empty. Drag some blocks in.");
+      setNotice({ text: "Canvas is empty. Drag some blocks in.", tone: "danger" });
       return;
     }
     setRunning(true);
-    setError(null);
+    setNotice(null);
     try {
       const body = {
         circuit_id: circuit.circuit_id,
@@ -189,7 +221,7 @@ export function FlowCanvas() {
       const res = await api.run(body);
       setRun(res);
     } catch (e) {
-      setError((e as Error).message);
+      setNotice({ text: (e as Error).message, tone: "danger" });
     } finally {
       setRunning(false);
     }
@@ -198,14 +230,40 @@ export function FlowCanvas() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs text-mute">
-          <span>{nodes.length} blocks</span>
-          <span className="text-edge">·</span>
-          <span>{edges.length} links</span>
-          {error && <span className="text-danger ml-3">{error}</span>}
+        <div className="flex items-center gap-2 text-xs text-mute min-w-0">
+          <span className="shrink-0">{nodes.length} blocks</span>
+          <span className="text-edge shrink-0">·</span>
+          <span className="shrink-0">{edges.length} links</span>
+          {notice && (
+            <span
+              className={`ml-3 truncate ${
+                notice.tone === "danger"
+                  ? "text-danger"
+                  : notice.tone === "warn"
+                    ? "text-warn"
+                    : "text-ok"
+              }`}
+              title={notice.text}
+            >
+              {notice.text}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <PresetPicker onPick={loadPreset} />
+          <button
+            onClick={runAutoConnect}
+            disabled={nodes.length < 2}
+            className="btn disabled:opacity-40 disabled:cursor-not-allowed"
+            title={
+              edges.length > 0
+                ? "Re-wire all blocks into a source→backend→algorithm→metric→sink chain (replaces existing links)"
+                : "Wire all blocks into a source→backend→algorithm→metric→sink chain"
+            }
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Auto-connect</span>
+          </button>
           <ShareButton nodes={nodes} edges={edges} sampleKey={sampleKey} />
           <button onClick={clearGraph} className="btn" title="Clear the canvas">
             <Trash2 className="w-3.5 h-3.5" /> Clear
