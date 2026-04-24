@@ -82,9 +82,11 @@ function RunningHint() {
         Executing pipeline…
       </div>
       <div className="mt-2 text-[11px] leading-relaxed">
-        Most runs finish within a few seconds. A cold{" "}
-        <span className="text-ink">QuBound</span> run can take up to about
-        2&nbsp;minutes on HF's shared CPU — please don't close the tab.
+        Most runs finish within a few seconds. Cold{" "}
+        <span className="text-ink">QuBound</span> (LSTM training) or{" "}
+        <span className="text-ink">Qshot</span> (HDBSCAN warmup + pilot
+        measurements) runs can take 1–3&nbsp;minutes on HF's shared CPU —
+        please don't close the tab.
       </div>
     </div>
   );
