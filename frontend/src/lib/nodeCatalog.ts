@@ -38,8 +38,18 @@ export interface NodeSpec {
   defaultData?: Record<string, unknown>;
   defaultCount?: 0 | 1; // how many copies are auto-placed on canvas reset
   /** Optional link to the paper this block implements. Surfaces as a small
-   *  external-link icon on the node card and palette tile. */
-  paper?: { url: string; title: string; venue: string };
+   *  external-link icon on the node card and palette tile.
+   *
+   *  `bibtex` is the copy-to-clipboard string for the Papers popover.
+   *  Keep the author list up-to-date here — this is what visitors will
+   *  paste into their .bib file.
+   */
+  paper?: {
+    url: string;
+    title: string;
+    venue: string;
+    bibtex: string;
+  };
 }
 
 export const NODE_CATALOG: NodeSpec[] = [
@@ -93,6 +103,14 @@ export const NODE_CATALOG: NodeSpec[] = [
       title:
         "Battle Against Fluctuating Quantum Noise: Compression-Aided Framework to Enable Robust Quantum Neural Network",
       venue: "ICCAD 2023",
+      bibtex: `@inproceedings{qucad2023,
+  title     = {Battle Against Fluctuating Quantum Noise: Compression-Aided Framework to Enable Robust Quantum Neural Network},
+  author    = {Antony Maria, Jovin and Jiang, Weiwen},
+  booktitle = {2023 IEEE/ACM International Conference on Computer-Aided Design (ICCAD)},
+  year      = {2023},
+  eprint    = {2304.04666},
+  archivePrefix = {arXiv},
+}`,
     },
   },
   {
@@ -110,6 +128,14 @@ export const NODE_CATALOG: NodeSpec[] = [
       title:
         "Computational Performance Bounds Prediction in Quantum Computing with Unstable Noise",
       venue: "IEEE TCAD 2025",
+      bibtex: `@article{qubound2025,
+  title   = {Computational Performance Bounds Prediction in Quantum Computing with Unstable Noise},
+  author  = {Antony Maria, Jovin and Jiang, Weiwen},
+  journal = {IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems},
+  year    = {2025},
+  eprint  = {2507.17043},
+  archivePrefix = {arXiv},
+}`,
     },
   },
   {
@@ -125,6 +151,14 @@ export const NODE_CATALOG: NodeSpec[] = [
       url: "https://arxiv.org/abs/2207.01578",
       title: "Quantum Neural Network Compression",
       venue: "ICCAD 2022",
+      bibtex: `@inproceedings{compressvqc2022,
+  title     = {Quantum Neural Network Compression},
+  author    = {Hu, Zhirui and Dong, Peiyan and Wang, Zhepeng and Lin, Youzuo and Wang, Yanzhi and Jiang, Weiwen},
+  booktitle = {2022 IEEE/ACM International Conference on Computer-Aided Design (ICCAD)},
+  year      = {2022},
+  eprint    = {2207.01578},
+  archivePrefix = {arXiv},
+}`,
     },
   },
   {

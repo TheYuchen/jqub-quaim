@@ -15,7 +15,7 @@ import {
   type NodeTypes,
   type OnConnect,
 } from "@xyflow/react";
-import { ChevronDown, Loader2, Play, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Link as LinkIcon, Loader2, Play, Trash2 } from "lucide-react";
 import { NODE_BY_KIND, NODE_CATALOG, type NodeKind } from "../lib/nodeCatalog";
 import {
   DEFAULT_PRESET_KEY,
@@ -25,23 +25,76 @@ import {
 } from "../lib/presets";
 import { useApp } from "../lib/store";
 import { api } from "../lib/api";
+import {
+  buildSharePayload,
+  buildShareUrl,
+  readHashPayload,
+  type SharePayload,
+} from "../lib/share";
 import { QNode, type QNodeData } from "./QNode";
 
 type RFNode = Node<QNodeData>;
 
 const nodeTypes: NodeTypes = { qnode: QNode as unknown as NodeTypes[string] };
 
+/**
+ * Build the initial (nodes, edges) shown on the canvas.
+ *
+ * Order of precedence:
+ *   1. A valid share payload in `#s=...` — lets the recipient of a shared
+ *      link land directly on the author's pipeline. Includes any custom
+ *      edits the author made on top of a preset (hand-moved nodes,
+ *      parameter overrides, extra/removed blocks).
+ *   2. The default preset — plain first-visit experience.
+ *
+ * We keep this pure (no side effects) and hoist the hash read into a
+ * useMemo so the initial `useNodesState` / `useEdgesState` can take its
+ * output as the seed value. Loading the linked sample circuit is handled
+ * in a separate effect below, because that's async.
+ */
+function buildInitialGraph(): {
+  nodes: Node<QNodeData>[];
+  edges: Edge[];
+  hashPayload: SharePayload | null;
+} {
+  const hashPayload = readHashPayload();
+  if (hashPayload) {
+    const nodes: Node<QNodeData>[] = hashPayload.n.map((pn) => ({
+      id: pn.i,
+      type: "qnode",
+      position: { x: pn.x, y: pn.y },
+      data: {
+        kind: pn.k,
+        // Merge kind defaults under the shared params so newer defaults
+        // introduced after the link was made don't silently vanish.
+        params: {
+          ...(NODE_BY_KIND[pn.k]?.defaultData ?? {}),
+          ...(pn.p ?? {}),
+        },
+      },
+    }));
+    const edges: Edge[] = hashPayload.e.map((pe, i) => ({
+      id: `e${i + 1}`,
+      source: pe.s,
+      target: pe.t,
+      animated: true,
+    }));
+    return { nodes, edges, hashPayload };
+  }
+  const preset = buildPresetGraph(PRESET_BY_KEY[DEFAULT_PRESET_KEY]);
+  return { nodes: preset.nodes, edges: preset.edges, hashPayload: null };
+}
+
 export function FlowCanvas() {
-  // Boot with the default preset. The picker in the header lets the user
-  // swap in any of the other presets at any time; that replaces the whole
-  // graph (same semantics as the old "Reset" button, just multi-option).
-  const initial = useMemo(
-    () => buildPresetGraph(PRESET_BY_KEY[DEFAULT_PRESET_KEY]),
-    [],
-  );
+  // Boot with either a shared-link graph or the default preset. The
+  // picker in the header lets the user swap in any of the other presets
+  // at any time; that replaces the whole graph (same semantics as the
+  // old "Reset" button, just multi-option).
+  const initial = useMemo(() => buildInitialGraph(), []);
   const [nodes, setNodes, onNodesChange] = useNodesState<RFNode>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const circuit = useApp((s) => s.circuit);
+  const sampleKey = useApp((s) => s.sampleKey);
   const setRun = useApp((s) => s.setRun);
   const running = useApp((s) => s.running);
   const setRunning = useApp((s) => s.setRunning);
@@ -50,11 +103,19 @@ export function FlowCanvas() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
 
-  // Auto-load the first sample on boot so the canvas has something to chew on.
+  // Auto-load a sample circuit on boot so the canvas has something to chew
+  // on. Prefer the share-link's `sk` key if present; fall back to bell_state.
   useEffect(() => {
     if (circuit) return;
-    api.loadSample("bell_state").then((c) => useApp.getState().setCircuit(c)).catch(() => {});
-  }, [circuit]);
+    const key = initial.hashPayload?.sk ?? "bell_state";
+    api
+      .loadSample(key)
+      .then((c) => {
+        useApp.getState().setCircuit(c);
+        useApp.getState().setSampleKey(key);
+      })
+      .catch(() => {});
+  }, [circuit, initial.hashPayload]);
 
   const onConnect: OnConnect = useCallback(
     (c: Connection) => setEdges((eds) => addEdge(c, eds)),
@@ -148,6 +209,7 @@ export function FlowCanvas() {
         </div>
         <div className="flex items-center gap-2">
           <PresetPicker onPick={loadPreset} />
+          <ShareButton nodes={nodes} edges={edges} sampleKey={sampleKey} />
           <button onClick={clearGraph} className="btn" title="Clear the canvas">
             <Trash2 className="w-3.5 h-3.5" /> Clear
           </button>
@@ -290,6 +352,83 @@ function colorForKind(kind: NodeKind): string {
     output: "rgb(var(--color-ink))",
   };
   return map[kind] ?? "rgb(var(--color-mute))";
+}
+
+/**
+ * "Share" button: copies a URL carrying the current canvas state on its
+ * fragment. Shows a short "Copied" confirmation so the user knows it
+ * landed; no modal, no toast, no dropdown — this is a one-click action.
+ *
+ * Clipboard access falls back to a hidden `<textarea>` + `execCommand`
+ * because the Space runs off HTTPS only in production — on plain HTTP
+ * dev envs `navigator.clipboard` is undefined.
+ */
+function ShareButton({
+  nodes,
+  edges,
+  sampleKey,
+}: {
+  nodes: Node<QNodeData>[];
+  edges: Edge[];
+  sampleKey: string | null;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const onClick = async () => {
+    const payload = buildSharePayload(nodes, edges, sampleKey);
+    const url = buildShareUrl(payload);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      // Also reflect the new hash in the address bar so a refresh works
+      // and the user can bookmark the link directly.
+      try {
+        window.history.replaceState(null, "", url);
+      } catch {
+        /* some embedded iframes block this; ignore */
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* silently ignore */
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="btn"
+      title={
+        sampleKey
+          ? "Copy a link that restores this pipeline"
+          : "Copy a link that restores this pipeline (uploaded circuit will fall back to the default sample for recipients)"
+      }
+      aria-label="Copy share link"
+    >
+      {copied ? (
+        <>
+          <Check className="w-3.5 h-3.5 text-ok" />
+          <span className="hidden sm:inline">Copied</span>
+        </>
+      ) : (
+        <>
+          <LinkIcon className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Share</span>
+        </>
+      )}
+    </button>
+  );
 }
 
 function EmptyCanvas() {

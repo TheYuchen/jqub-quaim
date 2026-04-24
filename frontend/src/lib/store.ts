@@ -19,6 +19,19 @@ interface AppState {
   circuit: CircuitInfo | null;
   setCircuit: (c: CircuitInfo | null) => void;
 
+  /**
+   * Which sample circuit is currently loaded. `null` means the user
+   * uploaded their own file (which we can't share, since the recipient
+   * doesn't have that upload).
+   *
+   * Tracked alongside `circuit` so the Share-link builder can record
+   * "which sample to reload on the recipient's side". Without this we'd
+   * have to fuzzy-match on `circuit.name`, which breaks if we ever rename
+   * a sample's display name.
+   */
+  sampleKey: string | null;
+  setSampleKey: (k: string | null) => void;
+
   run: RunResponse | null;
   setRun: (r: RunResponse | null) => void;
 
@@ -42,6 +55,8 @@ interface AppState {
 export const useApp = create<AppState>((set) => ({
   circuit: null,
   setCircuit: (c) => set({ circuit: c }),
+  sampleKey: null,
+  setSampleKey: (k) => set({ sampleKey: k }),
   run: null,
   setRun: (r) => set({ run: r }),
   health: null,

@@ -3,7 +3,9 @@ import { useApp } from "../lib/store";
 import {
   Activity,
   BookOpen,
+  Check,
   CircleUser,
+  Copy,
   GraduationCap,
   HelpCircle,
   PanelLeft,
@@ -196,6 +198,7 @@ export function TopBar({
  */
 function PapersPopover() {
   const [open, setOpen] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const papers = NODE_CATALOG.filter((n) => n.paper).map((n) => ({
@@ -220,6 +223,33 @@ function PapersPopover() {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  // Copy a BibTeX entry to the clipboard. `navigator.clipboard` is
+  // async + may reject on insecure contexts / permission issues, so we
+  // fall back to a transient textarea + execCommand just in case the
+  // Space ever serves over http. Transient "copied" tick auto-clears.
+  const copyBibtex = async (bibtex: string, algo: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(bibtex);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = bibtex;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiedKey(algo);
+      window.setTimeout(() => {
+        setCopiedKey((k) => (k === algo ? null : k));
+      }, 1500);
+    } catch {
+      /* silently ignore — the user can still click the arxiv link */
+    }
+  };
 
   return (
     <div ref={rootRef} className="relative">
@@ -249,27 +279,55 @@ function PapersPopover() {
           role="menu"
           className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-0.5 w-[min(22rem,calc(100vw-1.5rem))]"
         >
-          {papers.map((p) => (
-            <a
-              key={p.algo}
-              role="menuitem"
-              href={p.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
-              className="block px-3 py-2 rounded-md hover:bg-surfaceAlt transition-colors border border-transparent hover:border-edge/60"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-ink font-medium">{p.algo}</span>
-                <span className="text-[10px] text-mute font-mono shrink-0">
-                  {p.venue}
-                </span>
+          {papers.map((p) => {
+            const copied = copiedKey === p.algo;
+            return (
+              <div
+                key={p.algo}
+                className="flex items-stretch rounded-md hover:bg-surfaceAlt transition-colors border border-transparent hover:border-edge/60"
+              >
+                <a
+                  role="menuitem"
+                  href={p.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  className="flex-1 min-w-0 px-3 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-ink font-medium">
+                      {p.algo}
+                    </span>
+                    <span className="text-[10px] text-mute font-mono shrink-0">
+                      {p.venue}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-mute leading-snug mt-0.5">
+                    {p.title}
+                  </div>
+                </a>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    // Don't let the click bubble up & trigger the row's
+                    // anchor-navigation. User's intent here is "copy",
+                    // not "open arxiv".
+                    e.stopPropagation();
+                    copyBibtex(p.bibtex, p.algo);
+                  }}
+                  className="shrink-0 px-2.5 flex items-center justify-center text-mute hover:text-ink border-l border-edge/40 transition-colors"
+                  title={copied ? "Copied!" : "Copy BibTeX"}
+                  aria-label={`Copy BibTeX for ${p.algo}`}
+                >
+                  {copied ? (
+                    <Check className="w-3.5 h-3.5 text-ok" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </button>
               </div>
-              <div className="text-[11px] text-mute leading-snug mt-0.5">
-                {p.title}
-              </div>
-            </a>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

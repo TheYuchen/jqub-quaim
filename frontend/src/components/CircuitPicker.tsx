@@ -10,6 +10,7 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
   const [openPreview, setOpenPreview] = useState<string | null>(null);
   const circuit = useApp((s) => s.circuit);
   const setCircuit = useApp((s) => s.setCircuit);
+  const setSampleKey = useApp((s) => s.setSampleKey);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -25,6 +26,9 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
     try {
       const info = await api.loadSample(key);
       setCircuit(info);
+      // Record the sample key so a later "Share link" knows which sample
+      // the recipient should load. Cleared in onUpload below.
+      setSampleKey(key);
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -38,6 +42,10 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
     try {
       const info = await api.upload(f);
       setCircuit(info);
+      // User-uploaded circuits can't round-trip through a share link
+      // (the recipient has no access to the uploaded bytes). Clear the
+      // key so buildSharePayload emits `sk: null`.
+      setSampleKey(null);
     } catch (e) {
       setErr((e as Error).message);
     } finally {
