@@ -85,6 +85,16 @@ export const PIPELINE_PRESETS: PipelinePreset[] = [
     ],
   },
   {
+    key: "qshot",
+    label: "Qshot",
+    tagline: "Recommend a shot count for your circuit at 95% fidelity",
+    nodes: [
+      { id: "n1", kind: "input_circuit" },
+      { id: "n2", kind: "qshot" },
+    ],
+    edges: [{ source: "n1", target: "n2" }],
+  },
+  {
     key: "full",
     label: "Full stack",
     tagline: "QuCAD + CompressVQC + QuBound + Fidelity, end-to-end",

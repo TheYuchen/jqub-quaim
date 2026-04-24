@@ -22,3 +22,16 @@ numpy<2.4
 pandas==2.2.3
 scipy==1.14.1
 scikit-learn==1.5.2
+
+# Qshot dependencies
+# hdbscan — noise-aware clustering over the reference circuit db.
+# torch-geometric — dual-graph GNN fallback (flat install works even
+#   without torch-scatter / torch-sparse; PyG falls back to pure-Python
+#   scatter/gather, which is slower but functionally equivalent and far
+#   simpler to install on HF Spaces than the PyG wheel index).
+# pylatexenc — lets Qiskit's MatplotlibDrawer render circuit diagrams
+#   with proper LaTeX gate labels; without it the Qshot card's
+#   "Circuit Diagram" section falls back to a plain-text rendering.
+hdbscan>=0.8.41,<0.9
+torch-geometric>=2.6,<2.8
+pylatexenc>=2.10

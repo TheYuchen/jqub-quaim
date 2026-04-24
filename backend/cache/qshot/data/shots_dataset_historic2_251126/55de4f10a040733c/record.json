@@ -1,0 +1,146 @@
+{
+  "schema_version": "v4.1",
+  "created_at": "2026-04-03T07:26:57.277626+00:00",
+  "record_id": "55de4f10a040733c",
+  "circuit_id": "f07603727745dbd3",
+  "noise_source": {
+    "json_file": "ibm_pittsburgh_representative_3_2025-11-26T00_00_00_00_00.json",
+    "query_datetime": "2025-11-26T00:00:00+00:00",
+    "backend_name": "ibm_pittsburgh",
+    "fake_backend": "fake_fez",
+    "noise_summary": {
+      "T1_mean": 286.3702182752811,
+      "T2_mean": 343.41415954779154,
+      "prob_meas0_prep1_mean": 0.010163136017628206,
+      "prob_meas1_prep0_mean": 0.0031112279647435895,
+      "sx_gate_error_mean": 0.006631704857789813,
+      "twoq_gate_error_mean": 0.03820415699533108
+    }
+  },
+  "transpile": {
+    "optimization_level": 1,
+    "seed_transpiler": 1234
+  },
+  "fidelity_definition": "hellinger_fidelity_(sum_sqrt(pq))^2_vs_statevector_ideal",
+  "real_fidelity_curve": {
+    "shots_sequence": [
+      50,
+      62,
+      78,
+      98,
+      122
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "50": {
+        "mean": 0.9065208122142371,
+        "std": 0.03637387876707907,
+        "p05": 0.8461592019048371,
+        "p50": 0.9109944762645592,
+        "p95": 0.9605453895934599
+      },
+      "62": {
+        "mean": 0.8966023004733803,
+        "std": 0.04129308999295789,
+        "p05": 0.8272003804563269,
+        "p50": 0.9025049777968093,
+        "p95": 0.9609741760564208
+      },
+      "78": {
+        "mean": 0.9065027806125293,
+        "std": 0.03288617099812686,
+        "p05": 0.8548826701261563,
+        "p50": 0.9053006422983443,
+        "p95": 0.9483105652758679
+      },
+      "98": {
+        "mean": 0.9006458426515302,
+        "std": 0.030479334007974673,
+        "p05": 0.8613299443344441,
+        "p50": 0.8965072078352514,
+        "p95": 0.9449590740198398
+      },
+      "122": {
+        "mean": 0.8987437927057205,
+        "std": 0.02883819316597367,
+        "p05": 0.8679413028170477,
+        "p50": 0.8934238227356956,
+        "p95": 0.9520147509880011
+      }
+    }
+  },
+  "progress_fidelity_curve": {
+    "shots_axis": [
+      50,
+      62,
+      78,
+      98
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "50": {
+        "mean": 0.883887689523496,
+        "std": 0.05293906565336845,
+        "p05": 0.7844751752243209,
+        "p50": 0.8938032104819655,
+        "p95": 0.9491572017034217
+      },
+      "62": {
+        "mean": 0.889178104477298,
+        "std": 0.024799869065128106,
+        "p05": 0.8503534532340847,
+        "p50": 0.8907727912742529,
+        "p95": 0.9244201253964274
+      },
+      "78": {
+        "mean": 0.9128478777507091,
+        "std": 0.03077447542794553,
+        "p05": 0.8706070710682691,
+        "p50": 0.9099303475035778,
+        "p95": 0.9491298207822709
+      },
+      "98": {
+        "mean": 0.9173931414584462,
+        "std": 0.03455027640051837,
+        "p05": 0.8565943695153899,
+        "p50": 0.9233945476395129,
+        "p95": 0.9650596940421455
+      }
+    },
+    "note": "PF[k] = hellinger_fidelity(dist@shots[k], dist@shots[k+1]); length N-1."
+  },
+  "convergence": {
+    "converged": true,
+    "converged_shots": 78,
+    "params": {
+      "N_min": 3,
+      "W": 3,
+      "epsilon": 0.003,
+      "shots_ratio": 1.25,
+      "method": "real_fidelity_slope_only"
+    }
+  },
+  "features": {
+    "depth": 58.0,
+    "size": 119.0,
+    "num_2q": 24.0,
+    "swap": 0.0,
+    "unique_2q_edges": 4.0,
+    "max_2q_edge_mult": 8.0,
+    "cx": 0.0,
+    "ecr": 0.0,
+    "cz": 24.0,
+    "rz": 42.0,
+    "ry": 0.0,
+    "rx": 0.0,
+    "sx": 47.0,
+    "h": 0.0
+  },
+  "artifacts": {
+    "dir": "shots_dataset_historic2_251126/55de4f10a040733c",
+    "record_json": "shots_dataset_historic2_251126/55de4f10a040733c/record.json",
+    "arrays_npz": "shots_dataset_historic2_251126/55de4f10a040733c/arrays.npz",
+    "base_qasm": "shots_dataset_historic2_251126/55de4f10a040733c/base.qasm",
+    "transpiled_qasm": "shots_dataset_historic2_251126/55de4f10a040733c/transpiled.qasm"
+  }
+}

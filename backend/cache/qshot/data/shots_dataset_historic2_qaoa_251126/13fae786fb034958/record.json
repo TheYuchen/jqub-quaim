@@ -1,0 +1,146 @@
+{
+  "schema_version": "v4.1",
+  "created_at": "2026-04-02T21:54:07.334190+00:00",
+  "record_id": "13fae786fb034958",
+  "circuit_id": "2463a3c9115845cb",
+  "noise_source": {
+    "json_file": "ibm_pittsburgh_representative_3_2025-11-26T00_00_00_00_00.json",
+    "query_datetime": "2025-11-26T00:00:00+00:00",
+    "backend_name": "ibm_pittsburgh",
+    "fake_backend": "fake_fez",
+    "noise_summary": {
+      "T1_mean": 286.3702182752811,
+      "T2_mean": 343.41415954779154,
+      "prob_meas0_prep1_mean": 0.010163136017628206,
+      "prob_meas1_prep0_mean": 0.0031112279647435895,
+      "sx_gate_error_mean": 0.006631704857789813,
+      "twoq_gate_error_mean": 0.03820415699533108
+    }
+  },
+  "transpile": {
+    "optimization_level": 1,
+    "seed_transpiler": 1234
+  },
+  "fidelity_definition": "hellinger_fidelity_(sum_sqrt(pq))^2_vs_statevector_ideal",
+  "real_fidelity_curve": {
+    "shots_sequence": [
+      100,
+      150,
+      225,
+      338,
+      506
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "100": {
+        "mean": 0.9565412412039626,
+        "std": 0.014852696217312465,
+        "p05": 0.93490601778218,
+        "p50": 0.9536443506501681,
+        "p95": 0.9810278793626899
+      },
+      "150": {
+        "mean": 0.9644326391159878,
+        "std": 0.010142782287754882,
+        "p05": 0.9509341044418124,
+        "p50": 0.9651967805608501,
+        "p95": 0.980064928193093
+      },
+      "225": {
+        "mean": 0.9703044865224975,
+        "std": 0.011433178970852912,
+        "p05": 0.9517329020233595,
+        "p50": 0.973806432115133,
+        "p95": 0.9829183644667921
+      },
+      "338": {
+        "mean": 0.9726161451167699,
+        "std": 0.009607651856914185,
+        "p05": 0.958803302731923,
+        "p50": 0.9733149911491508,
+        "p95": 0.9842629801489514
+      },
+      "506": {
+        "mean": 0.9752687301321104,
+        "std": 0.006897173457647456,
+        "p05": 0.9629605267051161,
+        "p50": 0.9758829534466554,
+        "p95": 0.9848767494647216
+      }
+    }
+  },
+  "progress_fidelity_curve": {
+    "shots_axis": [
+      100,
+      150,
+      225,
+      338
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "100": {
+        "mean": 0.9404649627904705,
+        "std": 0.025571155895490232,
+        "p05": 0.8863525135535563,
+        "p50": 0.939943906697956,
+        "p95": 0.9761311339299636
+      },
+      "150": {
+        "mean": 0.9543614188361524,
+        "std": 0.015472703885445539,
+        "p05": 0.9308996011105853,
+        "p50": 0.9563409974811667,
+        "p95": 0.9765524620851664
+      },
+      "225": {
+        "mean": 0.9632552262235315,
+        "std": 0.014441804904184879,
+        "p05": 0.9354956671391645,
+        "p50": 0.9647013662057448,
+        "p95": 0.9800427360349405
+      },
+      "338": {
+        "mean": 0.9729260627471387,
+        "std": 0.008393291861082963,
+        "p05": 0.9592277627701657,
+        "p50": 0.975203220184462,
+        "p95": 0.9854255218244586
+      }
+    },
+    "note": "PF[k] = hellinger_fidelity(dist@shots[k], dist@shots[k+1]); length N-1."
+  },
+  "convergence": {
+    "converged": true,
+    "converged_shots": 225,
+    "params": {
+      "N_min": 4,
+      "W": 3,
+      "epsilon": 0.003,
+      "shots_ratio": 1.5,
+      "method": "real_fidelity_slope_only"
+    }
+  },
+  "features": {
+    "depth": 66.0,
+    "size": 115.0,
+    "num_2q": 12.0,
+    "swap": 0.0,
+    "unique_2q_edges": 6.0,
+    "max_2q_edge_mult": 2.0,
+    "cx": 0.0,
+    "ecr": 0.0,
+    "cz": 12.0,
+    "rz": 60.0,
+    "ry": 0.0,
+    "rx": 0.0,
+    "sx": 36.0,
+    "h": 0.0
+  },
+  "artifacts": {
+    "dir": "shots_dataset_historic2_qaoa_251126/13fae786fb034958",
+    "record_json": "shots_dataset_historic2_qaoa_251126/13fae786fb034958/record.json",
+    "arrays_npz": "shots_dataset_historic2_qaoa_251126/13fae786fb034958/arrays.npz",
+    "base_qasm": "shots_dataset_historic2_qaoa_251126/13fae786fb034958/base.qasm",
+    "transpiled_qasm": "shots_dataset_historic2_qaoa_251126/13fae786fb034958/transpiled.qasm"
+  }
+}

@@ -27,6 +27,8 @@ export function StepBody({ step }: { step: StepResult }) {
       return <QuCADCard s={s} />;
     case "compvqc":
       return <CompressVQCCard s={s} />;
+    case "qshot":
+      return <QshotCard s={s} />;
     case "fidelity":
       return <FidelityCard s={s} />;
     case "output":
@@ -153,6 +155,124 @@ function CompressVQCCard({ s }: { s: Record<string, unknown> }) {
         <Stat label="gates removed" value={`${removed}`} />
         <Stat label="depth reduction" value={`${shrinkPct.toFixed(0)}%`} />
       </div>
+      <details className="text-[11px] text-mute">
+        <summary className="cursor-pointer hover:text-ink">raw summary</summary>
+        <div className="mt-1 pl-2 border-l border-edge space-y-0.5">
+          {Object.entries(s).map(([k, v]) => (
+            <KvRow key={k} k={k} v={v} />
+          ))}
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/** Qshot — recommended shot count + predicted fidelity at that count. */
+function QshotCard({ s }: { s: Record<string, unknown> }) {
+  const shots = numOr(s["recommended_shots"], NaN);
+  const fid = numOr(s["predicted_fidelity"], NaN);
+  const std = numOr(s["predicted_std"], NaN);
+  const method = String(s["method"] ?? "regression");
+  const alpha = numOr(s["alpha"], 0.95);
+  const snapshot = String(s["noise_snapshot"] ?? "");
+  const cluster = s["cluster_label"];
+  const tier = s["tier"];
+  const nMatched = s["n_matched"];
+
+  const fit = (s["fit"] as Record<string, unknown> | undefined) ?? {};
+  const fInf = numOr(fit["F_inf"], NaN);
+  const target = numOr(fit["target"], NaN);
+
+  const pilot = (s["pilot_pf"] as Record<string, unknown> | undefined) ?? {};
+  const pilotPoints = Object.entries(pilot)
+    .map(([k, v]) => [Number(k), Number(v)] as [number, number])
+    .filter(([k, v]) => Number.isFinite(k) && Number.isFinite(v))
+    .sort((a, b) => a[0] - b[0]);
+
+  // GNN fallback gets its own label so users can tell whether the main
+  // regression path was used or not.
+  const methodLabel = method === "gnn_fallback" ? "GNN fallback" : "regression";
+
+  return (
+    <div className="mt-2 space-y-2">
+      <Caption>
+        <span className="text-ink font-medium">What Qshot did:</span> predicted
+        how many measurement shots your circuit needs to reach{" "}
+        {(alpha * 100).toFixed(0)}% of its converged fidelity under the chosen
+        IBM calibration snapshot. Saves you from over- or under-sampling on
+        real hardware.
+      </Caption>
+
+      {/* Three headline stats — mirrors the screenshot the author shared. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <Stat
+          label="recommended shots"
+          value={Number.isFinite(shots) ? `${shots}` : "—"}
+        />
+        <Stat
+          label="predicted fidelity"
+          value={Number.isFinite(fid) ? fid.toFixed(4) : "—"}
+          sub={Number.isFinite(std) ? `± ${std.toFixed(4)}` : undefined}
+        />
+        <Stat label="method" value={methodLabel} />
+      </div>
+
+      {/* Target-fidelity formula line — replicates the author's notation
+          "α × converged F (F_inf=…) = target". Only render if all the
+          numbers are real so we don't emit a half-filled sentence. */}
+      {Number.isFinite(fInf) && Number.isFinite(target) && (
+        <div className="text-[11px] text-mute">
+          <span className="text-ink">Target</span>: α={alpha.toFixed(2)} ×
+          converged F (F<sub>inf</sub>={fInf.toFixed(4)}) ={" "}
+          <span className="text-ink">{target.toFixed(4)}</span>
+        </div>
+      )}
+
+      {/* Cluster / tier / neighbors line — compact, tabular. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mute">
+        {cluster !== undefined && cluster !== null && (
+          <span>
+            <span className="text-ink">Cluster</span>: {String(cluster)}
+          </span>
+        )}
+        {tier !== undefined && tier !== null && (
+          <span>
+            <span className="text-ink">Tier</span>: {String(tier)}
+          </span>
+        )}
+        {nMatched !== undefined && nMatched !== null && (
+          <span>
+            <span className="text-ink">PF-matched neighbours</span>:{" "}
+            {String(nMatched)}
+          </span>
+        )}
+        {snapshot && (
+          <span className="font-mono text-edge">· {snapshot}</span>
+        )}
+      </div>
+
+      {/* Pilot-measurement sparkline — shows the shots vs. observed PF
+          points Qshot collected. Small, decorative, so keep it collapsed
+          behind a disclosure. */}
+      {pilotPoints.length >= 2 && (
+        <details className="text-[11px] text-mute">
+          <summary className="cursor-pointer hover:text-ink">
+            pilot measurements ({pilotPoints.length} points)
+          </summary>
+          <div className="mt-1 pl-2 border-l border-edge space-y-1">
+            <Sparkline data={pilotPoints.map(([, v]) => v)} height={28} />
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 font-mono">
+              {pilotPoints.map(([shots, pf]) => (
+                <div key={shots} className="flex justify-between">
+                  <span className="text-edge">{shots} shots</span>
+                  <span>{pf.toFixed(4)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      )}
+
       <details className="text-[11px] text-mute">
         <summary className="cursor-pointer hover:text-ink">raw summary</summary>
         <div className="mt-1 pl-2 border-l border-edge space-y-0.5">

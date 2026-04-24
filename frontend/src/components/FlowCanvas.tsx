@@ -490,6 +490,7 @@ function colorForKind(kind: NodeKind): string {
     qucad: "rgb(var(--color-accent2))",
     qubound: "rgb(var(--color-accent3))",
     compvqc: "rgb(var(--color-accent4))",
+    qshot: "rgb(var(--color-warn))",
     fidelity: "rgb(var(--color-ok))",
     output: "rgb(var(--color-ink))",
   };

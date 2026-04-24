@@ -1,0 +1,146 @@
+{
+  "schema_version": "v4.1",
+  "created_at": "2026-03-26T18:41:31.772612+00:00",
+  "record_id": "0ec76ad25a1e65a8",
+  "circuit_id": "837622aa70b6b7cd",
+  "noise_source": {
+    "json_file": "ibm_marrakesh_representative_1_2025-05-06T00_00_00_00_00.json",
+    "query_datetime": "2025-05-06T00:00:00+00:00",
+    "backend_name": "ibm_marrakesh",
+    "fake_backend": "fake_marrakesh",
+    "noise_summary": {
+      "T1_mean": 215.481747115048,
+      "T2_mean": 135.62021222633922,
+      "prob_meas0_prep1_mean": 0.029972956730769232,
+      "prob_meas1_prep0_mean": 0.023274739583333332,
+      "sx_gate_error_mean": 0.0071339761111955564,
+      "twoq_gate_error_mean": 0.01309083658108124
+    }
+  },
+  "transpile": {
+    "optimization_level": 1,
+    "seed_transpiler": 1234
+  },
+  "fidelity_definition": "hellinger_fidelity_(sum_sqrt(pq))^2_vs_statevector_ideal",
+  "real_fidelity_curve": {
+    "shots_sequence": [
+      100,
+      150,
+      225,
+      338,
+      506
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "100": {
+        "mean": 0.8735771126281631,
+        "std": 0.03349113975873333,
+        "p05": 0.8175249005707733,
+        "p50": 0.8745502396646376,
+        "p95": 0.9181685765594924
+      },
+      "150": {
+        "mean": 0.8789522596280227,
+        "std": 0.022407038749194058,
+        "p05": 0.8440000882037503,
+        "p50": 0.8794043197047662,
+        "p95": 0.9135349295631188
+      },
+      "225": {
+        "mean": 0.8933662135259567,
+        "std": 0.013011454106207864,
+        "p05": 0.87613987880662,
+        "p50": 0.892999209209349,
+        "p95": 0.9111232707134268
+      },
+      "338": {
+        "mean": 0.8935337508669896,
+        "std": 0.016314744810988876,
+        "p05": 0.8679307785461748,
+        "p50": 0.8947563538189316,
+        "p95": 0.919214756078987
+      },
+      "506": {
+        "mean": 0.8945059258759087,
+        "std": 0.014792135402272309,
+        "p05": 0.8748124191500416,
+        "p50": 0.8937009760721268,
+        "p95": 0.9127301697801847
+      }
+    }
+  },
+  "progress_fidelity_curve": {
+    "shots_axis": [
+      100,
+      150,
+      225,
+      338
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "100": {
+        "mean": 0.8946631798184491,
+        "std": 0.020744767747120873,
+        "p05": 0.8588724360653619,
+        "p50": 0.8960214308235102,
+        "p95": 0.9251219072301002
+      },
+      "150": {
+        "mean": 0.9277324972792165,
+        "std": 0.017178991063536465,
+        "p05": 0.9039662001021003,
+        "p50": 0.9303711404049193,
+        "p95": 0.952161162609207
+      },
+      "225": {
+        "mean": 0.9414430444137386,
+        "std": 0.011253750021183302,
+        "p05": 0.9263453215002911,
+        "p50": 0.9402018838586534,
+        "p95": 0.9565717876922005
+      },
+      "338": {
+        "mean": 0.953335558127922,
+        "std": 0.01473558093110044,
+        "p05": 0.9281678608673095,
+        "p50": 0.9546292701199495,
+        "p95": 0.9722422465040549
+      }
+    },
+    "note": "PF[k] = hellinger_fidelity(dist@shots[k], dist@shots[k+1]); length N-1."
+  },
+  "convergence": {
+    "converged": true,
+    "converged_shots": 225,
+    "params": {
+      "N_min": 4,
+      "W": 3,
+      "epsilon": 0.003,
+      "shots_ratio": 1.5,
+      "method": "real_fidelity_slope_only"
+    }
+  },
+  "features": {
+    "depth": 66.0,
+    "size": 115.0,
+    "num_2q": 12.0,
+    "swap": 0.0,
+    "unique_2q_edges": 6.0,
+    "max_2q_edge_mult": 2.0,
+    "cx": 0.0,
+    "ecr": 0.0,
+    "cz": 12.0,
+    "rz": 60.0,
+    "ry": 0.0,
+    "rx": 0.0,
+    "sx": 36.0,
+    "h": 0.0
+  },
+  "artifacts": {
+    "dir": "shots_dataset_historic_qaoa_250506/0ec76ad25a1e65a8",
+    "record_json": "shots_dataset_historic_qaoa_250506/0ec76ad25a1e65a8/record.json",
+    "arrays_npz": "shots_dataset_historic_qaoa_250506/0ec76ad25a1e65a8/arrays.npz",
+    "base_qasm": "shots_dataset_historic_qaoa_250506/0ec76ad25a1e65a8/base.qasm",
+    "transpiled_qasm": "shots_dataset_historic_qaoa_250506/0ec76ad25a1e65a8/transpiled.qasm"
+  }
+}

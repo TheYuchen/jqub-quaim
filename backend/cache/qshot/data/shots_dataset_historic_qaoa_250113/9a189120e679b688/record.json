@@ -1,0 +1,146 @@
+{
+  "schema_version": "v4.1",
+  "created_at": "2026-03-26T10:23:19.039045+00:00",
+  "record_id": "9a189120e679b688",
+  "circuit_id": "5a90e33a521acce2",
+  "noise_source": {
+    "json_file": "ibm_marrakesh_representative_5_2025-01-13T00_00_00_00_00.json",
+    "query_datetime": "2025-01-13T00:00:00+00:00",
+    "backend_name": "ibm_marrakesh",
+    "fake_backend": "fake_marrakesh",
+    "noise_summary": {
+      "T1_mean": 197.26487226455515,
+      "T2_mean": 140.2709094290409,
+      "prob_meas0_prep1_mean": 0.03365982905982906,
+      "prob_meas1_prep0_mean": 0.029408974358974358,
+      "sx_gate_error_mean": 0.00038436505284137685,
+      "twoq_gate_error_mean": 0.043460534616998926
+    }
+  },
+  "transpile": {
+    "optimization_level": 1,
+    "seed_transpiler": 1234
+  },
+  "fidelity_definition": "hellinger_fidelity_(sum_sqrt(pq))^2_vs_statevector_ideal",
+  "real_fidelity_curve": {
+    "shots_sequence": [
+      100,
+      150,
+      225,
+      338,
+      506
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "100": {
+        "mean": 0.828847738628001,
+        "std": 0.038134105913322204,
+        "p05": 0.7705928556507756,
+        "p50": 0.8325417211755365,
+        "p95": 0.8890338989165916
+      },
+      "150": {
+        "mean": 0.8373931410463152,
+        "std": 0.02549425302684855,
+        "p05": 0.7950783535760807,
+        "p50": 0.8402623984725094,
+        "p95": 0.8716923104762063
+      },
+      "225": {
+        "mean": 0.8544766802701859,
+        "std": 0.023132951771807842,
+        "p05": 0.8150400162382359,
+        "p50": 0.8567008241156072,
+        "p95": 0.8907887475630829
+      },
+      "338": {
+        "mean": 0.8497409394564899,
+        "std": 0.020005001928255505,
+        "p05": 0.8167327427837813,
+        "p50": 0.8514304355080614,
+        "p95": 0.8805819225245783
+      },
+      "506": {
+        "mean": 0.8500629109909852,
+        "std": 0.018739988236486736,
+        "p05": 0.8075470994120565,
+        "p50": 0.8518675561175392,
+        "p95": 0.8735469708272833
+      }
+    }
+  },
+  "progress_fidelity_curve": {
+    "shots_axis": [
+      100,
+      150,
+      225,
+      338
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "100": {
+        "mean": 0.8858641715248159,
+        "std": 0.03694053739788658,
+        "p05": 0.8328450725871985,
+        "p50": 0.8793194838206804,
+        "p95": 0.9411552459500928
+      },
+      "150": {
+        "mean": 0.922373854603326,
+        "std": 0.02032540143603386,
+        "p05": 0.8927404862851793,
+        "p50": 0.9254946495462133,
+        "p95": 0.9564503303513828
+      },
+      "225": {
+        "mean": 0.9415070897514227,
+        "std": 0.016024325327938706,
+        "p05": 0.9136011912329294,
+        "p50": 0.9428444965337752,
+        "p95": 0.9694122499827665
+      },
+      "338": {
+        "mean": 0.9529622418096064,
+        "std": 0.011371543273832658,
+        "p05": 0.9367040018858418,
+        "p50": 0.9511152316656196,
+        "p95": 0.9720840079857703
+      }
+    },
+    "note": "PF[k] = hellinger_fidelity(dist@shots[k], dist@shots[k+1]); length N-1."
+  },
+  "convergence": {
+    "converged": true,
+    "converged_shots": 225,
+    "params": {
+      "N_min": 4,
+      "W": 3,
+      "epsilon": 0.003,
+      "shots_ratio": 1.5,
+      "method": "real_fidelity_slope_only"
+    }
+  },
+  "features": {
+    "depth": 116.0,
+    "size": 291.0,
+    "num_2q": 40.0,
+    "swap": 0.0,
+    "unique_2q_edges": 5.0,
+    "max_2q_edge_mult": 8.0,
+    "cx": 0.0,
+    "ecr": 0.0,
+    "cz": 40.0,
+    "rz": 155.0,
+    "ry": 0.0,
+    "rx": 0.0,
+    "sx": 90.0,
+    "h": 0.0
+  },
+  "artifacts": {
+    "dir": "shots_dataset_historic_qaoa_250113/9a189120e679b688",
+    "record_json": "shots_dataset_historic_qaoa_250113/9a189120e679b688/record.json",
+    "arrays_npz": "shots_dataset_historic_qaoa_250113/9a189120e679b688/arrays.npz",
+    "base_qasm": "shots_dataset_historic_qaoa_250113/9a189120e679b688/base.qasm",
+    "transpiled_qasm": "shots_dataset_historic_qaoa_250113/9a189120e679b688/transpiled.qasm"
+  }
+}

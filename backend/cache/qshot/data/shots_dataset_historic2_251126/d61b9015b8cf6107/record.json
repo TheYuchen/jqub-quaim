@@ -1,0 +1,114 @@
+{
+  "schema_version": "v4.1",
+  "created_at": "2026-04-04T04:11:50.867768+00:00",
+  "record_id": "d61b9015b8cf6107",
+  "circuit_id": "d5d3630e1b9d1999",
+  "noise_source": {
+    "json_file": "ibm_pittsburgh_representative_3_2025-11-26T00_00_00_00_00.json",
+    "query_datetime": "2025-11-26T00:00:00+00:00",
+    "backend_name": "ibm_pittsburgh",
+    "fake_backend": "fake_fez",
+    "noise_summary": {
+      "T1_mean": 286.3702182752811,
+      "T2_mean": 343.41415954779154,
+      "prob_meas0_prep1_mean": 0.010163136017628206,
+      "prob_meas1_prep0_mean": 0.0031112279647435895,
+      "sx_gate_error_mean": 0.006631704857789813,
+      "twoq_gate_error_mean": 0.03820415699533108
+    }
+  },
+  "transpile": {
+    "optimization_level": 1,
+    "seed_transpiler": 1234
+  },
+  "fidelity_definition": "hellinger_fidelity_(sum_sqrt(pq))^2_vs_statevector_ideal",
+  "real_fidelity_curve": {
+    "shots_sequence": [
+      50,
+      62,
+      78
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "50": {
+        "mean": 0.8805934553735607,
+        "std": 0.04081988928566871,
+        "p05": 0.8260584059044577,
+        "p50": 0.87947353646526,
+        "p95": 0.9388709674019399
+      },
+      "62": {
+        "mean": 0.8804827128184682,
+        "std": 0.041973184744144694,
+        "p05": 0.8061876456412086,
+        "p50": 0.8863173410248957,
+        "p95": 0.9350273027416816
+      },
+      "78": {
+        "mean": 0.8736952583950269,
+        "std": 0.03165267477922245,
+        "p05": 0.8331058612459684,
+        "p50": 0.8716786955828095,
+        "p95": 0.9255832179898674
+      }
+    }
+  },
+  "progress_fidelity_curve": {
+    "shots_axis": [
+      50,
+      62
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "50": {
+        "mean": 0.8613583797144582,
+        "std": 0.044111002988475596,
+        "p05": 0.7941748441855626,
+        "p50": 0.8606367707593439,
+        "p95": 0.9228814332512735
+      },
+      "62": {
+        "mean": 0.8774544840956238,
+        "std": 0.034331640110187835,
+        "p05": 0.8388240426199034,
+        "p50": 0.8693649769410265,
+        "p95": 0.9475318150613927
+      }
+    },
+    "note": "PF[k] = hellinger_fidelity(dist@shots[k], dist@shots[k+1]); length N-1."
+  },
+  "convergence": {
+    "converged": true,
+    "converged_shots": 50,
+    "params": {
+      "N_min": 3,
+      "W": 3,
+      "epsilon": 0.003,
+      "shots_ratio": 1.25,
+      "method": "real_fidelity_slope_only"
+    }
+  },
+  "features": {
+    "depth": 175.0,
+    "size": 266.0,
+    "num_2q": 58.0,
+    "swap": 0.0,
+    "unique_2q_edges": 5.0,
+    "max_2q_edge_mult": 19.0,
+    "cx": 0.0,
+    "ecr": 0.0,
+    "cz": 58.0,
+    "rz": 100.0,
+    "ry": 0.0,
+    "rx": 0.0,
+    "sx": 102.0,
+    "h": 0.0
+  },
+  "artifacts": {
+    "dir": "shots_dataset_historic2_251126/d61b9015b8cf6107",
+    "record_json": "shots_dataset_historic2_251126/d61b9015b8cf6107/record.json",
+    "arrays_npz": "shots_dataset_historic2_251126/d61b9015b8cf6107/arrays.npz",
+    "base_qasm": "shots_dataset_historic2_251126/d61b9015b8cf6107/base.qasm",
+    "transpiled_qasm": "shots_dataset_historic2_251126/d61b9015b8cf6107/transpiled.qasm"
+  }
+}

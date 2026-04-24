@@ -10,6 +10,7 @@ import {
   PackageCheck,
   Server,
   Shrink,
+  Target,
   Waypoints,
 } from "lucide-react";
 
@@ -20,6 +21,7 @@ export type NodeKind =
   | "qucad"
   | "qubound"
   | "compvqc"
+  | "qshot"
   | "fidelity"
   | "output";
 
@@ -159,6 +161,24 @@ export const NODE_CATALOG: NodeSpec[] = [
   eprint    = {2207.01578},
   archivePrefix = {arXiv},
 }`,
+    },
+  },
+  {
+    kind: "qshot",
+    label: "Qshot",
+    family: "algorithm",
+    tagline: "recommend shot count",
+    description:
+      "Noise-aware shot-count recommender. Predicts the minimum number of measurement shots your circuit needs to reach a target fidelity on a chosen IBM calibration snapshot. Self-contained — no upstream backend required.",
+    icon: Target,
+    accent: "text-warn",
+    accentRing: "border-warn/40",
+    // Default: pittsburgh_1 snapshot + 95% of converged fidelity, matches
+    // the author's example_usage.py defaults. Users can tweak either from
+    // the block's parameter panel.
+    defaultData: {
+      noise_snapshot: "pittsburgh_1",
+      alpha: 0.95,
     },
   },
   {

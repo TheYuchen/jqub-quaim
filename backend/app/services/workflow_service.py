@@ -274,6 +274,88 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
     )
 
 
+def _handle_qshot(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
+    """Qshot — noise-aware shot-count recommender.
+
+    Qshot is self-contained by design (Jovin's handover note): it picks
+    its own `AerSimulator`, runs its own transpile pass, and consumes
+    calibration data through a bundled noise JSON. So this handler
+    ignores any upstream `ctx["backend"]`; the user steers noise via
+    the node's ``noise_snapshot`` parameter.
+
+    Heavy imports (torch-geometric, hdbscan) are deferred to the first
+    call — that's also when the singleton `QshotRecommender` does its
+    ~30-40s HDBSCAN warmup. Subsequent calls reuse the same instance.
+    """
+    t0 = _now()
+    # Deferred so boot stays cheap and `/api/health` answers even if
+    # Qshot's deps failed to install for some reason.
+    from qlib.qshot import (
+        DEFAULT_SNAPSHOT_KEY,
+        get_recommender,
+        resolve_noise_snapshot,
+    )
+
+    qc: QuantumCircuit = ctx["circuit"]
+    snapshot_key = str(node.data.get("noise_snapshot", DEFAULT_SNAPSHOT_KEY))
+    alpha = float(node.data.get("alpha", 0.95))
+    # Clamp alpha to a sane range — model was fit for fractions close to 1.
+    alpha = max(0.50, min(0.99, alpha))
+
+    # Qshot's pilot-measurement path runs `sim.run(tqc)` directly on the
+    # circuit; Aer refuses if there are unbound parameters. Bind any free
+    # parameters to zero so parametric samples (HEA / EfficientSU2 / VQC)
+    # still produce a usable circuit. This mirrors what QuBound does.
+    if qc.num_parameters > 0:
+        qc = qc.assign_parameters([0.0] * qc.num_parameters)
+
+    noise_path = resolve_noise_snapshot(snapshot_key)
+    recommender = get_recommender()
+    result = recommender.predict(qc, noise_path, alpha=alpha)
+
+    if result is None:
+        return _make_step(
+            node,
+            "error",
+            started_at=t0,
+            message=(
+                "Qshot could not produce a recommendation for this circuit. "
+                "It may be out of the trained distribution (5–8 qubits, "
+                "QAOA-like / HEA / random layered circuits)."
+            ),
+        )
+
+    # `result` is whatever recommend_shots() returned plus the keys the
+    # public API promises (`recommended_shots`, `method`, …). Lift the
+    # interesting fields into `summary` so the React card can render
+    # them without having to know the internal fit-dict shape.
+    fit = result.get("fit") or {}
+    summary = {
+        "recommended_shots": int(result["recommended_shots"]),
+        "predicted_fidelity": float(result["predicted_fidelity"]),
+        "predicted_std": float(result.get("predicted_std", 0.0)),
+        "method": result.get("method", "regression"),
+        "cluster_label": result.get("cluster_label"),
+        "tier": result.get("tier"),
+        "n_matched": result.get("n_matched"),
+        "alpha": alpha,
+        "noise_snapshot": snapshot_key,
+        # Fit parameters — used by the UI to render the target formula line.
+        "fit": {
+            "F_inf": float(fit["F_inf"]) if fit.get("F_inf") is not None else None,
+            "a": float(fit["a"]) if fit.get("a") is not None else None,
+            "b": float(fit["b"]) if fit.get("b") is not None else None,
+            "target": float(fit["target"]) if fit.get("target") is not None else None,
+        },
+        # Pilot measurements (shots → observed fidelity proxy) — handy for
+        # the "where the curve came from" chart in the card.
+        "pilot_pf": {
+            str(k): float(v) for k, v in (result.get("pilot_pf") or {}).items()
+        },
+    }
+    return _make_step(node, "ok", started_at=t0, summary=summary)
+
+
 def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
     t0 = _now()
     from qlib.qiskit_utils import simpleFidelityEstimator
@@ -315,6 +397,7 @@ _HANDLERS: dict[str, Callable[[FlowNode, dict, Settings], StepResult]] = {
     "qucad": _handle_qucad,
     "qubound": _handle_qubound,
     "compvqc": _handle_compvqc,
+    "qshot": _handle_qshot,
     "fidelity": _handle_fidelity,
     "output": _handle_output,
 }

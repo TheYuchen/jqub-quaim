@@ -1,0 +1,146 @@
+{
+  "schema_version": "v4.1",
+  "created_at": "2026-04-03T02:53:04.855675+00:00",
+  "record_id": "037cd63e8e2d1c14",
+  "circuit_id": "728312f3353652e7",
+  "noise_source": {
+    "json_file": "ibm_pittsburgh_representative_5_2025-07-24T00_00_00_00_00.json",
+    "query_datetime": "2025-07-24T00:00:00+00:00",
+    "backend_name": "ibm_pittsburgh",
+    "fake_backend": "fake_fez",
+    "noise_summary": {
+      "T1_mean": 295.0266644915258,
+      "T2_mean": 272.2469670133587,
+      "prob_meas0_prep1_mean": 0.2428886217948718,
+      "prob_meas1_prep0_mean": 0.29532564603365385,
+      "sx_gate_error_mean": 0.038808722855336035,
+      "twoq_gate_error_mean": 0.05791100844182038
+    }
+  },
+  "transpile": {
+    "optimization_level": 1,
+    "seed_transpiler": 1234
+  },
+  "fidelity_definition": "hellinger_fidelity_(sum_sqrt(pq))^2_vs_statevector_ideal",
+  "real_fidelity_curve": {
+    "shots_sequence": [
+      50,
+      62,
+      78,
+      98,
+      122
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "50": {
+        "mean": 0.14497933649496852,
+        "std": 0.037292799734594866,
+        "p05": 0.09782636016338353,
+        "p50": 0.1478046310805829,
+        "p95": 0.2050913734101096
+      },
+      "62": {
+        "mean": 0.1621270375263018,
+        "std": 0.04199034168886455,
+        "p05": 0.1117778004313876,
+        "p50": 0.14874678029749758,
+        "p95": 0.23815066103747515
+      },
+      "78": {
+        "mean": 0.175176421974277,
+        "std": 0.045618784013719126,
+        "p05": 0.10722571541016226,
+        "p50": 0.16967327403417018,
+        "p95": 0.2600232804645707
+      },
+      "98": {
+        "mean": 0.1722455531388537,
+        "std": 0.038872926353901126,
+        "p05": 0.128119299286385,
+        "p50": 0.16700024224443188,
+        "p95": 0.23949520013424833
+      },
+      "122": {
+        "mean": 0.173930612951393,
+        "std": 0.03421855430289207,
+        "p05": 0.12696416717403883,
+        "p50": 0.16693474979437667,
+        "p95": 0.2365850979266984
+      }
+    }
+  },
+  "progress_fidelity_curve": {
+    "shots_axis": [
+      50,
+      62,
+      78,
+      98
+    ],
+    "sample_reps": 30,
+    "summary": {
+      "50": {
+        "mean": 0.7357331164785145,
+        "std": 0.06890702495274556,
+        "p05": 0.6320365829557143,
+        "p50": 0.7498179063458323,
+        "p95": 0.8200099497638312
+      },
+      "62": {
+        "mean": 0.7906151107308449,
+        "std": 0.05852475712475571,
+        "p05": 0.6829724608364441,
+        "p50": 0.8005093672209875,
+        "p95": 0.8518987398899514
+      },
+      "78": {
+        "mean": 0.8161910339111245,
+        "std": 0.03579720801280786,
+        "p05": 0.7620674830129168,
+        "p50": 0.8226388649356224,
+        "p95": 0.8661529953979054
+      },
+      "98": {
+        "mean": 0.8487265728191903,
+        "std": 0.036480818089899204,
+        "p05": 0.7914194672493813,
+        "p50": 0.8479710536080624,
+        "p95": 0.898695787916242
+      }
+    },
+    "note": "PF[k] = hellinger_fidelity(dist@shots[k], dist@shots[k+1]); length N-1."
+  },
+  "convergence": {
+    "converged": true,
+    "converged_shots": 78,
+    "params": {
+      "N_min": 3,
+      "W": 3,
+      "epsilon": 0.003,
+      "shots_ratio": 1.25,
+      "method": "real_fidelity_slope_only"
+    }
+  },
+  "features": {
+    "depth": 32.0,
+    "size": 90.0,
+    "num_2q": 8.0,
+    "swap": 0.0,
+    "unique_2q_edges": 4.0,
+    "max_2q_edge_mult": 3.0,
+    "cx": 0.0,
+    "ecr": 0.0,
+    "cz": 8.0,
+    "rz": 47.0,
+    "ry": 0.0,
+    "rx": 0.0,
+    "sx": 30.0,
+    "h": 0.0
+  },
+  "artifacts": {
+    "dir": "shots_dataset2_historic_250724/037cd63e8e2d1c14",
+    "record_json": "shots_dataset2_historic_250724/037cd63e8e2d1c14/record.json",
+    "arrays_npz": "shots_dataset2_historic_250724/037cd63e8e2d1c14/arrays.npz",
+    "base_qasm": "shots_dataset2_historic_250724/037cd63e8e2d1c14/base.qasm",
+    "transpiled_qasm": "shots_dataset2_historic_250724/037cd63e8e2d1c14/transpiled.qasm"
+  }
+}

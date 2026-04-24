@@ -46,6 +46,7 @@ NodeType = Literal[
     "qucad",
     "qubound",
     "compvqc",
+    "qshot",
     "fidelity",
     "output",
 ]
