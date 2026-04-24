@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { NODE_CATALOG } from "../lib/nodeCatalog";
+import { copyToClipboard } from "../lib/clipboard";
 
 /**
  * Top application bar.
@@ -224,31 +225,15 @@ function PapersPopover() {
     };
   }, [open]);
 
-  // Copy a BibTeX entry to the clipboard. `navigator.clipboard` is
-  // async + may reject on insecure contexts / permission issues, so we
-  // fall back to a transient textarea + execCommand just in case the
-  // Space ever serves over http. Transient "copied" tick auto-clears.
+  // Copy a BibTeX entry to the clipboard and briefly flash a "copied" tick.
+  // `copyToClipboard` handles the navigator.clipboard → textarea fallback.
   const copyBibtex = async (bibtex: string, algo: string) => {
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(bibtex);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = bibtex;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
-      setCopiedKey(algo);
-      window.setTimeout(() => {
-        setCopiedKey((k) => (k === algo ? null : k));
-      }, 1500);
-    } catch {
-      /* silently ignore — the user can still click the arxiv link */
-    }
+    const ok = await copyToClipboard(bibtex);
+    if (!ok) return; // silently ignore — the user can still click the arxiv link
+    setCopiedKey(algo);
+    window.setTimeout(() => {
+      setCopiedKey((k) => (k === algo ? null : k));
+    }, 1500);
   };
 
   return (

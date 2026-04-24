@@ -31,6 +31,7 @@ import {
   readHashPayload,
   type SharePayload,
 } from "../lib/share";
+import { copyToClipboard } from "../lib/clipboard";
 import { QNode, type QNodeData } from "./QNode";
 
 type RFNode = Node<QNodeData>;
@@ -358,10 +359,7 @@ function colorForKind(kind: NodeKind): string {
  * "Share" button: copies a URL carrying the current canvas state on its
  * fragment. Shows a short "Copied" confirmation so the user knows it
  * landed; no modal, no toast, no dropdown — this is a one-click action.
- *
- * Clipboard access falls back to a hidden `<textarea>` + `execCommand`
- * because the Space runs off HTTPS only in production — on plain HTTP
- * dev envs `navigator.clipboard` is undefined.
+ * Clipboard quirks are handled by `lib/clipboard.ts`.
  */
 function ShareButton({
   nodes,
@@ -377,31 +375,17 @@ function ShareButton({
   const onClick = async () => {
     const payload = buildSharePayload(nodes, edges, sampleKey);
     const url = buildShareUrl(payload);
+    const ok = await copyToClipboard(url);
+    if (!ok) return;
+    // Also reflect the new hash in the address bar so a refresh works
+    // and the user can bookmark the link directly.
     try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = url;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-      }
-      // Also reflect the new hash in the address bar so a refresh works
-      // and the user can bookmark the link directly.
-      try {
-        window.history.replaceState(null, "", url);
-      } catch {
-        /* some embedded iframes block this; ignore */
-      }
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      window.history.replaceState(null, "", url);
     } catch {
-      /* silently ignore */
+      /* some embedded iframes block this; ignore */
     }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
   };
 
   return (
