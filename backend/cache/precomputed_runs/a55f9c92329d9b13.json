@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1776930554.1299539,
-      "finished_at": 1776930554.1299546,
+      "started_at": 1777007999.4811087,
+      "finished_at": 1777007999.4811099,
       "summary": {
         "num_qubits": 2,
         "depth": 2,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1776930554.1299582,
-      "finished_at": 1776930554.1305816,
+      "started_at": 1777007999.4811168,
+      "finished_at": 1777007999.4821203,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,13 +35,33 @@
       "node_type": "compvqc",
       "label": "CompressVQC",
       "status": "ok",
-      "started_at": 1776930554.1305852,
-      "finished_at": 1776930596.435685,
+      "started_at": 1777007999.4821265,
+      "finished_at": 1777008041.5798137,
       "summary": {
         "original_depth": 2,
         "compressed_depth": 2,
         "gates_removed": 0,
-        "lut_candidates": 1
+        "lut_candidates": 1,
+        "before": {
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 2,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          },
+          "diagram_text": "     ┌─────────────┐     \nq_0: ┤ Ry(theta_0) ├──■──\n     ├─────────────┤┌─┴─┐\nq_1: ┤ Ry(theta_1) ├┤ X ├\n     └─────────────┘└───┘"
+        },
+        "after": {
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          },
+          "diagram_text": "     ┌───────────┐     \nq_0: ┤ Ry(3.142) ├──■──\n     ├───────────┤┌─┴─┐\nq_1: ┤ Ry(3.142) ├┤ X ├\n     └───────────┘└───┘"
+        }
       },
       "message": null
     },
@@ -50,10 +70,10 @@
       "node_type": "fidelity",
       "label": "Fidelity estimate",
       "status": "ok",
-      "started_at": 1776930596.435703,
-      "finished_at": 1776930596.4364464,
+      "started_at": 1777008041.579832,
+      "finished_at": 1777008041.5806217,
       "summary": {
-        "fidelity": 0.4998981633981524
+        "fidelity": 1.7208205307253672e-15
       },
       "message": null
     },
@@ -62,8 +82,8 @@
       "node_type": "output",
       "label": "Output",
       "status": "ok",
-      "started_at": 1776930596.436452,
-      "finished_at": 1776930596.442581,
+      "started_at": 1777008041.580632,
+      "finished_at": 1777008041.5875187,
       "summary": {
         "num_qubits": 2,
         "depth": 2,
@@ -72,10 +92,10 @@
           "ry": 2,
           "cx": 1
         },
-        "diagram_text": "     ┌───────────┐     \nq_0: ┤ Ry(1.571) ├──■──\n     └─┬───────┬─┘┌─┴─┐\nq_1: ──┤ Ry(0) ├──┤ X ├\n       └───────┘  └───┘",
-        "transpiled_depth": 7,
-        "transpiled_size": 10,
-        "fidelity": 0.4998981633981524
+        "diagram_text": "     ┌───────────┐     \nq_0: ┤ Ry(3.142) ├──■──\n     ├───────────┤┌─┴─┐\nq_1: ┤ Ry(3.142) ├┤ X ├\n     └───────────┘└───┘",
+        "transpiled_depth": 8,
+        "transpiled_size": 11,
+        "fidelity": 1.7208205307253672e-15
       },
       "message": null
     }
@@ -88,9 +108,9 @@
       "ry": 2,
       "cx": 1
     },
-    "diagram_text": "     ┌───────────┐     \nq_0: ┤ Ry(1.571) ├──■──\n     └─┬───────┬─┘┌─┴─┐\nq_1: ──┤ Ry(0) ├──┤ X ├\n       └───────┘  └───┘",
-    "transpiled_depth": 7,
-    "transpiled_size": 10,
-    "fidelity": 0.4998981633981524
+    "diagram_text": "     ┌───────────┐     \nq_0: ┤ Ry(3.142) ├──■──\n     ├───────────┤┌─┴─┐\nq_1: ┤ Ry(3.142) ├┤ X ├\n     └───────────┘└───┘",
+    "transpiled_depth": 8,
+    "transpiled_size": 11,
+    "fidelity": 1.7208205307253672e-15
   }
 }

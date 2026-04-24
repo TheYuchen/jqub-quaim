@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1776930264.971431,
-      "finished_at": 1776930264.9714317,
+      "started_at": 1777007993.743302,
+      "finished_at": 1777007993.743303,
       "summary": {
         "num_qubits": 3,
         "depth": 6,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1776930264.9714355,
-      "finished_at": 1776930264.972142,
+      "started_at": 1777007993.743308,
+      "finished_at": 1777007993.7441707,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,8 +35,8 @@
       "node_type": "compvqc",
       "label": "CompressVQC",
       "status": "skipped",
-      "started_at": 1776930264.9721465,
-      "finished_at": 1776930264.9721477,
+      "started_at": 1777007993.7441812,
+      "finished_at": 1777007993.7441835,
       "summary": {
         "num_parameters": 0
       },
@@ -47,8 +47,8 @@
       "node_type": "fidelity",
       "label": "Fidelity estimate",
       "status": "ok",
-      "started_at": 1776930264.9721498,
-      "finished_at": 1776930264.9732702,
+      "started_at": 1777007993.7441857,
+      "finished_at": 1777007993.745243,
       "summary": {
         "fidelity": 0.12499999999999994
       },
@@ -59,8 +59,8 @@
       "node_type": "output",
       "label": "Output",
       "status": "ok",
-      "started_at": 1776930264.9732754,
-      "finished_at": 1776930265.0691805,
+      "started_at": 1777007993.745248,
+      "finished_at": 1777007993.8410323,
       "summary": {
         "num_qubits": 3,
         "depth": 6,
@@ -71,7 +71,7 @@
           "swap": 1
         },
         "diagram_text": "     ┌───┐                                        \nq_0: ┤ H ├─■────────■───────────────────────────X─\n     └───┘ │P(π/2)  │       ┌───┐               │ \nq_1: ──────■────────┼───────┤ H ├─■─────────────┼─\n                    │P(π/4) └───┘ │P(π/2) ┌───┐ │ \nq_2: ───────────────■─────────────■───────┤ H ├─X─\n                                          └───┘   ",
-        "transpiled_depth": 35,
+        "transpiled_depth": 32,
         "transpiled_size": 44,
         "fidelity": 0.12499999999999994
       },
@@ -88,7 +88,7 @@
       "swap": 1
     },
     "diagram_text": "     ┌───┐                                        \nq_0: ┤ H ├─■────────■───────────────────────────X─\n     └───┘ │P(π/2)  │       ┌───┐               │ \nq_1: ──────■────────┼───────┤ H ├─■─────────────┼─\n                    │P(π/4) └───┘ │P(π/2) ┌───┐ │ \nq_2: ───────────────■─────────────■───────┤ H ├─X─\n                                          └───┘   ",
-    "transpiled_depth": 35,
+    "transpiled_depth": 32,
     "transpiled_size": 44,
     "fidelity": 0.12499999999999994
   }

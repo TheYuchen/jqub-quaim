@@ -242,6 +242,18 @@ function QuCADCard({ s }: { s: Record<string, unknown> }) {
           <Sparkline data={trace} height={40} />
         </div>
       )}
+      <CircuitDiff
+        s={s}
+        afterLabel="pruned (θ=0 on masked params)"
+        afterHint={
+          // QuCAD doesn't remove gates — it zeroes their rotation angle.
+          // Call that out so the user doesn't see "same diagram" and
+          // conclude the pass didn't do anything.
+          "QuCAD marks pruned parameters by setting θ=0 on the rotation " +
+          "gate. The gate stays in the ASCII diagram, but the binding " +
+          "makes it an identity at runtime — the transpiler folds it away."
+        }
+      />
       <details className="text-[11px] text-mute">
         <summary className="cursor-pointer hover:text-ink">raw summary</summary>
         <div className="mt-1 pl-2 border-l border-edge space-y-0.5">
@@ -275,6 +287,7 @@ function CompressVQCCard({ s }: { s: Record<string, unknown> }) {
         <Stat label="gates removed" value={`${removed}`} />
         <Stat label="depth reduction" value={`${shrinkPct.toFixed(0)}%`} />
       </div>
+      <CircuitDiff s={s} afterLabel="compressed" />
       <details className="text-[11px] text-mute">
         <summary className="cursor-pointer hover:text-ink">raw summary</summary>
         <div className="mt-1 pl-2 border-l border-edge space-y-0.5">
@@ -488,6 +501,140 @@ function Gauge({ value, inverted = false }: { value: number; inverted?: boolean 
   );
 }
 
+/**
+ * Before/after circuit diff, sharable between QuCAD and CompressVQC.
+ *
+ * The backend ships matching `summary.before` and `summary.after` blocks
+ * from `_diagram_snapshot()` — each has `depth`, `size`, `num_parameters`,
+ * `ops`, and `diagram_text`. This component renders:
+ *
+ *   1. A compact metric diff header ("depth 24 → 16 (-8)")
+ *   2. A collapsible dual-pane ASCII diagram (desktop: side-by-side;
+ *      mobile: stacked vertically so the wide ASCII doesn't get clipped).
+ *
+ * The entire block is a no-op if either side is missing — graceful
+ * fallback for cache entries that predate this feature, so a cached
+ * response without these fields just shows the existing stat tiles.
+ */
+function CircuitDiff({
+  s,
+  afterLabel = "after",
+  afterHint,
+}: {
+  s: Record<string, unknown>;
+  afterLabel?: string;
+  afterHint?: string;
+}) {
+  const before = s["before"] as Record<string, unknown> | undefined;
+  const after = s["after"] as Record<string, unknown> | undefined;
+  if (!before || !after) return null;
+
+  const bDepth = numOr(before["depth"], 0);
+  const aDepth = numOr(after["depth"], bDepth);
+  const bSize = numOr(before["size"], 0);
+  const aSize = numOr(after["size"], bSize);
+  const bParams = numOr(before["num_parameters"], 0);
+  const aParams = numOr(after["num_parameters"], bParams);
+
+  const bDiag = typeof before["diagram_text"] === "string" ? (before["diagram_text"] as string) : "";
+  const aDiag = typeof after["diagram_text"] === "string" ? (after["diagram_text"] as string) : "";
+
+  return (
+    <div className="panel px-2.5 py-2 space-y-1.5">
+      <div className="text-[10px] uppercase tracking-wider text-mute">
+        before / after
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
+        <MetricDelta label="depth" before={bDepth} after={aDepth} />
+        <MetricDelta label="gates" before={bSize} after={aSize} />
+        {bParams > 0 && (
+          <MetricDelta
+            label="params"
+            before={bParams}
+            after={aParams}
+            // For params, "no change" is expected for QuCAD (it preserves
+            // gate count, just zeroes angles). Don't colour the badge if
+            // the count didn't move.
+            neutralWhenEqual
+          />
+        )}
+      </div>
+      {afterHint && (
+        <div className="text-[10px] text-mute leading-snug">{afterHint}</div>
+      )}
+      {(bDiag || aDiag) && (
+        <details className="text-[11px]">
+          <summary className="cursor-pointer text-mute hover:text-ink">
+            circuit diagrams (before → {afterLabel})
+          </summary>
+          <div className="mt-1 grid grid-cols-1 md:grid-cols-2 gap-1.5">
+            {bDiag && <DiagramPane label="before" diagram={bDiag} />}
+            {aDiag && <DiagramPane label={afterLabel} diagram={aDiag} />}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/** One of the two before/after diagram panes. */
+function DiagramPane({ label, diagram }: { label: string; diagram: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wider text-mute mb-0.5">
+        {label}
+      </div>
+      <pre className="font-mono text-[10px] leading-tight p-2 bg-canvas/60 border border-edge rounded overflow-x-auto text-ink whitespace-pre">
+        {diagram}
+      </pre>
+    </div>
+  );
+}
+
+/**
+ * `label: before → after (±delta)` — one inline stat used in the
+ * before/after header. Colour encoded so "fewer gates" is green
+ * (improvement for both QuCAD and CompressVQC).
+ */
+function MetricDelta({
+  label,
+  before,
+  after,
+  neutralWhenEqual = false,
+}: {
+  label: string;
+  before: number;
+  after: number;
+  neutralWhenEqual?: boolean;
+}) {
+  const delta = after - before;
+  const tone =
+    delta < 0
+      ? "text-ok"
+      : delta > 0
+        ? "text-warn"
+        : neutralWhenEqual
+          ? "text-mute"
+          : "text-mute";
+  const sign = delta > 0 ? "+" : "";
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-mute">{label}</span>
+      <span className="font-mono text-ink">
+        {before}
+        <span className="text-mute mx-0.5">→</span>
+        {after}
+      </span>
+      {delta !== 0 && (
+        <span className={`font-mono text-[10px] ${tone}`}>
+          ({sign}
+          {delta})
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** Compact comparison of two integer values as side-by-side proportional bars. */
 function DepthCompare({ before, after }: { before: number; after: number }) {
   const max = Math.max(before, after, 1);
@@ -593,6 +740,12 @@ function Sparkline({ data, height = 32 }: { data: number[]; height?: number }) {
 function KvRow({ k, v }: { k: string; v: unknown }) {
   if (k === "diagram_text" && typeof v === "string") {
     return null; // handled by dedicated card
+  }
+  // The `before`/`after` blocks are rendered by <CircuitDiff>; they're
+  // large nested objects whose raw k/v dump would drown out the rest of
+  // the summary.
+  if ((k === "before" || k === "after") && typeof v === "object" && v !== null) {
+    return null;
   }
   if (Array.isArray(v)) {
     return (

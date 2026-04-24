@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1776929830.603091,
-      "finished_at": 1776929830.6030917,
+      "started_at": 1777007983.4253235,
+      "finished_at": 1777007983.4253242,
       "summary": {
         "num_qubits": 3,
         "depth": 3,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1776929830.6030972,
-      "finished_at": 1776929830.6039722,
+      "started_at": 1777007983.425328,
+      "finished_at": 1777007983.4259672,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,8 +35,8 @@
       "node_type": "qucad",
       "label": "QuCAD",
       "status": "ok",
-      "started_at": 1776929830.603977,
-      "finished_at": 1776929833.1417608,
+      "started_at": 1777007983.4259748,
+      "finished_at": 1777007985.8476357,
       "summary": {
         "iterations": 3,
         "original_parameters": 0,
@@ -46,7 +46,27 @@
           0,
           0,
           0
-        ]
+        ],
+        "before": {
+          "depth": 3,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "cx": 2,
+            "h": 1
+          },
+          "diagram_text": "     ┌───┐          \nq_0: ┤ H ├──■───────\n     └───┘┌─┴─┐     \nq_1: ─────┤ X ├──■──\n          └───┘┌─┴─┐\nq_2: ──────────┤ X ├\n               └───┘"
+        },
+        "after": {
+          "depth": 3,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "cx": 2,
+            "h": 1
+          },
+          "diagram_text": "     ┌───┐          \nq_0: ┤ H ├──■───────\n     └───┘┌─┴─┐     \nq_1: ─────┤ X ├──■──\n          └───┘┌─┴─┐\nq_2: ──────────┤ X ├\n               └───┘"
+        }
       },
       "message": null
     },
@@ -55,8 +75,8 @@
       "node_type": "fidelity",
       "label": "Fidelity estimate",
       "status": "ok",
-      "started_at": 1776929833.143085,
-      "finished_at": 1776929833.1440926,
+      "started_at": 1777007985.8485506,
+      "finished_at": 1777007985.849118,
       "summary": {
         "fidelity": 0.4999999999999999
       },
@@ -67,8 +87,8 @@
       "node_type": "output",
       "label": "Output",
       "status": "ok",
-      "started_at": 1776929833.144101,
-      "finished_at": 1776929833.1531296,
+      "started_at": 1777007985.8491266,
+      "finished_at": 1777007985.8580184,
       "summary": {
         "num_qubits": 3,
         "depth": 3,

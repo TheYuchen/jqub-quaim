@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1776929977.1801715,
-      "finished_at": 1776929977.1801722,
+      "started_at": 1777007988.34862,
+      "finished_at": 1777007988.3486211,
       "summary": {
         "num_qubits": 4,
         "depth": 11,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1776929977.1801767,
-      "finished_at": 1776929977.1812444,
+      "started_at": 1777007988.3486257,
+      "finished_at": 1777007988.3493624,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,8 +35,8 @@
       "node_type": "compvqc",
       "label": "CompressVQC",
       "status": "error",
-      "started_at": 1776929977.4030888,
-      "finished_at": 1776929977.4030943,
+      "started_at": 1777007988.8515658,
+      "finished_at": 1777007988.851569,
       "summary": {},
       "message": "ValueError: Maximum allowed dimension exceeded"
     }

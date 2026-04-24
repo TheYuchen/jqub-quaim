@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1776930740.715154,
-      "finished_at": 1776930740.7151546,
+      "started_at": 1777008644.229461,
+      "finished_at": 1777008644.229462,
       "summary": {
         "num_qubits": 3,
         "depth": 6,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1776930740.7151587,
-      "finished_at": 1776930740.7160077,
+      "started_at": 1777008644.2294679,
+      "finished_at": 1777008644.2301753,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,8 +35,8 @@
       "node_type": "qucad",
       "label": "QuCAD",
       "status": "ok",
-      "started_at": 1776930740.716012,
-      "finished_at": 1776930743.2350292,
+      "started_at": 1777008644.2301798,
+      "finished_at": 1777008646.689381,
       "summary": {
         "iterations": 3,
         "original_parameters": 0,
@@ -46,7 +46,31 @@
           0,
           0,
           0
-        ]
+        ],
+        "before": {
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          },
+          "diagram_text": "     ┌────────────┐┌───┐           ┌───┐     ┌───┐\nq_0: ┤ Ry(1.9106) ├┤ X ├─────■─────┤ X ├──■──┤ X ├\n     └────────────┘└───┘┌────┴────┐└───┘┌─┴─┐└───┘\nq_1: ───────────────────┤ Ry(π/2) ├──■──┤ X ├─────\n                        └─────────┘┌─┴─┐└───┘     \nq_2: ──────────────────────────────┤ X ├──────────\n                                   └───┘          "
+        },
+        "after": {
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          },
+          "diagram_text": "     ┌────────────┐┌───┐           ┌───┐     ┌───┐\nq_0: ┤ Ry(1.9106) ├┤ X ├─────■─────┤ X ├──■──┤ X ├\n     └────────────┘└───┘┌────┴────┐└───┘┌─┴─┐└───┘\nq_1: ───────────────────┤ Ry(π/2) ├──■──┤ X ├─────\n                        └─────────┘┌─┴─┐└───┘     \nq_2: ──────────────────────────────┤ X ├──────────\n                                   └───┘          "
+        }
       },
       "message": null
     },
@@ -55,8 +79,8 @@
       "node_type": "compvqc",
       "label": "CompressVQC",
       "status": "skipped",
-      "started_at": 1776930743.2363064,
-      "finished_at": 1776930743.2363095,
+      "started_at": 1777008646.6906803,
+      "finished_at": 1777008646.6906843,
       "summary": {
         "num_parameters": 0
       },
@@ -67,10 +91,10 @@
       "node_type": "qubound",
       "label": "QuBound",
       "status": "ok",
-      "started_at": 1776930743.236337,
-      "finished_at": 1776930812.4924889,
+      "started_at": 1777008646.6907148,
+      "finished_at": 1777008715.8227694,
       "summary": {
-        "predicted_error_bound": 0.12110963463783264,
+        "predicted_error_bound": 0.15127795934677124,
         "source": "cached_ibm_history",
         "cached_backend": "ibm_fez",
         "history_window": "2026-04-09 → 2026-04-22",
@@ -83,8 +107,8 @@
       "node_type": "fidelity",
       "label": "Fidelity estimate",
       "status": "ok",
-      "started_at": 1776930812.4928994,
-      "finished_at": 1776930812.4946136,
+      "started_at": 1777008715.8236978,
+      "finished_at": 1777008715.8251417,
       "summary": {
         "fidelity": 0.0
       },
@@ -95,8 +119,8 @@
       "node_type": "output",
       "label": "Output",
       "status": "ok",
-      "started_at": 1776930812.49462,
-      "finished_at": 1776930812.5053742,
+      "started_at": 1777008715.8251522,
+      "finished_at": 1777008715.8372605,
       "summary": {
         "num_qubits": 3,
         "depth": 7,
@@ -113,7 +137,7 @@
         "transpiled_depth": 17,
         "transpiled_size": 31,
         "fidelity": 0.0,
-        "qubound_error_bound": 0.12110963463783264
+        "qubound_error_bound": 0.15127795934677124
       },
       "message": null
     }
@@ -134,6 +158,6 @@
     "transpiled_depth": 17,
     "transpiled_size": 31,
     "fidelity": 0.0,
-    "qubound_error_bound": 0.12110963463783264
+    "qubound_error_bound": 0.15127795934677124
   }
 }

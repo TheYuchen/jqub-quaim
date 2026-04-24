@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1776929543.1017594,
-      "finished_at": 1776929543.1017601,
+      "started_at": 1777007980.558741,
+      "finished_at": 1777007980.5587418,
       "summary": {
         "num_qubits": 2,
         "depth": 2,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1776929543.1017644,
-      "finished_at": 1776929543.1027074,
+      "started_at": 1777007980.5587459,
+      "finished_at": 1777007980.5594301,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,8 +35,8 @@
       "node_type": "compvqc",
       "label": "CompressVQC",
       "status": "skipped",
-      "started_at": 1776929543.102712,
-      "finished_at": 1776929543.1027133,
+      "started_at": 1777007980.5594342,
+      "finished_at": 1777007980.5594356,
       "summary": {
         "num_parameters": 0
       },
@@ -47,8 +47,8 @@
       "node_type": "fidelity",
       "label": "Fidelity estimate",
       "status": "ok",
-      "started_at": 1776929543.1027155,
-      "finished_at": 1776929543.103334,
+      "started_at": 1777007980.5594375,
+      "finished_at": 1777007980.5600338,
       "summary": {
         "fidelity": 0.4999999999999999
       },
@@ -59,8 +59,8 @@
       "node_type": "output",
       "label": "Output",
       "status": "ok",
-      "started_at": 1776929543.103338,
-      "finished_at": 1776929543.1979172,
+      "started_at": 1777007980.5600379,
+      "finished_at": 1777007980.6534197,
       "summary": {
         "num_qubits": 2,
         "depth": 2,

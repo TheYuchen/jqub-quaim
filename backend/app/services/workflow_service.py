@@ -50,6 +50,28 @@ def _make_step(
     )
 
 
+def _diagram_snapshot(qc: QuantumCircuit) -> dict[str, Any]:
+    """Capture a compact "shape" of ``qc`` for before/after panels.
+
+    Includes the ASCII diagram plus the three numbers we use for the quick
+    diff header (depth / size / ops). We keep everything in one helper so
+    QuCAD and CompressVQC produce identically-shaped payloads — the
+    frontend <CircuitDiff> component can then render both without
+    branching on node type.
+
+    ``fold=120`` matches what the Output step already ships. For the
+    biggest sample circuits (QAOA max-cut, ~14 qubits), that tops out
+    around 4-6 KB per diagram — well under the step summary budget.
+    """
+    return {
+        "depth": int(qc.depth()),
+        "size": int(qc.size()),
+        "num_parameters": int(qc.num_parameters),
+        "ops": {k: int(v) for k, v in qc.count_ops().items()},
+        "diagram_text": str(qc.draw(output="text", fold=120)),
+    }
+
+
 def _default_label(node_type: str) -> str:
     return {
         "input_circuit": "Input circuit",
@@ -143,10 +165,17 @@ def _handle_qucad(node: FlowNode, ctx: dict, settings: Settings) -> StepResult:
     rho = float(node.data.get("rho", 500.0))
 
     noise_model = NoiseModel.from_backend(backend)
+    # Snapshot the "before" state before training, while the circuit
+    # still has free parameters — its diagram shows symbolic thetas.
+    before = _diagram_snapshot(qc)
     theta, mask, history = run_qucad_training_noisy(
         qc, noise_model, backend, iterations=iterations, lam=lam, rho=rho
     )
     bound_qc = qc.assign_parameters(theta * (mask != 0))
+    # After QuCAD, the circuit's gates are unchanged but many rotations
+    # have their angle forced to 0. The after-diagram surfaces which
+    # parameters were pruned away.
+    after = _diagram_snapshot(bound_qc)
     ctx["circuit"] = bound_qc
     return _make_step(
         node,
@@ -158,6 +187,9 @@ def _handle_qucad(node: FlowNode, ctx: dict, settings: Settings) -> StepResult:
             "kept_parameters": int((mask != 0).sum()),
             "final_loss": float(history["loss"][-1]) if history["loss"] else None,
             "sparsity_trace": [int(s) for s in history["sparsity"]],
+            # Shared before/after block — see _diagram_snapshot for shape.
+            "before": before,
+            "after": after,
         },
     )
 
@@ -256,9 +288,13 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
             message="CompressVQC found no compressible rotation pairs in this circuit.",
             summary={"lut_size": 0},
         )
+    # Snapshot the input before the QAOA-LUT pass rewrites it. The
+    # after-diagram is the visibly shorter compressed circuit.
+    before = _diagram_snapshot(qc)
     qp = quadraticProgram_luttoqp(qc, lut)
     result = admmOptimizedCompVQC(qp)
     compressed = resultsCompressVQC(result, qc)
+    after = _diagram_snapshot(compressed)
 
     ctx["circuit"] = compressed
     return _make_step(
@@ -270,6 +306,9 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
             "compressed_depth": compressed.depth(),
             "gates_removed": qc.size() - compressed.size(),
             "lut_candidates": len(lut),
+            # Shared before/after block — see _diagram_snapshot for shape.
+            "before": before,
+            "after": after,
         },
     )
 

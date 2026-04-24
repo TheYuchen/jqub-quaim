@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1776930409.2221887,
-      "finished_at": 1776930409.2221897,
+      "started_at": 1777007996.429176,
+      "finished_at": 1777007996.4291766,
       "summary": {
         "num_qubits": 6,
         "depth": 7,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1776930409.222193,
-      "finished_at": 1776930409.2230248,
+      "started_at": 1777007996.4291804,
+      "finished_at": 1777007996.4299242,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,8 +35,8 @@
       "node_type": "compvqc",
       "label": "CompressVQC",
       "status": "error",
-      "started_at": 1776930409.3694034,
-      "finished_at": 1776930409.3694077,
+      "started_at": 1777007996.5797415,
+      "finished_at": 1777007996.579744,
       "summary": {},
       "message": "ValueError: array is too big; `arr.size * arr.dtype.itemsize` is larger than the maximum possible size."
     }

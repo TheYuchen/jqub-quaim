@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1776930551.3216171,
-      "finished_at": 1776930551.321618,
+      "started_at": 1777007996.580423,
+      "finished_at": 1777007996.5804248,
       "summary": {
         "num_qubits": 2,
         "depth": 2,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1776930551.3216245,
-      "finished_at": 1776930551.3226597,
+      "started_at": 1777007996.5804365,
+      "finished_at": 1777007996.581268,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,18 +35,38 @@
       "node_type": "qucad",
       "label": "QuCAD",
       "status": "ok",
-      "started_at": 1776930551.3226645,
-      "finished_at": 1776930554.117023,
+      "started_at": 1777007996.581274,
+      "finished_at": 1777007999.4658334,
       "summary": {
         "iterations": 3,
         "original_parameters": 2,
-        "kept_parameters": 2,
-        "final_loss": 0.9998833853923568,
+        "kept_parameters": 1,
+        "final_loss": 0.9978555663319897,
         "sparsity_trace": [
-          2,
-          2,
-          2
-        ]
+          1,
+          1,
+          1
+        ],
+        "before": {
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 2,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          },
+          "diagram_text": "     ┌─────────────┐     \nq_0: ┤ Ry(theta_0) ├──■──\n     ├─────────────┤┌─┴─┐\nq_1: ┤ Ry(theta_1) ├┤ X ├\n     └─────────────┘└───┘"
+        },
+        "after": {
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          },
+          "diagram_text": "     ┌──────────────┐     \nq_0: ┤ Ry(0.065561) ├──■──\n     └──┬───────┬───┘┌─┴─┐\nq_1: ───┤ Ry(0) ├────┤ X ├\n        └───────┘    └───┘"
+        }
       },
       "message": null
     },
@@ -55,10 +75,10 @@
       "node_type": "fidelity",
       "label": "Fidelity estimate",
       "status": "ok",
-      "started_at": 1776930554.1181962,
-      "finished_at": 1776930554.1192138,
+      "started_at": 1777007999.4669728,
+      "finished_at": 1777007999.4676611,
       "summary": {
-        "fidelity": 0.9999416919911968
+        "fidelity": 0.9989258225053006
       },
       "message": null
     },
@@ -67,8 +87,8 @@
       "node_type": "output",
       "label": "Output",
       "status": "ok",
-      "started_at": 1776930554.1192217,
-      "finished_at": 1776930554.1287615,
+      "started_at": 1777007999.4676712,
+      "finished_at": 1777007999.4790518,
       "summary": {
         "num_qubits": 2,
         "depth": 2,
@@ -77,10 +97,10 @@
           "ry": 2,
           "cx": 1
         },
-        "diagram_text": "     ┌───────────────┐      \nq_0: ┤ Ry(-0.012837) ├───■──\n     ├───────────────┴┐┌─┴─┐\nq_1: ┤ Ry(-0.0082736) ├┤ X ├\n     └────────────────┘└───┘",
-        "transpiled_depth": 8,
-        "transpiled_size": 11,
-        "fidelity": 0.9999416919911968
+        "diagram_text": "     ┌──────────────┐     \nq_0: ┤ Ry(0.065561) ├──■──\n     └──┬───────┬───┘┌─┴─┐\nq_1: ───┤ Ry(0) ├────┤ X ├\n        └───────┘    └───┘",
+        "transpiled_depth": 7,
+        "transpiled_size": 10,
+        "fidelity": 0.9989258225053006
       },
       "message": null
     }
@@ -93,9 +113,9 @@
       "ry": 2,
       "cx": 1
     },
-    "diagram_text": "     ┌───────────────┐      \nq_0: ┤ Ry(-0.012837) ├───■──\n     ├───────────────┴┐┌─┴─┐\nq_1: ┤ Ry(-0.0082736) ├┤ X ├\n     └────────────────┘└───┘",
-    "transpiled_depth": 8,
-    "transpiled_size": 11,
-    "fidelity": 0.9999416919911968
+    "diagram_text": "     ┌──────────────┐     \nq_0: ┤ Ry(0.065561) ├──■──\n     └──┬───────┬───┘┌─┴─┐\nq_1: ───┤ Ry(0) ├────┤ X ├\n        └───────┘    └───┘",
+    "transpiled_depth": 7,
+    "transpiled_size": 10,
+    "fidelity": 0.9989258225053006
   }
 }
