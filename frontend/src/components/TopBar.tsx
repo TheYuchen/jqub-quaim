@@ -1,6 +1,17 @@
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/store";
-import { Activity, HelpCircle, PanelLeft, PanelRight, Zap } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  CircleUser,
+  GraduationCap,
+  HelpCircle,
+  PanelLeft,
+  PanelRight,
+  Zap,
+} from "lucide-react";
 import { ThemeSwitcher } from "./ThemeSwitcher";
+import { NODE_CATALOG } from "../lib/nodeCatalog";
 
 /**
  * Top application bar.
@@ -110,6 +121,42 @@ export function TopBar({
         >
           {mobile ? chipLabelShort : chipLabel}
         </button>
+        {/* External-links group: JQub lab, papers, developer. Desktop
+            shows icon+label; mobile collapses to icon-only to keep the
+            header under ~390px. A subtle vertical divider (desktop only)
+            separates metadata chips from these links and from the theme
+            /tour controls that follow. */}
+        <span
+          className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
+          aria-hidden="true"
+        />
+        <a
+          href="https://jqub.ece.gmu.edu/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-ghost"
+          title="JQub Lab at George Mason University"
+          aria-label="JQub Lab"
+        >
+          <GraduationCap className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Lab</span>
+        </a>
+        <PapersPopover />
+        <a
+          href="https://theyuchen.github.io/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-ghost"
+          title="Developer: Yuchen Yuan"
+          aria-label="Developer homepage"
+        >
+          <CircleUser className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">Developer</span>
+        </a>
+        <span
+          className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
+          aria-hidden="true"
+        />
         <ThemeSwitcher />
         {onOpenTour && (
           <button
@@ -135,5 +182,88 @@ export function TopBar({
         )}
       </div>
     </header>
+  );
+}
+
+/**
+ * Popover listing the three algorithm papers. Data is pulled from
+ * nodeCatalog so there's a single source of truth: each algorithm block
+ * already carries its own paper metadata (title, venue, arxiv URL), and
+ * this popover just surfaces all of them at once. Same open/close UX as
+ * the other popovers in the app (outside-click + Escape).
+ */
+function PapersPopover() {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const papers = NODE_CATALOG.filter((n) => n.paper).map((n) => ({
+    algo: n.label,
+    ...(n.paper as NonNullable<(typeof n)["paper"]>),
+  }));
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as globalThis.Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="btn-ghost"
+        title="Papers behind each algorithm block"
+        aria-label="Papers"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <BookOpen className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Papers</span>
+      </button>
+      {open && (
+        // Viewport-aware width: 22rem (352px) caps the title lines to a
+        // reasonable length on desktop; on mobile the calc() arm keeps
+        // the menu inside the right-aligned viewport with a 24px margin.
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-0.5 w-[min(22rem,calc(100vw-1.5rem))]"
+        >
+          {papers.map((p) => (
+            <a
+              key={p.algo}
+              role="menuitem"
+              href={p.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpen(false)}
+              className="block px-3 py-2 rounded-md hover:bg-surfaceAlt transition-colors border border-transparent hover:border-edge/60"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-ink font-medium">{p.algo}</span>
+                <span className="text-[10px] text-mute font-mono shrink-0">
+                  {p.venue}
+                </span>
+              </div>
+              <div className="text-[11px] text-mute leading-snug mt-0.5">
+                {p.title}
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

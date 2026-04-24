@@ -781,7 +781,7 @@ function TrySlide() {
       <div className="mt-4 flex items-center gap-2 text-[11px] text-mute">
         <Sparkles className="w-3 h-3 text-accent" />
         You can re-open this tour any time from the{" "}
-        <span className="text-ink">help</span> button in the top-right.
+        <span className="text-ink">Tour</span> button in the top-right.
       </div>
     </div>
   );
