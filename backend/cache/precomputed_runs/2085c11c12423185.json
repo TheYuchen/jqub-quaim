@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1777008207.9720106,
-      "finished_at": 1777008207.9720113,
+      "started_at": 1776929833.2528346,
+      "finished_at": 1776929833.2528353,
       "summary": {
         "num_qubits": 3,
         "depth": 3,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1777008207.9720154,
-      "finished_at": 1777008207.9727519,
+      "started_at": 1776929833.2528393,
+      "finished_at": 1776929833.25355,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,8 +35,8 @@
       "node_type": "qucad",
       "label": "QuCAD",
       "status": "ok",
-      "started_at": 1777008207.972756,
-      "finished_at": 1777008210.6758628,
+      "started_at": 1776929833.2535546,
+      "finished_at": 1776929835.8405695,
       "summary": {
         "iterations": 3,
         "original_parameters": 0,
@@ -46,27 +46,7 @@
           0,
           0,
           0
-        ],
-        "before": {
-          "depth": 3,
-          "size": 3,
-          "num_parameters": 0,
-          "ops": {
-            "cx": 2,
-            "h": 1
-          },
-          "diagram_text": "     ┌───┐          \nq_0: ┤ H ├──■───────\n     └───┘┌─┴─┐     \nq_1: ─────┤ X ├──■──\n          └───┘┌─┴─┐\nq_2: ──────────┤ X ├\n               └───┘"
-        },
-        "after": {
-          "depth": 3,
-          "size": 3,
-          "num_parameters": 0,
-          "ops": {
-            "cx": 2,
-            "h": 1
-          },
-          "diagram_text": "     ┌───┐          \nq_0: ┤ H ├──■───────\n     └───┘┌─┴─┐     \nq_1: ─────┤ X ├──■──\n          └───┘┌─┴─┐\nq_2: ──────────┤ X ├\n               └───┘"
-        }
+        ]
       },
       "message": null
     },
@@ -75,8 +55,8 @@
       "node_type": "compvqc",
       "label": "CompressVQC",
       "status": "skipped",
-      "started_at": 1777008210.6770837,
-      "finished_at": 1777008210.677087,
+      "started_at": 1776929835.8419423,
+      "finished_at": 1776929835.8419466,
       "summary": {
         "num_parameters": 0
       },
@@ -87,10 +67,10 @@
       "node_type": "qubound",
       "label": "QuBound",
       "status": "ok",
-      "started_at": 1777008210.6771781,
-      "finished_at": 1777008279.9432058,
+      "started_at": 1776929835.8420024,
+      "finished_at": 1776929904.8079379,
       "summary": {
-        "predicted_error_bound": 0.17682379484176636,
+        "predicted_error_bound": 0.1514820009469986,
         "source": "cached_ibm_history",
         "cached_backend": "ibm_fez",
         "history_window": "2026-04-09 → 2026-04-22",
@@ -103,8 +83,8 @@
       "node_type": "fidelity",
       "label": "Fidelity estimate",
       "status": "ok",
-      "started_at": 1777008279.943998,
-      "finished_at": 1777008279.9449198,
+      "started_at": 1776929904.8083656,
+      "finished_at": 1776929904.8101954,
       "summary": {
         "fidelity": 0.4999999999999999
       },
@@ -115,8 +95,8 @@
       "node_type": "output",
       "label": "Output",
       "status": "ok",
-      "started_at": 1777008279.944926,
-      "finished_at": 1777008279.9548545,
+      "started_at": 1776929904.810209,
+      "finished_at": 1776929904.8192823,
       "summary": {
         "num_qubits": 3,
         "depth": 4,
@@ -131,7 +111,7 @@
         "transpiled_depth": 10,
         "transpiled_size": 18,
         "fidelity": 0.4999999999999999,
-        "qubound_error_bound": 0.17682379484176636
+        "qubound_error_bound": 0.1514820009469986
       },
       "message": null
     }
@@ -150,6 +130,6 @@
     "transpiled_depth": 10,
     "transpiled_size": 18,
     "fidelity": 0.4999999999999999,
-    "qubound_error_bound": 0.17682379484176636
+    "qubound_error_bound": 0.1514820009469986
   }
 }

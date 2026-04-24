@@ -8,8 +8,8 @@
       "node_type": "input_circuit",
       "label": "Input circuit",
       "status": "ok",
-      "started_at": 1777007991.0634098,
-      "finished_at": 1777007991.0634108,
+      "started_at": 1776930122.0790014,
+      "finished_at": 1776930122.0790021,
       "summary": {
         "num_qubits": 4,
         "depth": 14,
@@ -22,8 +22,8 @@
       "node_type": "fake_backend",
       "label": "Noisy simulator",
       "status": "ok",
-      "started_at": 1777007991.0634146,
-      "finished_at": 1777007991.0641568,
+      "started_at": 1776930122.079006,
+      "finished_at": 1776930122.0797513,
       "summary": {
         "backend_name": "FakeFez",
         "num_qubits": 156
@@ -35,8 +35,8 @@
       "node_type": "compvqc",
       "label": "CompressVQC",
       "status": "error",
-      "started_at": 1777007991.2166805,
-      "finished_at": 1777007991.216684,
+      "started_at": 1776930122.2307503,
+      "finished_at": 1776930122.2307544,
       "summary": {},
       "message": "MemoryError: Unable to allocate 16.0 TiB for an array with shape (1099511627776,) and data type complex128"
     }
