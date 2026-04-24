@@ -190,8 +190,11 @@ function QshotCard({ s }: { s: Record<string, unknown> }) {
     .sort((a, b) => a[0] - b[0]);
 
   // GNN fallback gets its own label so users can tell whether the main
-  // regression path was used or not.
-  const methodLabel = method === "gnn_fallback" ? "GNN fallback" : "regression";
+  // regression path was used or not. When the fallback is active, Qshot
+  // couldn't match the query to any cluster (cluster_label = -1) and is
+  // extrapolating via the dual-graph network — worth flagging.
+  const isFallback = method === "gnn_fallback";
+  const methodLabel = isFallback ? "GNN fallback" : "regression";
 
   return (
     <div className="mt-2 space-y-2">
@@ -217,6 +220,18 @@ function QshotCard({ s }: { s: Record<string, unknown> }) {
         <Stat label="method" value={methodLabel} />
       </div>
 
+      {/* Flag fallback path so users know the number comes from a neural-
+          network extrapolation, not a cluster match. Qshot's training
+          distribution is 5-8 qubits; anything smaller/larger tends to
+          fall through to fallback. */}
+      {isFallback && (
+        <div className="text-[11px] leading-relaxed rounded-md border border-warn/40 bg-warn/10 px-2 py-1.5 text-ink">
+          Circuit didn't match any cluster in the training set (out of the
+          validated 5–8 qubit range), so Qshot extrapolated with the dual-
+          graph GNN fallback. Treat the prediction as a best guess.
+        </div>
+      )}
+
       {/* Target-fidelity formula line — replicates the author's notation
           "α × converged F (F_inf=…) = target". Only render if all the
           numbers are real so we don't emit a half-filled sentence. */}
@@ -228,28 +243,38 @@ function QshotCard({ s }: { s: Record<string, unknown> }) {
         </div>
       )}
 
-      {/* Cluster / tier / neighbors line — compact, tabular. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mute">
-        {cluster !== undefined && cluster !== null && (
-          <span>
-            <span className="text-ink">Cluster</span>: {String(cluster)}
-          </span>
-        )}
-        {tier !== undefined && tier !== null && (
-          <span>
-            <span className="text-ink">Tier</span>: {String(tier)}
-          </span>
-        )}
-        {nMatched !== undefined && nMatched !== null && (
-          <span>
-            <span className="text-ink">PF-matched neighbours</span>:{" "}
-            {String(nMatched)}
-          </span>
-        )}
-        {snapshot && (
-          <span className="font-mono text-edge">· {snapshot}</span>
-        )}
-      </div>
+      {/* Cluster / tier / neighbors line — compact, tabular. The
+          regression path reports these; the GNN fallback returns -1 / -1
+          / 0, which is meaningless to a user, so suppress the whole line
+          when the fallback path produced the result. */}
+      {!isFallback && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-mute">
+          {cluster !== undefined && cluster !== null && (
+            <span>
+              <span className="text-ink">Cluster</span>: {String(cluster)}
+            </span>
+          )}
+          {tier !== undefined && tier !== null && (
+            <span>
+              <span className="text-ink">Tier</span>: {String(tier)}
+            </span>
+          )}
+          {nMatched !== undefined && nMatched !== null && (
+            <span>
+              <span className="text-ink">PF-matched neighbours</span>:{" "}
+              {String(nMatched)}
+            </span>
+          )}
+          {snapshot && (
+            <span className="font-mono text-edge">· {snapshot}</span>
+          )}
+        </div>
+      )}
+      {isFallback && snapshot && (
+        <div className="text-[11px] text-mute font-mono">
+          · {snapshot}
+        </div>
+      )}
 
       {/* Pilot-measurement sparkline — shows the shots vs. observed PF
           points Qshot collected. Small, decorative, so keep it collapsed

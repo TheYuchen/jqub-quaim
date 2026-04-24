@@ -87,7 +87,10 @@ export const PIPELINE_PRESETS: PipelinePreset[] = [
   {
     key: "qshot",
     label: "Qshot",
-    tagline: "Recommend a shot count for your circuit at 95% fidelity",
+    // Nudge users toward the 5-8 qubit range the model was trained on;
+    // otherwise they'll get GNN-fallback extrapolations for toy samples
+    // like bell_state without realising the result is a best-guess.
+    tagline: "Recommend a shot count for a 5-8 qubit circuit (try ry_chain_6q)",
     nodes: [
       { id: "n1", kind: "input_circuit" },
       { id: "n2", kind: "qshot" },
