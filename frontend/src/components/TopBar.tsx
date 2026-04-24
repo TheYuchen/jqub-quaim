@@ -1,7 +1,6 @@
 import { useApp } from "../lib/store";
 import {
   Activity,
-  CircleUser,
   GraduationCap,
   HelpCircle,
   PanelLeft,
@@ -10,6 +9,7 @@ import {
 } from "lucide-react";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { PapersPopover } from "./PapersPopover";
+import { DevelopersPopover } from "./DevelopersPopover";
 
 /**
  * Top application bar.
@@ -142,17 +142,7 @@ export function TopBar({
           <span className="hidden sm:inline">Lab</span>
         </a>
         <PapersPopover />
-        <a
-          href="https://theyuchen.github.io/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-ghost"
-          title="Developer: Yuchen Yuan"
-          aria-label="Developer homepage"
-        >
-          <CircleUser className="w-3.5 h-3.5" />
-          <span className="hidden md:inline">Developer</span>
-        </a>
+        <DevelopersPopover />
         <span
           className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
           aria-hidden="true"
