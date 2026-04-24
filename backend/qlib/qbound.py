@@ -1,254 +1,311 @@
 """QuBound implementation (refactored from Jovin Antony Maria's original).
 
-Original algorithm preserved; the wrapper `call_QuBound(...)` now takes an
-explicit `token` argument instead of reading from `st.secrets`, so this
-module is usable outside Streamlit.
+Algorithm overview: given a VQC plus 14 days of historical backend noise
+calibration data, train an LSTM to predict the ``hellinger_distance``
+between the noiseless circuit output and today's noisy output — i.e.
+how much the output distribution will drift under the current hardware.
+
+Two entry points:
+
+* :func:`call_QuBound` — live path, fetches calibration history from
+  IBM Quantum Platform (requires a valid token, slow, ~15 s).
+* :func:`call_QuBound_from_cache` — offline path, reads a pickle
+  produced by ``scripts/fetch_ibm_history.py``. Used by the HF Space
+  demo so it can run without network or credentials.
 """
 
-from qiskit_ibm_runtime import QiskitRuntimeService
-from qiskit import QuantumCircuit
-from qiskit_aer.noise import NoiseModel
-from qiskit_aer import AerSimulator
-from qiskit.quantum_info import hellinger_distance  # state_fidelity and total variation distance are used for simple Fidelity calculations
-from qiskit import transpile
-from qiskit_ibm_runtime.fake_provider import FakeFez
-from qiskit import qpy
+from __future__ import annotations
 
-import torch
-from torch import nn
-
+import logging
+import pickle
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
 import numpy as np
 import pandas as pd
+import torch
+from qiskit import QuantumCircuit, qpy, transpile
+from qiskit.quantum_info import hellinger_distance
+from qiskit_aer import AerSimulator
+from qiskit_aer.noise import NoiseModel
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit_ibm_runtime.fake_provider import FakeFez
+from torch import nn
 
-def get_gate_name_for_pair(properties, qubits):
+logger = logging.getLogger(__name__)
+
+
+# ---- Hyperparameters ---------------------------------------------------
+# Exposed as module-level constants so future ablation studies don't need
+# to hunt them down inside function bodies.
+
+HISTORY_WINDOW_DAYS = 14
+"""Number of past days of calibration snapshots to pull from a backend."""
+
+PROGRESS_PRINT_INTERVAL = 7
+"""Log a progress message every N days while fetching calibrations."""
+
+SHOTS = 2048
+"""Shots per Aer simulator run when producing noisy / noiseless labels."""
+
+SEQUENCE_WINDOW_SIZE = 5
+"""Sliding-window length fed into the LSTM (days of context per sample)."""
+
+LSTM_INPUT_FEATURES = 8
+"""Per-timestep feature count: T1/T2/readout (x1 qubit) + 1 gate error,
+doubled once trend/residual are concatenated. Kept as a constant because
+it is coupled to :func:`extract_time_series_from_historic` — changing
+the feature extraction must update this value."""
+
+LSTM_HIDDEN_BLOCKS = 16
+"""LSTM hidden state size."""
+
+LSTM_LEARNING_RATE = 0.01
+LSTM_EPOCHS = 50
+LSTM_LOG_EPOCH_INTERVAL = 10
+
+CONFIDENCE_LEVEL = 0.95
+"""Upper-quantile weight in the asymmetric pinball loss; predicts the
+95th-percentile error bound."""
+
+
+def get_gate_name_for_pair(
+    properties: Any, qubits: tuple[int, int]
+) -> str | None:
+    """Return the two-qubit gate name (``cx``/``cz``/``ecr``) that acts
+    on the given qubit pair, according to ``properties.gates``. Returns
+    ``None`` if no gate targets exactly those qubits."""
     target_qubits = list(qubits)
-    
     for gate_info in properties.gates:
         if gate_info.qubits == target_qubits:
             return gate_info.gate
-            
     return None
 
-# function to get the necessary noise data from ibm_cloud 
-# gets the properties object for each day of the 14 day window
-def look_back_window_ForError(backend, date_selected = datetime.now()):
-    look_back_days = 14
-    historical_data = []
 
+def look_back_window_ForError(
+    backend: Any, date_selected: datetime | None = None
+) -> list[dict[str, Any]]:
+    """Fetch ``HISTORY_WINDOW_DAYS`` days of ``BackendProperties``
+    ending at ``date_selected`` (default: now).
+
+    Returns a list of ``{"date": "YYYY-MM-DD", "properties": <obj>}``
+    dicts ordered from oldest to most recent.
+    """
     if date_selected is None:
         date_selected = datetime.now()
 
-    print(f"Starting data collection")
+    logger.info("Starting calibration data collection over %d days", HISTORY_WINDOW_DAYS)
 
-    for i in range(look_back_days, 0, -1):
-        # target_date = datetime.now() - timedelta(days = i) # 
-        target_date = date_selected - timedelta(days = i)
-        # print(target_date)
-
-        properties = backend.properties(datetime = target_date)
-
-        historical_data.append({
+    historical_data: list[dict[str, Any]] = []
+    for i in range(HISTORY_WINDOW_DAYS, 0, -1):
+        target_date = date_selected - timedelta(days=i)
+        properties = backend.properties(datetime=target_date)
+        historical_data.append(
+            {
                 "date": target_date.strftime("%Y-%m-%d"),
-                "properties": properties
-            })
-        if i % 7 == 0:
-            print("Half way done...") 
+                "properties": properties,
+            }
+        )
+        if i % PROGRESS_PRINT_INTERVAL == 0:
+            logger.info("Half way done...")
     return historical_data
 
 
-# uses the properties generated to replicated the noise into a noise model 
-# then use that to generate effective labels/outputs with noise 
-# and work on it without noise
-def get_labels_fromNoise(qc, historic_data, backend):
-    print("Getting error prediction labels from circuit nonoise and noise values")
+def get_labels_fromNoise(
+    qc: QuantumCircuit, historic_data: list[dict[str, Any]], backend: Any
+) -> torch.Tensor:
+    """For each historical day, compute the Hellinger distance between
+    the noiseless counts and the noisy counts (noise model built from
+    that day's properties). Returns a 1-D tensor of error labels, one
+    per day, suitable as LSTM supervision."""
+    logger.info("Computing error labels from circuit noiseless vs. noisy runs")
 
-    labels = []  # the error we want to predict
-
-    # create a temp circuit, This was done in the q_adapt implementaiton, and compressVQC
-    # qc = QuantumCircuit(2)
-    # qc.h(0)
-    # qc.cx(0, 1)
+    # Mutation by design: attaches measurements so the Aer shots mean
+    # something. Caller doesn't reuse ``qc`` after this point.
     qc.measure_all()
-    # print(qc)
-
     qc = transpile(qc, backend, optimization_level=3)
+
     simulator = AerSimulator()
-    # noise_model = NoiseModel
-    nonoise_value = simulator.run(qc, shots = 2048).result().get_counts()
+    nonoise_value = simulator.run(qc, shots=SHOTS).result().get_counts()
 
+    labels: list[float] = []
     for history in historic_data:
-        properties = history['properties']
-        noise_model = NoiseModel.from_backend(backend, properties)  # get the noise signature to replicate
-        noisy_simulator = AerSimulator(noise_model = noise_model)
-        noise_value = noisy_simulator.run(qc, shots = 2048).result().get_counts()
+        properties = history["properties"]
+        noise_model = NoiseModel.from_backend(backend, properties)
+        noisy_simulator = AerSimulator(noise_model=noise_model)
+        noise_value = noisy_simulator.run(qc, shots=SHOTS).result().get_counts()
 
-        # using true metric to calculate difference between probability distributions
+        # Hellinger is a proper metric on probability distributions,
+        # bounded in [0, 1] — convenient for training.
         error = hellinger_distance(nonoise_value, noise_value)
         labels.append(error)
 
-    return torch.tensor(labels, dtype = torch.float32)   # must convertt to tensor so it can be used in LSTm
+    return torch.tensor(labels, dtype=torch.float32)
 
-# this uses the output form the previous funciton to get the 
-# T1, Tw, Readout and gate errors
-def extract_time_series_from_historic(historical_data, qubit_indices = [0], gate_qubit = [(0,1)]):
-    print("Starting Error values Extraction from historic data.")
-    extracted_data = []
 
+def extract_time_series_from_historic(
+    historical_data: list[dict[str, Any]],
+    qubit_indices: list[int] | None = None,
+    gate_qubit: list[tuple[int, int]] | None = None,
+) -> pd.DataFrame:
+    """Unpack T1 / T2 / readout error / two-qubit gate error into a
+    tidy per-day DataFrame, indexed by date. Defaults to qubit 0 and
+    the (0, 1) pair — the smallest circuit we ever exercise."""
+    if qubit_indices is None:
+        qubit_indices = [0]
+    if gate_qubit is None:
+        gate_qubit = [(0, 1)]
+
+    logger.info("Extracting per-qubit error time series from historic data")
+
+    extracted_data: list[dict[str, Any]] = []
     for history in historical_data:
-        date = history['date']
-        properties = history['properties']
+        properties = history["properties"]
+        row: dict[str, Any] = {"date": history["date"]}
 
-        row = {'date':date}
-
-
-        # get the respective T1, T2, readout errors
         for i in qubit_indices:
-            row[f'q{i}_t1'] = properties.t1(i)
-            row[f'q{i}_t2'] = properties.t2(i)
-            row[f'q{i}_readout_err'] = properties.readout_error(i)
+            row[f"q{i}_t1"] = properties.t1(i)
+            row[f"q{i}_t2"] = properties.t2(i)
+            row[f"q{i}_readout_err"] = properties.readout_error(i)
 
-        # getting the gate errors
         for g in gate_qubit:
             gate_name = get_gate_name_for_pair(properties, g)
-            row[f'gate_err_{g[0]}_{g[1]}'] = properties.gate_error(gate_name, g)
+            row[f"gate_err_{g[0]}_{g[1]}"] = properties.gate_error(gate_name, g)
 
         extracted_data.append(row)
 
-    df  = pd.DataFrame(extracted_data).set_index('date')
-    return df
+    return pd.DataFrame(extracted_data).set_index("date")
 
 
-# ---------- Perform QuDeCOM
+# ---- QuDeCOM: trend / residual split -----------------------------------
 
-def decompose_noise(df):
-    print("breaking extracted df in to trend and residue.")
-    trend = df.rolling(window=3, min_periods=1).mean()  # return the mean for the 3 rows and then the next following rows 
-                                                        # then subtract form the df to get the residual
-                                                        # essentially do 1d conolution with a window of 3
+
+def decompose_noise(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split a noise time series into a rolling-mean trend (predictable
+    drift) and the residual (unpredictable fluctuations). Matches the
+    decomposition described in the QuBound paper."""
+    logger.info("Decomposing extracted time series into trend and residual")
+    trend = df.rolling(window=3, min_periods=1).mean()
     residual = df - trend
-
-    # extract the prdictable drift and unpredictable fluctuations, according to the paper
-    return trend, residual 
+    return trend, residual
 
 
+# ---- LSTM forecaster ---------------------------------------------------
 
-#------------- encoding the drift and fluctuations, 
-# into a feature vector for the LSTM
-# lstm takes into consideratino of a sequence, hence this is necessary
-def create_sequences(df, window_size=5):
-    print("preprocessing lstm data ==")
+
+def create_sequences(df: pd.DataFrame, window_size: int = SEQUENCE_WINDOW_SIZE) -> torch.Tensor:
+    """Turn a (days x features) DataFrame into overlapping windows of
+    length ``window_size`` suitable as LSTM inputs."""
+    logger.debug("Building LSTM input sequences with window=%d", window_size)
     data = df.values
-    sequences = []
-    for i in range(len(data) - window_size):
-        window = data[i : i + window_size]   # return the sequence/data form 0-5, 1-6, 2-7...
-        sequences.append(window)
-    return torch.tensor(np.array(sequences), dtype=torch.float32)   # convert to torch tensor, so that we can pass it to a lstm
+    sequences = [data[i : i + window_size] for i in range(len(data) - window_size)]
+    return torch.tensor(np.array(sequences), dtype=torch.float32)
 
 
-#------------------------------
-# Finally now that pre-processing is complete, 
-# the LSTM model 
-# or QuPRED
-#--------------------------------
 class QuPred(nn.Module):
-    def __init__(self, input_features, blocks):
+    """LSTM-based error-bound forecaster.
+
+    One LSTM layer consumes the daily noise sequence; a final linear
+    head projects the last hidden state onto a scalar predicted error.
+    """
+
+    def __init__(self, input_features: int, blocks: int) -> None:
         super().__init__()
         self.lstm = nn.LSTM(input_features, blocks, batch_first=True)
         self.fc = nn.Linear(blocks, 1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         _, (h_n, _) = self.lstm(x)
         return self.fc(h_n[-1])
-    
-# using stistical confidence for the loss to get the bound 
-# for a bell curve to be with in the 95% of all the data, 
-# that is the value should lie between 2 standard deviations of the mean
-# taking the idea from the confidence table in the paper
-# Statistical theory; we can be 95% sure that out data wont be away from the actual value
-def loss_fn(preds, targets, confidence=0.95):
+
+
+def loss_fn(
+    preds: torch.Tensor, targets: torch.Tensor, confidence: float = CONFIDENCE_LEVEL
+) -> torch.Tensor:
+    """Asymmetric pinball loss: penalises under-prediction at weight
+    ``confidence`` and over-prediction at weight ``confidence - 1``,
+    so minimising it recovers the ``confidence``-quantile of the error
+    distribution (default 95%)."""
     errors = targets - preds
     return torch.max(confidence * errors, (confidence - 1) * errors).mean()
 
-def train_loop(x_train, y_train):
 
-    print("Entered Model training ...")
-    # hyper parameters
-    model = QuPred(input_features= 8, blocks = 16)
-    optimizer = torch.optim.Adam(model.parameters(), lr = 0.01)
-    epochs = 50
+def train_loop(x_train: torch.Tensor, y_train: torch.Tensor) -> QuPred:
+    """Train a fresh :class:`QuPred` for ``LSTM_EPOCHS`` epochs and
+    return the trained model. Hyperparameters live as module-level
+    constants above."""
+    logger.info("Entering LSTM training loop")
+    model = QuPred(input_features=LSTM_INPUT_FEATURES, blocks=LSTM_HIDDEN_BLOCKS)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LSTM_LEARNING_RATE)
 
-    # the actually training
-    for epoch in range(epochs):
+    for epoch in range(LSTM_EPOCHS):
         model.train()
         model.zero_grad()
 
-        predictions = model(x_train)  # remember that x train is of the size 9,5,4
-        loss = loss_fn(predictions, y_train, confidence = 0.95)
-
-        # calculate the gradients
+        predictions = model(x_train)
+        loss = loss_fn(predictions, y_train, confidence=CONFIDENCE_LEVEL)
         loss.backward()
-        # make changes to the weights
         optimizer.step()
 
-        if epoch % 10 == 0:
-            print(f"Epoch {epoch} | Model Loss: {loss.item():.6f}")
-    
+        if epoch % LSTM_LOG_EPOCH_INTERVAL == 0:
+            logger.info("Epoch %d | Loss: %.6f", epoch, loss.item())
+
     return model
 
-def predict_vqc_bound(model, x_train):
+
+def predict_vqc_bound(model: QuPred, x_train: torch.Tensor) -> float:
+    """Evaluate the trained model on the most recent sequence (today's
+    noise) and return its scalar error-bound prediction."""
     model.eval()
     with torch.no_grad():
+        latest_noise = x_train[-1].unsqueeze(0)
+        return float(model(latest_noise).item())
 
-        # model.eval()
-        # with torch.no_grad():
-        #     # Take the VERY LAST noise, which is today's noise to predict the performance
-        #     latest_noise = x_train[-1].unsqueeze(0) 
-        #     predicted_bound = model(latest_noise_sequence)
-        #     print(f"The predicted error bound today: {predicted_bound.item():.4f}")
 
-        latest_noise = x_train[-1].unsqueeze(0) 
-        predicted_bound = model(latest_noise).item()
-        
-        return predicted_bound
-
-def _train_and_predict(qc, historic_data, provider):
+def _train_and_predict(
+    qc: QuantumCircuit, historic_data: list[dict[str, Any]], provider: Any
+) -> tuple[float, QuPred]:
     """Shared QuBound pipeline once ``historic_data`` is available.
 
-    Pulls the time-series features out of 14 days of BackendProperties,
+    Pulls the time-series features out of the calibration snapshots,
     trains the LSTM on noise-aware labels from a Qiskit Aer simulation,
-    and returns the predicted error bound for *today* plus the trained model.
+    and returns ``(predicted_error_bound_today, trained_model)``.
     """
     extracted_df = extract_time_series_from_historic(historic_data)
     trend_df, residual_df = decompose_noise(extracted_df)
 
-    combined_df = pd.concat([trend_df, residual_df], axis=1)
-    combined_df = combined_df.fillna(0)
+    combined_df = pd.concat([trend_df, residual_df], axis=1).fillna(0)
     normalized_df = (combined_df - combined_df.mean()) / combined_df.std()
 
-    x_train = create_sequences(normalized_df, window_size=5)
+    x_train = create_sequences(normalized_df, window_size=SEQUENCE_WINDOW_SIZE)
     y_train = get_labels_fromNoise(qc, historic_data, provider)
-    y_train = y_train[5:].unsqueeze(1)
+    y_train = y_train[SEQUENCE_WINDOW_SIZE:].unsqueeze(1)
 
     model = train_loop(x_train, y_train)
     final_bound = predict_vqc_bound(model, x_train)
     return final_bound, model
 
 
-# provider is the fake backend that will be used for transpiling and other uses
-# this is the function that will be called by the website to run the QuBound from scratch
-def call_QuBound(qc, provider, token, date=None):
+def call_QuBound(
+    qc: QuantumCircuit,
+    provider: Any,
+    token: str,
+    date: datetime | None = None,
+) -> tuple[float, QuPred]:
     """Run QuBound against the **live** IBM Quantum Platform API.
 
-    Fetches 14 days of historical noise from ``ibm_fez`` and trains the LSTM.
-    Slow (live fetch is ~15 s) and requires network + valid token.
+    Fetches ``HISTORY_WINDOW_DAYS`` days of historical noise from
+    ``ibm_fez`` and trains the LSTM. Slow (live fetch is ~15 s) and
+    requires network access plus a valid token.
 
     Parameters
     ----------
     qc : QuantumCircuit
-    provider : qiskit backend (fake or real) used for labelling
-    token : str  IBM Quantum Platform API token
-    date : datetime or None  reference date; defaults to now
+    provider : qiskit backend (fake or real) used for transpile + Aer
+        noise-model construction during label generation.
+    token : IBM Quantum Platform API token.
+    date : Reference date; defaults to now.
     """
     if date is None:
         date = datetime.now()
@@ -262,25 +319,29 @@ def call_QuBound(qc, provider, token, date=None):
     return _train_and_predict(qc, historic_data, provider)
 
 
-def call_QuBound_from_cache(qc, cached_history_path, reference_backend=None):
-    """Run QuBound against a pickle of pre-fetched 14-day backend properties.
+def call_QuBound_from_cache(
+    qc: QuantumCircuit,
+    cached_history_path: str | Path,
+    reference_backend: Any = None,
+) -> tuple[float, QuPred, dict[str, Any]]:
+    """Run QuBound against a pickle of pre-fetched 14-day backend
+    properties.
 
     Parameters
     ----------
     qc : QuantumCircuit
-    cached_history_path : str | pathlib.Path
-        Path to the pickle produced by ``scripts/fetch_ibm_history.py``.
-    reference_backend : qiskit backend, optional
-        Backend used for transpile + simulator construction. Defaults to
-        ``FakeFez`` (matches the ibm_fez calibration in the cache).
+    cached_history_path : Path to the pickle produced by
+        ``scripts/fetch_ibm_history.py``.
+    reference_backend : Backend used for transpile + simulator
+        construction. Defaults to ``FakeFez`` (matches the ``ibm_fez``
+        calibration in the cache).
 
     Returns
     -------
-    (predicted_bound, model, metadata) : tuple
-        ``metadata`` is a dict describing the cached data source.
+    (predicted_bound, model, metadata) : ``metadata`` is a dict
+        describing the cached data source (backend name, fetch date,
+        day count, date range).
     """
-    import pickle
-
     with open(cached_history_path, "rb") as fh:
         payload = pickle.load(fh)
 
@@ -302,19 +363,18 @@ def call_QuBound_from_cache(qc, cached_history_path, reference_backend=None):
     return bound, model, metadata
 
 
-
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Minimal CLI entry for ad-hoc testing outside the web app.
     # Expects two environment variables:
     #   IBM_QUANTUM_TOKEN  - IBM Quantum Platform API token
     #   QBOUND_QPY_FILE    - path to a .qpy file holding the trained VQC
     import os
 
+    logging.basicConfig(level=logging.INFO)
+
     token = os.environ["IBM_QUANTUM_TOKEN"]
     qpy_path = os.environ["QBOUND_QPY_FILE"]
     with open(qpy_path, "rb") as file:
         qc = qpy.load(file)[0]
     bound, _model = call_QuBound(qc, FakeFez(), token=token)
-    print(f"Final bound: {bound}")
+    logger.info("Final bound: %s", bound)

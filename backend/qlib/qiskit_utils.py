@@ -1,50 +1,39 @@
-import io
-import qiskit
+"""Small Qiskit helpers used by the pipeline.
+
+Historically this module collected a handful of utility functions ported
+from Jovin's Streamlit prototype; most of them were superseded by the
+FastAPI service layer (circuit loading lives in
+``app/services/circuit_service.py``, transpilation is inlined at the
+call site, and matplotlib drawing is never used in headless serving).
+
+What remains is the one helper still consumed at runtime:
+``simpleFidelityEstimator``, called from
+``workflow_service._handle_fidelity`` to score the output circuit
+against the all-zeros state.
+"""
+
+from __future__ import annotations
+
+import logging
+
 from qiskit import QuantumCircuit
-from qiskit import qasm2, qasm3, qpy
-from qiskit_ibm_runtime.fake_provider import FakeFez, FakeMarrakesh, FakeTorino
-from qiskit import transpile
 from qiskit.quantum_info import Statevector, state_fidelity
 
-def display_circuit(qc: QuantumCircuit):
-    return qc.draw("mpl")
+logger = logging.getLogger(__name__)
 
-def qasmFile_toCircuit(file):
-    """Load a Qiskit QPY or QASM file-like object into a QuantumCircuit."""
-    try:
-        if isinstance(file, (bytes, bytearray)):
-            file_obj = io.BytesIO(file)
-        else:
-            file_obj = file
-            if hasattr(file_obj, "seek"):
-                file_obj.seek(0)
 
-        qc = qpy.load(file_obj)[0]
-        return qc
-    except Exception as exc:
-        if hasattr(file, "seek"):
-            file.seek(0)
-        raise RuntimeError(f"Could not load uploaded circuit file: {exc}") from exc
-    
-def transpile_optim(qc, backend, optim):
-    optim_qc = transpile(qc, backend=backend, optimization_level=optim,basis_gates=['sx', 'rz', 'cx', 'id'])
-    return optim_qc
+def simpleFidelityEstimator(qc: QuantumCircuit) -> float:
+    """Compute ``<0...0|U|0...0>`` for the given circuit.
 
-def simpleFidelityEstimator(qc):
-
-    # qc = QuantumCircuit(2)
-    # qc.h(0)
-    # qc.cx(0, 1)
-    # print(qc)
-
-    qc = qc.remove_final_measurements(inplace=False) # remove the measurements since statevector doesnt do measurements
-    print(qc)
-
+    Strips any final measurements (``Statevector`` can't handle them),
+    evolves the all-zeros state through ``qc``, and returns the fidelity
+    against ``|0...0>``. Good enough for the demo's "did the circuit
+    stay close to its noiseless target" sanity check, though obviously
+    not representative of arbitrary target states.
+    """
+    qc = qc.remove_final_measurements(inplace=False)
     final_state = Statevector.from_instruction(qc)
-
-    # Define the target state (e.g., (|00> + |11>)/sqrt(2))
-    target_state = Statevector.from_label('0' * qc.num_qubits) 
-    #Calculate fidelity
+    target_state = Statevector.from_label("0" * qc.num_qubits)
     fidelity = state_fidelity(final_state, target_state)
-    print(f"Fidelity: {fidelity}")
-    return fidelity
+    logger.debug("simpleFidelityEstimator: fidelity=%.6f", fidelity)
+    return float(fidelity)
