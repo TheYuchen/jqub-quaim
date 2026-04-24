@@ -72,7 +72,7 @@ export function ThemeSwitcher() {
         // long taglines don't truncate.
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-1 w-[min(17rem,calc(100vw-1.5rem))]"
+          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-50 p-2 flex flex-col gap-1 w-[min(17rem,calc(100vw-1.5rem))]"
         >
           {/* w- is viewport-aware: 17rem (272px) on wide screens, else
               capped at viewport minus 24px so it stays flush with the
