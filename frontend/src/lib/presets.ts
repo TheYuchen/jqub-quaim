@@ -108,7 +108,13 @@ export const PIPELINE_PRESETS: PipelinePreset[] = [
   },
 ];
 
-export const DEFAULT_PRESET_KEY = "qubound";
+// Default pipeline shown on first load. QuCAD is preferred over QuBound
+// here because (a) its precomputed-cache hit for default circuits returns
+// instantly, and (b) on a cache miss its ADMM pass on small circuits is
+// still sub-second, whereas QuBound's LSTM-based bound predictor can take
+// tens of seconds on the shared HF CPU even with the 14-day calibration
+// cache warmed up. Better first impression for drive-by visitors.
+export const DEFAULT_PRESET_KEY = "qucad";
 
 export const PRESET_BY_KEY: Record<string, PipelinePreset> = Object.fromEntries(
   PIPELINE_PRESETS.map((p) => [p.key, p]),
