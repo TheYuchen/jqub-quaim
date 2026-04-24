@@ -242,9 +242,16 @@ function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
         Load preset <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
+        // Anchor on mobile vs desktop differs so the popover never clips:
+        //   - Mobile (<md): `left-0` — popover extends rightwards from the
+        //     button's left edge. On a ~390px iPhone, that keeps the full
+        //     256px popover inside the viewport.
+        //   - Desktop (≥md): `md:right-0` — popover aligns to the button's
+        //     right edge and extends leftwards, staying flush with the
+        //     right-hand cluster (Clear / Run pipeline).
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-20 p-1.5 flex flex-col gap-0.5 w-64"
+          className="absolute top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-20 p-1.5 flex flex-col gap-0.5 left-0 md:left-auto md:right-0 w-[min(16rem,calc(100vw-1.5rem))]"
         >
           {PIPELINE_PRESETS.map((p) => (
             <button
