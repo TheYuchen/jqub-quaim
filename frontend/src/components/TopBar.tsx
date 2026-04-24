@@ -98,38 +98,40 @@ export function TopBar({
             Visual pipeline for noise-aware VQC experiments
           </div>
         </div>
+        {/* Status chips live in the left cluster — they describe the app's
+            runtime state (library versions + whether the live-IBM path is
+            hot) and belong next to the title, not mixed in with the
+            external-link / theme controls on the right. The version chip
+            is hidden on mobile to save room; the IBM chip stays since it
+            is interactive. */}
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0 ml-1 sm:ml-2">
+          {!mobile && (
+            <span className="chip">
+              <Activity className="w-3 h-3" />
+              {health
+                ? `qiskit ${health.qiskit_version} · torch ${health.torch_version}`
+                : "loading…"}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (serverCanGoLive) setUseLiveIbm(!useLiveIbm);
+            }}
+            disabled={!serverCanGoLive}
+            aria-pressed={effectiveLive}
+            className={`chip transition-colors ${chipClass}`}
+            title={chipTitle}
+          >
+            {mobile ? chipLabelShort : chipLabel}
+          </button>
+        </div>
       </div>
       <div className="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0">
-        {/* qiskit/torch version chip — hidden on mobile to save room */}
-        {!mobile && (
-          <span className="chip">
-            <Activity className="w-3 h-3" />
-            {health
-              ? `qiskit ${health.qiskit_version} · torch ${health.torch_version}`
-              : "loading…"}
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            if (serverCanGoLive) setUseLiveIbm(!useLiveIbm);
-          }}
-          disabled={!serverCanGoLive}
-          aria-pressed={effectiveLive}
-          className={`chip transition-colors ${chipClass}`}
-          title={chipTitle}
-        >
-          {mobile ? chipLabelShort : chipLabel}
-        </button>
         {/* External-links group: JQub lab, papers, developer. Desktop
             shows icon+label; mobile collapses to icon-only to keep the
             header under ~390px. A subtle vertical divider (desktop only)
-            separates metadata chips from these links and from the theme
-            /tour controls that follow. */}
-        <span
-          className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
-          aria-hidden="true"
-        />
+            separates the links from the theme/tour controls that follow. */}
         <a
           href="https://jqub.ece.gmu.edu/"
           target="_blank"
@@ -234,12 +236,17 @@ function PapersPopover() {
         <span className="hidden sm:inline">Papers</span>
       </button>
       {open && (
-        // Viewport-aware width: 22rem (352px) caps the title lines to a
-        // reasonable length on desktop; on mobile the calc() arm keeps
-        // the menu inside the right-aligned viewport with a 24px margin.
+        // Mobile: the Papers button sits roughly mid-header, so anchoring
+        // the popover to the button's right edge (absolute right-0) would
+        // overflow the viewport on either side once the menu is 22rem
+        // wide. Switch to `fixed` positioning flush with the viewport's
+        // right edge and just below the 56px header, which guarantees it
+        // stays on-screen regardless of where the button ends up.
+        // Desktop (≥sm): back to absolute right-0 of the button so the
+        // menu tracks with the header cluster.
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-0.5 w-[min(22rem,calc(100vw-1.5rem))]"
+          className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-0.5 w-[min(22rem,calc(100vw-1.5rem))]"
         >
           {papers.map((p) => (
             <a
