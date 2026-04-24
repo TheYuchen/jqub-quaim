@@ -41,16 +41,18 @@ export function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
         <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
-        // Anchor on mobile vs desktop differs so the popover never clips:
-        //   - Mobile (<md): `left-0` — popover extends rightwards from the
-        //     button's left edge. On a ~390px iPhone, that keeps the full
-        //     256px popover inside the viewport.
-        //   - Desktop (≥md): `md:right-0` — popover aligns to the button's
-        //     right edge and extends leftwards, staying flush with the
-        //     right-hand cluster (Clear / Run pipeline).
+        // Mobile (<sm): this button sits in the right-hand cluster of the
+        // toolbar, so anchoring `left-0` pushed the popover past the right
+        // viewport edge. Pin it with `fixed right-3 top-14` instead so it
+        // always stays inside the viewport — same pattern PapersPopover
+        // and DevelopersPopover use. The header is z-20, and a fixed
+        // child with `z-30` stacks cleanly above React Flow.
+        //
+        // Desktop (≥sm): `absolute right-0 top-full` anchors it to the
+        // button and extends leftwards under the right-hand toolbar cluster.
         <div
           role="menu"
-          className="absolute top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-20 p-1.5 flex flex-col gap-0.5 left-0 md:left-auto md:right-0 w-[min(16rem,calc(100vw-1.5rem))]"
+          className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-1.5 flex flex-col gap-0.5 w-[min(18rem,calc(100vw-1.5rem))]"
         >
           {PIPELINE_PRESETS.map((p) => (
             <button

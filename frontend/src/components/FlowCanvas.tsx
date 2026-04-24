@@ -18,7 +18,9 @@ import {
 import {
   AlertCircle,
   AlertTriangle,
+  Box,
   Check,
+  Link2,
   Loader2,
   Play,
   Trash2,
@@ -287,14 +289,23 @@ export function FlowCanvas() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4">
-        {/* Status counter. Full form on ≥sm, compact "N·M" on <sm so the
-            toolbar still fits a 390px iPhone viewport. */}
+        {/* Status counter. Full form on ≥sm. On <sm we swap in an icon
+            pair (Box = "blocks", Link2 = "links") so the compact counter
+            is still self-explanatory — a bare "5·4" turned out to be
+            unreadable in user testing. */}
         <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-mute shrink-0">
           <span className="hidden sm:inline">{nodes.length} blocks</span>
           <span className="hidden sm:inline text-edge">·</span>
           <span className="hidden sm:inline">{edges.length} links</span>
-          <span className="sm:hidden font-mono" aria-label={`${nodes.length} blocks, ${edges.length} links`}>
-            {nodes.length}·{edges.length}
+          <span
+            className="sm:hidden flex items-center gap-1"
+            aria-label={`${nodes.length} blocks, ${edges.length} links`}
+          >
+            <Box className="w-3 h-3" aria-hidden="true" />
+            <span className="tabular-nums">{nodes.length}</span>
+            <span className="text-edge mx-0.5" aria-hidden="true">·</span>
+            <Link2 className="w-3 h-3" aria-hidden="true" />
+            <span className="tabular-nums">{edges.length}</span>
           </span>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
