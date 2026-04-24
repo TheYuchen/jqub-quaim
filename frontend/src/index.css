@@ -5,42 +5,19 @@
 /* ============================================================
  * Theme tokens
  *
- * Default is "dark" (the original navy + cyan palette).
- *   data-theme="light" : white background with soft accents
- *   data-theme="gmu"   : GMU Mason green canvas + Mason gold primary
+ * Default is "light" — CSS variables on `:root` are the light palette,
+ * so the app renders correctly even before any JS runs (no flash of
+ * unthemed content on first paint, SSR-safe, accessibility-friendly).
+ *   data-theme="dark" : original navy + cyan palette
+ *   data-theme="gmu"  : GMU Mason green canvas + Mason gold primary
  *
  * Values are `R G B` triplets so Tailwind's `/ <alpha-value>` syntax
  * works uniformly: `bg-canvas/80` → rgb(var(--color-canvas) / 0.8).
  * ============================================================ */
 @layer base {
   :root {
-    color-scheme: dark;
-    /* DARK (default) */
-    --color-canvas: 11 16 32;
-    --color-surface: 17 24 48;
-    --color-surfaceAlt: 21 29 56;
-    --color-edge: 31 42 74;
-    --color-mute: 132 146 199;
-    --color-ink: 230 235 255;
-    --color-accent: 76 201 240;
-    --color-accent2: 123 92 255;
-    --color-accent3: 247 37 133;
-    --color-accent4: 6 214 160;
-    --color-warn: 244 162 97;
-    --color-danger: 239 71 111;
-    --color-ok: 45 212 191;
-    /* Body bg gradient and scrollbar colors are theme-specific too */
-    --body-bg:
-      radial-gradient(1200px 600px at 80% -10%, rgb(123 92 255 / 0.12), transparent 70%),
-      radial-gradient(1000px 500px at 0% 110%, rgb(76 201 240 / 0.10), transparent 70%),
-      rgb(var(--color-canvas));
-    --scrollbar-thumb: rgb(var(--color-edge));
-    --rf-edge-stroke: 74 90 138;      /* #4a5a8a */
-    --rf-edge-selected: var(--color-accent);
-  }
-
-  [data-theme="light"] {
     color-scheme: light;
+    /* LIGHT (default) — white background with soft accents */
     --color-canvas: 246 247 251;
     --color-surface: 255 255 255;
     --color-surfaceAlt: 240 243 249;
@@ -60,6 +37,30 @@
       rgb(var(--color-canvas));
     --scrollbar-thumb: rgb(var(--color-edge));
     --rf-edge-stroke: 148 163 184;     /* slate-400 */
+    --rf-edge-selected: var(--color-accent);
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --color-canvas: 11 16 32;
+    --color-surface: 17 24 48;
+    --color-surfaceAlt: 21 29 56;
+    --color-edge: 31 42 74;
+    --color-mute: 132 146 199;
+    --color-ink: 230 235 255;
+    --color-accent: 76 201 240;
+    --color-accent2: 123 92 255;
+    --color-accent3: 247 37 133;
+    --color-accent4: 6 214 160;
+    --color-warn: 244 162 97;
+    --color-danger: 239 71 111;
+    --color-ok: 45 212 191;
+    --body-bg:
+      radial-gradient(1200px 600px at 80% -10%, rgb(123 92 255 / 0.12), transparent 70%),
+      radial-gradient(1000px 500px at 0% 110%, rgb(76 201 240 / 0.10), transparent 70%),
+      rgb(var(--color-canvas));
+    --scrollbar-thumb: rgb(var(--color-edge));
+    --rf-edge-stroke: 74 90 138;      /* #4a5a8a */
     --rf-edge-selected: var(--color-accent);
   }
 

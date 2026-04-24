@@ -2,13 +2,14 @@
  * Theme registry + persistence.
  *
  * Theme tokens are defined as CSS variables in index.css under
- * `:root` (dark), `[data-theme="light"]`, and `[data-theme="gmu"]`.
- * This module is responsible for picking which of those is active
- * at runtime by writing to `document.documentElement.dataset.theme`,
- * and for persisting the user's choice across page loads.
+ * `:root` (light — the default), `[data-theme="dark"]`, and
+ * `[data-theme="gmu"]`. This module is responsible for picking which of
+ * those is active at runtime by writing to
+ * `document.documentElement.dataset.theme`, and for persisting the
+ * user's choice across page loads.
  */
 
-export type ThemeKey = "dark" | "light" | "gmu";
+export type ThemeKey = "light" | "dark" | "gmu";
 
 export interface ThemeSpec {
   key: ThemeKey;
@@ -21,16 +22,16 @@ export interface ThemeSpec {
 
 export const THEMES: ThemeSpec[] = [
   {
-    key: "dark",
-    label: "Midnight",
-    tagline: "Deep navy · electric cyan",
-    swatch: ["#0b1020", "#4cc9f0"],
-  },
-  {
     key: "light",
     label: "Light",
     tagline: "White background · soft accents",
     swatch: ["#f6f7fb", "#0284c7"],
+  },
+  {
+    key: "dark",
+    label: "Midnight",
+    tagline: "Deep navy · electric cyan",
+    swatch: ["#0b1020", "#4cc9f0"],
   },
   {
     key: "gmu",
@@ -44,7 +45,7 @@ export const THEME_BY_KEY: Record<ThemeKey, ThemeSpec> = Object.fromEntries(
   THEMES.map((t) => [t.key, t]),
 ) as Record<ThemeKey, ThemeSpec>;
 
-export const DEFAULT_THEME: ThemeKey = "dark";
+export const DEFAULT_THEME: ThemeKey = "light";
 const LS_THEME = "jqub.theme";
 
 export function loadStoredTheme(): ThemeKey {
@@ -62,9 +63,9 @@ export function loadStoredTheme(): ThemeKey {
 
 export function applyTheme(theme: ThemeKey): void {
   if (typeof document === "undefined") return;
-  // Dark is the :root default, so clear the attribute instead of setting
-  // it. Avoids an extra CSS selector lookup and keeps inspector clean.
-  if (theme === "dark") {
+  // Light is the :root default, so clear the attribute instead of
+  // setting it. Dark and GMU live behind `data-theme` selectors.
+  if (theme === "light") {
     delete document.documentElement.dataset.theme;
   } else {
     document.documentElement.dataset.theme = theme;

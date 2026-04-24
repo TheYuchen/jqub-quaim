@@ -13,13 +13,14 @@
     />
   </head>
   <body class="bg-canvas text-ink font-sans antialiased">
-    <!-- Apply stored theme before first paint to avoid a dark→light flash
-         on initial load for users with non-default themes. -->
+    <!-- Apply stored theme before first paint so returning users who
+         picked Dark or GMU don't see a flash of the light default. The
+         light theme IS the :root default, so it needs no attribute. -->
     <script>
       (function () {
         try {
           var t = localStorage.getItem("jqub.theme");
-          if (t === "light" || t === "gmu") {
+          if (t === "dark" || t === "gmu") {
             document.documentElement.dataset.theme = t;
           }
         } catch (_) { /* ignore */ }
