@@ -16,8 +16,6 @@ import { CircleUser, ExternalLink } from "lucide-react";
 
 interface Person {
   name: string;
-  /** One-line role label; shows under the name in small muted text. */
-  role: string;
   /** Where the "open" click takes the user. */
   url: string;
   /** Domain/platform label shown as a right-aligned footer chip. */
@@ -27,13 +25,11 @@ interface Person {
 const PEOPLE: Person[] = [
   {
     name: "Yuchen Yuan",
-    role: "Demo & UI",
     url: "https://theyuchen.github.io/",
     linkLabel: "theyuchen.github.io",
   },
   {
     name: "Jovin Antony Maria",
-    role: "Algorithm author",
     url: "https://www.linkedin.com/in/jovin-antony-maria-987262348/",
     linkLabel: "LinkedIn",
   },
@@ -94,14 +90,9 @@ export function DevelopersPopover() {
               className="px-3 py-2 rounded-md hover:bg-surfaceAlt transition-colors border border-transparent hover:border-edge/60 flex items-center gap-3"
             >
               <CircleUser className="w-4 h-4 text-mute shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-ink font-medium truncate">
-                  {p.name}
-                </div>
-                <div className="text-[11px] text-mute leading-snug truncate">
-                  {p.role}
-                </div>
-              </div>
+              <span className="flex-1 min-w-0 text-sm text-ink font-medium truncate">
+                {p.name}
+              </span>
               <span className="flex items-center gap-1 text-[10px] text-mute font-mono shrink-0">
                 {p.linkLabel}
                 <ExternalLink className="w-3 h-3" />
