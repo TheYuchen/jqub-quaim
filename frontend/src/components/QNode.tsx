@@ -11,9 +11,29 @@ import {
   NODE_BY_KIND,
   type NodeKind,
   type NodeParamSpec,
+  type NodeSpec,
 } from "../lib/nodeCatalog";
 import { NodeParamEditor } from "./NodeParamEditor";
+import { TipIcon } from "./TipIcon";
 import { useApp } from "../lib/store";
+
+/** Plain-language description of each node-family role, surfaced as a
+ *  tooltip on the small family badge under the node label. The 5 words
+ *  (SOURCE / BACKEND / ALGORITHM / METRIC / SINK) make sense to anyone
+ *  who's seen a workflow editor before, but not to the quantum-only or
+ *  newcomer audience this demo gets. */
+const FAMILY_HINTS: Record<NodeSpec["family"], string> = {
+  source:
+    "Where the pipeline starts — feeds your quantum circuit to the rest of the graph.",
+  backend:
+    "Provides a noise model. Algorithm blocks downstream use it to simulate hardware behaviour.",
+  algorithm:
+    "A research algorithm. Reads the circuit (and noise) from upstream, may transform the circuit or attach a metric.",
+  metric:
+    "Computes a quantitative score on the current circuit (e.g. fidelity).",
+  sink:
+    "Where the pipeline ends — aggregates final metrics and the resulting circuit.",
+};
 
 export interface QNodeData extends Record<string, unknown> {
   kind: NodeKind;
@@ -102,8 +122,9 @@ export function QNode({ id, data, selected }: NodeProps) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="font-medium text-ink text-sm">{spec.label}</div>
-          <div className="text-[10px] text-mute uppercase tracking-wider">
-            {spec.family}
+          <div className="text-[10px] text-mute uppercase tracking-wider flex items-center gap-1">
+            <span>{spec.family}</span>
+            <TipIcon hint={FAMILY_HINTS[spec.family]} size={10} />
           </div>
         </div>
       </div>

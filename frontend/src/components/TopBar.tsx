@@ -10,6 +10,7 @@ import {
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { PapersPopover } from "./PapersPopover";
 import { DevelopersPopover } from "./DevelopersPopover";
+import { TipIcon } from "./TipIcon";
 
 /**
  * Top application bar.
@@ -118,10 +119,10 @@ export function TopBar({
             }}
             disabled={!serverCanGoLive}
             aria-pressed={effectiveLive}
-            className={`chip transition-colors ${chipClass}`}
-            title={chipTitle}
+            className={`chip transition-colors gap-1 ${chipClass}`}
           >
-            {mobile ? chipLabelShort : chipLabel}
+            <span>{mobile ? chipLabelShort : chipLabel}</span>
+            <TipIcon hint={chipTitle} size={10} />
           </button>
         </div>
       </div>

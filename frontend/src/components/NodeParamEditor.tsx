@@ -1,5 +1,5 @@
-import { HelpCircle } from "lucide-react";
 import type { NodeParamSpec } from "../lib/nodeCatalog";
+import { TipIcon } from "./TipIcon";
 
 /**
  * Inline parameter editor for a canvas node.
@@ -153,31 +153,7 @@ function NumberField({
 }
 
 /** Field label with a small ⓘ icon when the param spec carries a hint.
- *
- *  Uses a CSS `group-hover` / `group-focus` tooltip — instant, no
- *  delay, works for keyboard tabs as well as mouse hovers.
- *
- *  Why no `aria-label` or `title` on the icon wrapper:
- *  - `title` has a 1-2 s display delay on macOS Chrome and races our
- *    own tooltip.
- *  - `aria-label` on a `cursor:help` element causes some browsers to
- *    fall back to the same delayed native tooltip, which is what
- *    gave users the "wait 2 seconds before anything shows up" bug.
- *
- *  Instead, the tooltip's own text is what screen readers read (it's
- *  a visible `<span role="tooltip">` containing the same words a
- *  sighted user sees). The icon itself is decorative
- *  (`aria-hidden="true"`).
- *
- *  Geometry: tooltip pops above the icon (`bottom-full mb-1`),
- *  anchored to the icon's center, capped at 14rem so it doesn't
- *  overflow narrow nodes, z-50 to clear React Flow's edge layer.
- *  `pointer-events-none` so the tooltip doesn't trap hovers.
- *
- *  `tabIndex={0}` makes the icon keyboard-focusable so users tabbing
- *  through the form can read each hint without using the mouse;
- *  `group-focus:block` reuses the same tooltip for the focus state.
- */
+ *  Tooltip behaviour lives in the shared `TipIcon` component. */
 function FieldLabel({
   label,
   hint,
@@ -188,36 +164,7 @@ function FieldLabel({
   return (
     <span className="inline-flex items-center gap-1 min-w-0">
       <span className="truncate">{label}</span>
-      {hint && (
-        <span
-          tabIndex={0}
-          // Use a NAMED Tailwind group (`group/tip`) instead of plain
-          // `group`. The QNode card already carries `group` to drive the
-          // hover-reveal × delete button, and unnamed `group-hover:`
-          // matches ANY ancestor `.group` — so a plain `group` here was
-          // showing every tooltip whenever the user hovered the node
-          // card at all. Named groups scope the hover/focus check to
-          // exactly this wrapper.
-          className="group/tip relative shrink-0 inline-flex items-center text-mute/70 hover:text-ink focus:text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/60 rounded-full cursor-help"
-          onClick={(e) => {
-            // Keep clicking the icon from focusing the wrapped input.
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <HelpCircle
-            className="w-3 h-3"
-            strokeWidth={2}
-            aria-hidden="true"
-          />
-          <span
-            role="tooltip"
-            className="hidden group-hover/tip:block group-focus/tip:block pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 w-max max-w-[14rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left"
-          >
-            {hint}
-          </span>
-        </span>
-      )}
+      {hint && <TipIcon hint={hint} />}
     </span>
   );
 }
