@@ -12,16 +12,17 @@ short_description: Interactive quantum pipeline builder from JQub lab.
 # QuAIM
 
 Interactive web demo from the [JQub lab](https://jqub.ece.gmu.edu/) at
-George Mason University, showcasing QuCAD, QuBound, and CompressVQC on
-configurable quantum pipelines.
+George Mason University, showcasing QuCAD, QuBound, CompressVQC, and
+Qshot on configurable quantum pipelines.
 
 ## What it does
 
 Drag-and-drop visual pipeline over research algorithms from the JQub lab —
-currently QuCAD, QuBound, and CompressVQC, with more to come — applied to
-a quantum circuit of your choice (upload a `.qpy` or pick a built-in
-sample). Each block in the graph becomes a stage of a FastAPI-side
-pipeline; run order is topologically sorted from the React-Flow edges.
+currently QuCAD, QuBound, CompressVQC, and Qshot, with more to come —
+applied to a quantum circuit of your choice (upload a `.qpy` or `.qasm`
+or pick a built-in sample). Each block in the graph becomes a stage of a
+FastAPI-side pipeline; run order is topologically sorted from the
+React-Flow edges.
 
 - **QuCAD**: ADMM-regularized, noise-aware VQC sparsification.
 - **QuBound**: LSTM over 14 days of real `ibm_fez` calibration data
@@ -31,17 +32,23 @@ pipeline; run order is topologically sorted from the React-Flow edges.
   history instead.
 - **CompressVQC**: QAOA-optimized lookup table for folding redundant
   parametric rotations on Heron-family hardware.
+- **Qshot**: noise-aware shot-count recommender. Matches your circuit
+  against ~3k simulator-measured fidelity curves (under bundled IBM noise
+  snapshots) to find the smallest shot count that achieves a target
+  fidelity bound. Falls back to a dual-graph GNN when no cluster
+  matches — typically for circuits outside the 5–8 qubit training range.
 
 Default preset × sample combinations are precomputed and served from
 cache, so the demo returns instantly on first click. A cold QuBound run
-(cache miss, no token) trains the LSTM on the shared HF CPU and takes
-about 2 min; QuCAD and CompressVQC are sub-second on small circuits.
+(LSTM training) or Qshot run (HDBSCAN warmup + pilot measurements) on
+the shared HF CPU takes 1–3 min; QuCAD and CompressVQC are sub-second
+on small circuits.
 
 ## Stack
 
-- **Backend**: FastAPI + Qiskit 2.4 + qiskit-aer + qiskit-optimization +
-  PyTorch (CPU wheel). Serves the JSON API under `/api/*` and the built
-  React bundle under `/`.
+- **Backend**: FastAPI + Qiskit 2.3 + qiskit-aer + qiskit-optimization +
+  PyTorch (CPU wheel) + torch-geometric + hdbscan. Serves the JSON API
+  under `/api/*` and the built React bundle under `/`.
 - **Frontend**: Vite + React 18 + TypeScript + Tailwind CSS + `@xyflow/react`
   (React Flow v12) + Zustand.
 - **Deployment**: Single Docker image (two-stage build) on Hugging Face
