@@ -29,6 +29,12 @@ export interface PipelinePreset {
   tagline: string;
   nodes: PresetNodeSpec[];
   edges: PresetEdgeSpec[];
+  /** Optional sample-circuit key (must match a `circuits/samples/{key}`
+   *  on the backend). Loading this preset will also auto-load that
+   *  sample so the user lands on a circuit the preset is meant for —
+   *  used by Qshot to land users on a 5–8q circuit by default instead
+   *  of the global default `bell_state` (2q, would force GNN fallback). */
+  defaultCircuit?: string;
 }
 
 export const PIPELINE_PRESETS: PipelinePreset[] = [
@@ -87,15 +93,18 @@ export const PIPELINE_PRESETS: PipelinePreset[] = [
   {
     key: "qshot",
     label: "Qshot",
-    // Nudge users toward the 5-8 qubit range the model was trained on;
-    // otherwise they'll get GNN-fallback extrapolations for toy samples
-    // like bell_state without realising the result is a best-guess.
-    tagline: "Recommend a shot count for a 5-8 qubit circuit (try ry_chain_6q)",
+    // Auto-load ry_chain_6q (6q HEA) so the preset lands inside Qshot's
+    // 5-8q training range out of the box. Without this, Qshot on the
+    // global default bell_state (2q) immediately falls through to the
+    // GNN extrapolation path and the user sees a "best guess" warn
+    // banner that isn't really representative of Qshot's main path.
+    tagline: "Recommend a shot count for a 5-8 qubit circuit",
     nodes: [
       { id: "n1", kind: "input_circuit" },
       { id: "n2", kind: "qshot" },
     ],
     edges: [{ source: "n1", target: "n2" }],
+    defaultCircuit: "ry_chain_6q",
   },
   {
     key: "full",

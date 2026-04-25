@@ -195,6 +195,23 @@ export function FlowCanvas() {
     setEdges(g.edges);
     setRun(null);
     setNotice(null);
+    // If the preset declares a default sample, also swap the active
+    // circuit. This lets Qshot land users on a 5-8q circuit by default
+    // (ry_chain_6q) instead of bell_state — saves them from accidentally
+    // running the GNN-fallback path the first time. Skip the network
+    // round-trip when we're already on the requested sample.
+    if (preset.defaultCircuit && preset.defaultCircuit !== sampleKey) {
+      const target = preset.defaultCircuit;
+      api
+        .loadSample(target)
+        .then((c) => {
+          useApp.getState().setCircuit(c);
+          useApp.getState().setSampleKey(target);
+        })
+        .catch(() => {
+          /* silent — leaves the previous circuit in place */
+        });
+    }
     // Different presets have different widths; re-fit the view so the user
     // sees the whole new chain instead of a zoomed-in slice.
     requestAnimationFrame(() => {
