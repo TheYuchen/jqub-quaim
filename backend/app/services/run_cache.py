@@ -1,10 +1,12 @@
 """Content-addressed cache for pipeline run responses.
 
-Motivation: most visitors to the demo just want to see what the three
+Motivation: most visitors to the demo just want to see what the bundled
 preset pipelines produce on a bundled sample. Running the full stack
 takes 30-60 s per click, which is plenty of time for someone to bounce.
-With a shipped cache, those four presets x six samples return in
-milliseconds with a "cached" badge in the UI.
+With a shipped cache, the preset × sample combinations all return in
+milliseconds with a "cached" badge in the UI. (At time of writing:
+5 presets × 9 samples; the precompute script under scripts/ enumerates
+the actual matrix when run.)
 
 The cache is keyed by a deterministic hash of:
 

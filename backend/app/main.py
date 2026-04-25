@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="QuAIM",
-    description="Interactive pipeline over QuCAD / QuBound / CompressVQC.",
+    description="Interactive pipeline over QuCAD / QuBound / CompressVQC / Qshot.",
     version="0.1.0",
     lifespan=lifespan,
 )
