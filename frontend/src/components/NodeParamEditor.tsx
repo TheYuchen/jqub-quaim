@@ -191,7 +191,14 @@ function FieldLabel({
       {hint && (
         <span
           tabIndex={0}
-          className="group relative shrink-0 inline-flex items-center text-mute/70 hover:text-ink focus:text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/60 rounded-full cursor-help"
+          // Use a NAMED Tailwind group (`group/tip`) instead of plain
+          // `group`. The QNode card already carries `group` to drive the
+          // hover-reveal × delete button, and unnamed `group-hover:`
+          // matches ANY ancestor `.group` — so a plain `group` here was
+          // showing every tooltip whenever the user hovered the node
+          // card at all. Named groups scope the hover/focus check to
+          // exactly this wrapper.
+          className="group/tip relative shrink-0 inline-flex items-center text-mute/70 hover:text-ink focus:text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/60 rounded-full cursor-help"
           onClick={(e) => {
             // Keep clicking the icon from focusing the wrapped input.
             e.preventDefault();
@@ -205,7 +212,7 @@ function FieldLabel({
           />
           <span
             role="tooltip"
-            className="hidden group-hover:block group-focus:block pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 w-max max-w-[14rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left"
+            className="hidden group-hover/tip:block group-focus/tip:block pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 w-max max-w-[14rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left"
           >
             {hint}
           </span>
