@@ -13,6 +13,7 @@ import {
   Target,
   Waypoints,
 } from "lucide-react";
+import { NOISE_SNAPSHOTS } from "./qshotSnapshots";
 
 export type NodeKind =
   | "input_circuit"
@@ -24,6 +25,38 @@ export type NodeKind =
   | "qshot"
   | "fidelity"
   | "output";
+
+/** Schema describing one editable parameter on a node.
+ *
+ *  Drives `<NodeParamEditor>` — when a `NodeSpec` lists `params`, the
+ *  block on the canvas renders an inline editor instead of a static
+ *  read-out of `defaultData`. Keep this list narrow on purpose: only
+ *  expose the knobs the algorithm's author considered user-tunable in
+ *  the original code (the function arguments of `predict()` /
+ *  `run_qucad_*` etc., NOT the module-level constants used during
+ *  training). Touching the latter would invalidate bundled state.
+ */
+export type NodeParamSpec =
+  | {
+      key: string;
+      label: string;
+      type: "select";
+      options: { value: string; label: string }[];
+      /** Optional one-line hint shown under the field. */
+      hint?: string;
+    }
+  | {
+      key: string;
+      label: string;
+      type: "number" | "int";
+      min?: number;
+      max?: number;
+      step?: number;
+      /** Decimals shown in the inline current-value chip. Defaults to
+       *  2 for `number`, 0 for `int`. */
+      displayPrecision?: number;
+      hint?: string;
+    };
 
 export interface NodeSpec {
   kind: NodeKind;
@@ -39,6 +72,10 @@ export interface NodeSpec {
   accentRing: string;   // tailwind ring/border color
   defaultData?: Record<string, unknown>;
   defaultCount?: 0 | 1; // how many copies are auto-placed on canvas reset
+  /** When present, the canvas node renders an inline editor in place of
+   *  the static param read-out. Order matters — params render top-to-
+   *  bottom in the order listed here. */
+  params?: NodeParamSpec[];
   /** Optional link to the paper this block implements. Surfaces as a small
    *  external-link icon on the node card and palette tile.
    *
@@ -78,6 +115,21 @@ export const NODE_CATALOG: NodeSpec[] = [
     accentRing: "border-accent/40",
     defaultData: { backend_name: "FakeFez" },
     defaultCount: 1,
+    // Backend handler in workflow_service supports three Heron-family
+    // fakes (FakeFez / FakeMarrakesh / FakeTorino). Adding more requires
+    // extending `_load_fake_backend` in tandem.
+    params: [
+      {
+        key: "backend_name",
+        label: "Fake backend",
+        type: "select",
+        options: [
+          { value: "FakeFez", label: "FakeFez · 156q (Heron r2)" },
+          { value: "FakeMarrakesh", label: "FakeMarrakesh · 156q (Heron r2)" },
+          { value: "FakeTorino", label: "FakeTorino · 133q (Heron r1)" },
+        ],
+      },
+    ],
   },
   {
     kind: "ibm_backend",
@@ -100,6 +152,40 @@ export const NODE_CATALOG: NodeSpec[] = [
     accent: "text-accent2",
     accentRing: "border-accent2/50",
     defaultData: { iterations: 3, lam: 0.005, rho: 500.0 },
+    // ADMM hyperparameters from the QuCAD paper: more iterations and a
+    // higher λ tend to push weights more aggressively to zero (sparser
+    // circuit) at the cost of training time; ρ is the standard ADMM
+    // penalty weight. Defaults match the original training script.
+    params: [
+      {
+        key: "iterations",
+        label: "ADMM iterations",
+        type: "int",
+        min: 1,
+        max: 20,
+        step: 1,
+        hint: "more iterations → tighter convergence, slower run",
+      },
+      {
+        key: "lam",
+        label: "Regularisation λ",
+        type: "number",
+        min: 0.0001,
+        max: 0.05,
+        step: 0.001,
+        displayPrecision: 4,
+        hint: "larger λ → sparser pruning",
+      },
+      {
+        key: "rho",
+        label: "ADMM penalty ρ",
+        type: "number",
+        min: 10,
+        max: 5000,
+        step: 10,
+        displayPrecision: 0,
+      },
+    ],
     paper: {
       url: "https://arxiv.org/abs/2304.04666",
       title:
@@ -180,6 +266,32 @@ export const NODE_CATALOG: NodeSpec[] = [
       noise_snapshot: "pittsburgh_1",
       alpha: 0.95,
     },
+    // The two user-facing knobs of QshotRecommender.predict(). Other
+    // arguments (k_struct / k_pf / pilot_points / pilot_reps) are model
+    // hyperparameters the author tuned during training; touching them
+    // would invalidate the bundled clusters, so they're deliberately
+    // not exposed.
+    params: [
+      {
+        key: "noise_snapshot",
+        label: "Noise snapshot",
+        type: "select",
+        options: NOISE_SNAPSHOTS.map((s) => ({
+          value: s.key,
+          label: s.label,
+        })),
+      },
+      {
+        key: "alpha",
+        label: "Target fidelity α",
+        type: "number",
+        min: 0.5,
+        max: 0.99,
+        step: 0.01,
+        displayPrecision: 2,
+        hint: "fraction of converged fidelity to hit",
+      },
+    ],
   },
   {
     kind: "fidelity",
