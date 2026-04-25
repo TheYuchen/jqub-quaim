@@ -64,7 +64,7 @@ export function AlgorithmsSlide() {
           name="Qshot"
           kind="qshot"
           oneLine="Recommended shot count, predicted."
-          detail="Matches your circuit against ~3k pre-measured records to predict the smallest shot count that hits a target fidelity. Falls back to a dual-graph GNN for circuits outside the 5–8 qubit training range."
+          detail="Matches your circuit against ~3k simulator-measured fidelity curves (under bundled IBM noise models) to find the smallest shot count that achieves a target fidelity bound. Falls back to a dual-graph GNN when no cluster matches — typically for circuits outside the 5–8 qubit training range or with unusual structure."
         >
           <QshotVisual />
         </AlgoCard>

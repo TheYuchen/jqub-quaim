@@ -202,8 +202,9 @@ function QshotCard({ s }: { s: Record<string, unknown> }) {
         <span className="text-ink font-medium">What Qshot did:</span> predicted
         how many measurement shots your circuit needs to reach{" "}
         {(alpha * 100).toFixed(0)}% of its converged fidelity under the chosen
-        IBM calibration snapshot. Saves you from over- or under-sampling on
-        real hardware.
+        IBM calibration snapshot. Helps you size your measurement budget —
+        the prediction assumes the bundled noise model, so real-hardware
+        behaviour may drift.
       </Caption>
 
       {/* Three headline stats — mirrors the screenshot the author shared. */}
@@ -226,9 +227,10 @@ function QshotCard({ s }: { s: Record<string, unknown> }) {
           fall through to fallback. */}
       {isFallback && (
         <div className="text-[11px] leading-relaxed rounded-md border border-warn/40 bg-warn/10 px-2 py-1.5 text-ink">
-          Circuit didn't match any cluster in the training set (out of the
-          validated 5–8 qubit range), so Qshot extrapolated with the dual-
-          graph GNN fallback. Treat the prediction as a best guess.
+          Circuit didn't match any cluster in the training set — typically
+          because it's outside the validated 5–8 qubit range or has an
+          unusual structure. Qshot extrapolated with the dual-graph GNN
+          fallback; treat the prediction as a best guess.
         </div>
       )}
 

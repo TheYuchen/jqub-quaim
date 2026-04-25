@@ -169,7 +169,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     family: "algorithm",
     tagline: "recommend shot count",
     description:
-      "Noise-aware shot-count recommender. Predicts the minimum number of measurement shots your circuit needs to reach a target fidelity on a chosen IBM calibration snapshot. Self-contained — no upstream backend required.",
+      "Noise-aware shot-count recommender. Predicts the smallest shot count that meets a target fidelity bound (with statistical confidence, z=1.645) on a chosen IBM calibration snapshot. Self-contained — no upstream backend required.",
     icon: Target,
     accent: "text-warn",
     accentRing: "border-warn/40",
