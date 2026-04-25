@@ -30,6 +30,3 @@ export const NOISE_SNAPSHOTS: NoiseSnapshot[] = [
 ];
 
 export const DEFAULT_SNAPSHOT_KEY = "pittsburgh_1";
-
-export const SNAPSHOT_BY_KEY: Record<string, NoiseSnapshot> =
-  Object.fromEntries(NOISE_SNAPSHOTS.map((s) => [s.key, s]));

@@ -58,6 +58,7 @@ def _default_label(node_type: str) -> str:
         "qucad": "QuCAD",
         "qubound": "QuBound",
         "compvqc": "CompressVQC",
+        "qshot": "Qshot",
         "fidelity": "Fidelity estimate",
         "output": "Output",
     }.get(node_type, node_type)

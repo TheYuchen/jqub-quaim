@@ -187,24 +187,34 @@ export function FlowCanvas() {
     [screenToFlowPosition, setNodes],
   );
 
+  // Monotonic counter so we can tell stale `loadSample` resolutions
+  // (from a prior preset click) from the most recent one. Without this,
+  // a user who quickly toggles between two presets that pull different
+  // default circuits could end up with preset A's graph but preset B's
+  // sample, depending on which network call resolved last.
+  const presetGenerationRef = useRef(0);
+
   const loadPreset = (key: string) => {
     const preset = PRESET_BY_KEY[key];
     if (!preset) return;
+    const myGen = ++presetGenerationRef.current;
     const g = buildPresetGraph(preset);
     setNodes(g.nodes);
     setEdges(g.edges);
     setRun(null);
     setNotice(null);
     // If the preset declares a default sample, also swap the active
-    // circuit. This lets Qshot land users on a 5-8q circuit by default
-    // (ry_chain_6q) instead of bell_state — saves them from accidentally
-    // running the GNN-fallback path the first time. Skip the network
-    // round-trip when we're already on the requested sample.
+    // circuit. Lets Qshot land users on a 5-8q circuit by default
+    // (ry_chain_6q) instead of bell_state. Skip the network round-trip
+    // when we're already on the requested sample.
     if (preset.defaultCircuit && preset.defaultCircuit !== sampleKey) {
       const target = preset.defaultCircuit;
       api
         .loadSample(target)
         .then((c) => {
+          // Drop the result if the user has clicked another preset in the
+          // meantime — that newer click owns the sample state now.
+          if (presetGenerationRef.current !== myGen) return;
           useApp.getState().setCircuit(c);
           useApp.getState().setSampleKey(target);
         })

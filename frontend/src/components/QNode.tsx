@@ -1,6 +1,11 @@
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
-import { AlertTriangle, FileText, X } from "lucide-react";
-import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
+import { useState } from "react";
+import { AlertTriangle, ChevronDown, FileText, X } from "lucide-react";
+import {
+  NODE_BY_KIND,
+  type NodeKind,
+  type NodeParamSpec,
+} from "../lib/nodeCatalog";
 import { NodeParamEditor } from "./NodeParamEditor";
 import { useApp } from "../lib/store";
 
@@ -32,6 +37,12 @@ export function QNode({ id, data, selected }: NodeProps) {
   // shallow comparison keeps the cost cheap.
   const circuit = useApp((s) => s.circuit);
   const sampleKey = useApp((s) => s.sampleKey);
+  // Per-instance disclosure state for the param editor. Default to
+  // collapsed so the canvas stays scannable; users click the chevron
+  // to reveal the controls. State lives in component-local React
+  // state, not in node-data, because it's UI affordance only — we
+  // don't want it serialised into share-links or auto-connect graphs.
+  const [paramsOpen, setParamsOpen] = useState(false);
   if (!spec) return null;
   const Icon = spec.icon;
 
@@ -120,14 +131,45 @@ export function QNode({ id, data, selected }: NodeProps) {
         <QshotFitChip nq={circuit.num_qubits} />
       )}
 
-      {/* Editable params (schema-driven) take priority. Otherwise fall
-          back to the static read-out of any leftover defaultData. */}
+      {/* Editable params (schema-driven) start collapsed so the block
+          stays compact on a busy canvas. Header row shows a one-line
+          summary of the current values; click to expand the full
+          editor. Other node kinds fall back to the static read-out. */}
       {spec.params && spec.params.length > 0 ? (
-        <NodeParamEditor
-          spec={spec.params}
-          values={d.params ?? {}}
-          onChange={patchParams}
-        />
+        <div className="mt-2 pt-2 border-t border-edge/60">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setParamsOpen((v) => !v);
+            }}
+            aria-expanded={paramsOpen}
+            aria-label={
+              paramsOpen ? "Hide parameters" : "Show parameters"
+            }
+            className="nodrag w-full flex items-center gap-1.5 text-[10px] text-mute hover:text-ink transition-colors"
+          >
+            <ChevronDown
+              className={`w-3 h-3 shrink-0 transition-transform ${
+                paramsOpen ? "rotate-0" : "-rotate-90"
+              }`}
+              strokeWidth={2.5}
+            />
+            <span className="shrink-0">params</span>
+            {!paramsOpen && (
+              <span className="font-mono text-ink truncate text-[10px]">
+                {summariseParams(spec.params, d.params ?? {})}
+              </span>
+            )}
+          </button>
+          {paramsOpen && (
+            <NodeParamEditor
+              spec={spec.params}
+              values={d.params ?? {}}
+              onChange={patchParams}
+            />
+          )}
+        </div>
       ) : (
         d.params &&
         Object.keys(d.params).length > 0 && (
@@ -151,6 +193,32 @@ export function QNode({ id, data, selected }: NodeProps) {
       )}
     </div>
   );
+}
+
+/** Build a one-line "param₁ · param₂ · …" summary for the collapsed
+ *  state of the param editor. Selects use the raw value (short keys
+ *  like "pittsburgh_1") rather than the long display label so the
+ *  whole summary stays under ~30 characters; numbers respect the
+ *  spec's `displayPrecision`. Result is meant to be a glanceable
+ *  cue — not a full read-out — so order in the schema matters. */
+function summariseParams(
+  spec: NodeParamSpec[],
+  values: Record<string, unknown>,
+): string {
+  const parts: string[] = [];
+  for (const p of spec) {
+    const raw = values[p.key];
+    if (raw === undefined || raw === null || raw === "") continue;
+    if (p.type === "select") {
+      parts.push(String(raw));
+    } else {
+      const n = Number(raw);
+      if (!Number.isFinite(n)) continue;
+      const precision = p.displayPrecision ?? (p.type === "int" ? 0 : 2);
+      parts.push(n.toFixed(precision));
+    }
+  }
+  return parts.join(" · ");
 }
 
 /** Tiny in-block status pill for the Qshot node: shows whether the
