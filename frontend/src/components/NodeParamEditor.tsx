@@ -153,11 +153,20 @@ function NumberField({
 }
 
 /** Field label with a small ⓘ icon when the param spec carries a hint.
- *  Uses the native `title` attribute on the icon so we get a tooltip
- *  for free — no portal, no positioning math, accessible to keyboard
- *  focus and screen readers. The icon is wrapped in a `<span>` so the
- *  label's parent `<label>` doesn't accidentally focus the input when
- *  the user clicks the icon. */
+ *  Uses a CSS `group-hover` tooltip rather than the native `title`
+ *  attribute — `title` has a ~1-2 second display delay on macOS Chrome
+ *  and gets eaten outright in some configurations, which led users to
+ *  see the cursor:help affordance with nothing showing up.
+ *
+ *  The tooltip pops above the icon (`bottom-full mb-1`), is anchored
+ *  to the icon's center (`left-1/2 -translate-x-1/2`), capped at 14rem
+ *  so it doesn't overflow the canvas, z-50 to clear React Flow's edge
+ *  layer, and `pointer-events-none` so the tooltip itself doesn't trap
+ *  hovers (i.e. moving the cursor onto the tooltip doesn't extend its
+ *  visibility — it's purely read-only).
+ *
+ *  `aria-label` on the icon's wrapper still feeds screen readers, and
+ *  the icon click is blocked from focusing the wrapped input. */
 function FieldLabel({
   label,
   hint,
@@ -172,8 +181,7 @@ function FieldLabel({
         <span
           role="img"
           aria-label={hint}
-          title={hint}
-          className="shrink-0 inline-flex items-center text-mute/70 hover:text-ink cursor-help"
+          className="group relative shrink-0 inline-flex items-center text-mute/70 hover:text-ink cursor-help"
           onClick={(e) => {
             // Keep clicking the icon from focusing the wrapped input.
             e.preventDefault();
@@ -181,6 +189,12 @@ function FieldLabel({
           }}
         >
           <HelpCircle className="w-3 h-3" strokeWidth={2} />
+          <span
+            role="tooltip"
+            className="hidden group-hover:block pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 w-max max-w-[14rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left"
+          >
+            {hint}
+          </span>
         </span>
       )}
     </span>
