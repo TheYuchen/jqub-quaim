@@ -74,7 +74,7 @@ export function WelcomeTour({
         onClick={dismiss}
       />
       {/* Card */}
-      <div className="relative panel w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)]">
+      <div className="relative panel w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)]">
         <button
           onClick={dismiss}
           aria-label="Close"
