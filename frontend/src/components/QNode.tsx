@@ -1,6 +1,11 @@
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import { FileText, X } from "lucide-react";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
+import {
+  DEFAULT_SNAPSHOT_KEY,
+  NOISE_SNAPSHOTS,
+  SNAPSHOT_BY_KEY,
+} from "../lib/qshotSnapshots";
 
 export interface QNodeData extends Record<string, unknown> {
   kind: NodeKind;
@@ -20,9 +25,18 @@ export interface QNodeData extends Record<string, unknown> {
 export function QNode({ id, data, selected }: NodeProps) {
   const d = data as QNodeData;
   const spec = NODE_BY_KIND[d.kind];
-  const { deleteElements } = useReactFlow();
+  const flow = useReactFlow();
+  const { deleteElements } = flow;
   if (!spec) return null;
   const Icon = spec.icon;
+
+  /** Patch this node's `data.params` and propagate to React Flow state. */
+  const patchParams = (patch: Record<string, unknown>) => {
+    flow.updateNodeData(id, {
+      ...d,
+      params: { ...(d.params ?? {}), ...patch },
+    });
+  };
 
   const hasInput = spec.family !== "source";
   const hasOutput = spec.family !== "sink";
@@ -77,17 +91,24 @@ export function QNode({ id, data, selected }: NodeProps) {
       >
         {spec.tagline}
       </div>
-      {d.params && Object.keys(d.params).length > 0 && (
-        <div className="mt-2 pt-2 border-t border-edge/60 space-y-0.5">
-          {Object.entries(d.params).map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-2 text-[11px]">
-              <span className="text-mute">{k}</span>
-              <span className="font-mono text-ink truncate max-w-[120px]">
-                {String(v)}
-              </span>
-            </div>
-          ))}
-        </div>
+      {d.kind === "qshot" ? (
+        <QshotParamEditor
+          params={d.params ?? {}}
+          onChange={patchParams}
+        />
+      ) : (
+        d.params && Object.keys(d.params).length > 0 && (
+          <div className="mt-2 pt-2 border-t border-edge/60 space-y-0.5">
+            {Object.entries(d.params).map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-2 text-[11px]">
+                <span className="text-mute">{k}</span>
+                <span className="font-mono text-ink truncate max-w-[120px]">
+                  {String(v)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )
       )}
       {hasInput && (
         <Handle type="target" position={Position.Left} isConnectable={true} />
@@ -95,6 +116,90 @@ export function QNode({ id, data, selected }: NodeProps) {
       {hasOutput && (
         <Handle type="source" position={Position.Right} isConnectable={true} />
       )}
+    </div>
+  );
+}
+
+/**
+ * Inline parameter editor for the Qshot block.
+ *
+ * Two user-facing knobs the author exposes through `predict()`:
+ *   - `noise_snapshot`: which IBM calibration snapshot to score against.
+ *     Six bundled options; defaults to `pittsburgh_1`.
+ *   - `alpha`: target fidelity fraction (Qshot finds the smallest shot
+ *     count where predicted F ≥ α × F_converged). Default 0.95, clamped
+ *     to [0.50, 0.99] to match the backend's safety clamp.
+ *
+ * Everything else in `predict()` (k_struct, k_pf, pilot_points,
+ * pilot_reps) is a model hyperparameter the author tuned during
+ * training; we deliberately don't expose those — fiddling with them
+ * would invalidate the bundled clusters.
+ *
+ * The `nodrag` class on the wrapper is critical: without it, dragging
+ * the dropdown to make a selection would be intercepted by React Flow
+ * as a node-move gesture.
+ */
+function QshotParamEditor({
+  params,
+  onChange,
+}: {
+  params: Record<string, unknown>;
+  onChange: (patch: Record<string, unknown>) => void;
+}) {
+  const snapshotKey = String(params.noise_snapshot ?? DEFAULT_SNAPSHOT_KEY);
+  const alpha =
+    typeof params.alpha === "number"
+      ? params.alpha
+      : parseFloat(String(params.alpha ?? "0.95"));
+  const safeAlpha = Number.isFinite(alpha) ? alpha : 0.95;
+  // If the stored key isn't recognised, surface that in the label so the
+  // user can see why their chosen snapshot isn't taking effect; the
+  // backend's resolve_noise_snapshot() will fall back to default anyway.
+  const knownSnapshot = SNAPSHOT_BY_KEY[snapshotKey];
+
+  return (
+    <div className="nodrag mt-2 pt-2 border-t border-edge/60 space-y-1.5">
+      <label className="block text-[10px] text-mute">
+        <span className="block mb-0.5">Noise snapshot</span>
+        <select
+          value={knownSnapshot ? snapshotKey : ""}
+          onChange={(e) => onChange({ noise_snapshot: e.target.value })}
+          className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink focus:outline-none focus:border-accent/60"
+        >
+          {!knownSnapshot && (
+            <option value="" disabled>
+              {snapshotKey} (unknown)
+            </option>
+          )}
+          {NOISE_SNAPSHOTS.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block text-[10px] text-mute">
+        <span className="flex items-baseline justify-between mb-0.5">
+          <span>Target fidelity α</span>
+          <span className="font-mono text-ink">{safeAlpha.toFixed(2)}</span>
+        </span>
+        <input
+          type="number"
+          min={0.5}
+          max={0.99}
+          step={0.01}
+          value={safeAlpha}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (!Number.isFinite(v)) return;
+            // Clamp on the way in so the UI never persists an out-of-range
+            // value the backend would silently reject.
+            const clamped = Math.max(0.5, Math.min(0.99, v));
+            onChange({ alpha: clamped });
+          }}
+          className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink font-mono focus:outline-none focus:border-accent/60"
+        />
+      </label>
     </div>
   );
 }

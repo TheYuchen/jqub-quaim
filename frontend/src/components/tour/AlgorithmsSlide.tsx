@@ -1,11 +1,11 @@
 // Tour slide 2: the algorithm blocks as cards with inline SVG visuals.
 //
-// Kicker and heading avoid a fixed count ("three") — the cards below are
-// currently QuCAD, QuBound, CompressVQC, but the lab ships new modules
-// regularly. When you add a fourth block, also bump the md:grid-cols
+// Kicker and heading avoid a fixed count — the cards below are
+// currently QuCAD, QuBound, CompressVQC, Qshot, but the lab ships new
+// modules regularly. When you add a fifth+ block, bump the lg:grid-cols
 // breakpoint so the cards don't get squeezed.
 
-import { FileText, LineChart, Shrink, Waypoints } from "lucide-react";
+import { FileText, LineChart, Shrink, Target, Waypoints } from "lucide-react";
 import { NODE_BY_KIND, type NodeKind } from "../../lib/nodeCatalog";
 
 export function AlgorithmsSlide() {
@@ -19,7 +19,7 @@ export function AlgorithmsSlide() {
           One block per algorithm. Chain them any way you like.
         </h2>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <AlgoCard
           accent="text-accent2"
           border="border-accent2/40"
@@ -55,6 +55,18 @@ export function AlgorithmsSlide() {
           detail="Builds a lookup table of equivalent gate sequences, then solves a QUBO to fold redundant rotations on Heron-family hardware."
         >
           <CompVQCVisual />
+        </AlgoCard>
+        <AlgoCard
+          accent="text-warn"
+          border="border-warn/40"
+          bg="bg-warn/5"
+          icon={<Target className="w-4 h-4" strokeWidth={2} />}
+          name="Qshot"
+          kind="qshot"
+          oneLine="Recommended shot count, predicted."
+          detail="Matches your circuit against ~3k pre-measured records to predict the smallest shot count that hits a target fidelity. Falls back to a dual-graph GNN for circuits outside the 5–8 qubit training range."
+        >
+          <QshotVisual />
         </AlgoCard>
       </div>
       <div className="mt-5 panel-alt p-3 text-[12px] text-mute leading-relaxed">
@@ -267,6 +279,83 @@ function CompVQCVisual() {
       ))}
       <text x="10" y="80" fill="#8492c7" fontSize="8" fontFamily="monospace">
         3 of 7 rotations folded
+      </text>
+    </svg>
+  );
+}
+
+function QshotVisual() {
+  // Shows the F(s) = F_inf - a/s^b convergence curve, a horizontal
+  // dashed target line at α × F_inf, and a vertical dashed marker at
+  // the recommended shot count where the curve crosses target. Mirrors
+  // the diagnostic plot Qshot itself emits via plot_recommendation().
+  const W = 240;
+  const H = 84;
+  // f(s) = 0.985 - 1.6 / s^0.65 sampled across shots ∈ [40, 4000] in
+  // log space → mapped onto the SVG viewport.
+  const F_INF = 0.985;
+  const A = 1.6;
+  const B = 0.65;
+  const SHOTS_MIN = 40;
+  const SHOTS_MAX = 4000;
+  const N = 50;
+  const xOf = (s: number) =>
+    16 + ((Math.log(s) - Math.log(SHOTS_MIN)) /
+          (Math.log(SHOTS_MAX) - Math.log(SHOTS_MIN))) * (W - 28);
+  const yOf = (f: number) => H - 14 - (f - 0.4) * (H - 22) / 0.6;
+  const points = Array.from({ length: N }, (_, i) => {
+    const s = SHOTS_MIN * Math.pow(SHOTS_MAX / SHOTS_MIN, i / (N - 1));
+    const f = F_INF - A / Math.pow(s, B);
+    return `${xOf(s).toFixed(1)},${yOf(f).toFixed(1)}`;
+  }).join(" ");
+  const target = 0.95 * F_INF; // α × F_inf
+  // Solve F_inf - a/s^b = target → s = (a / (F_inf - target))^(1/b)
+  const recommendedShots = Math.pow(A / (F_INF - target), 1 / B);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} aria-label="Qshot fidelity-vs-shots curve">
+      {/* axes */}
+      <line x1="16" y1={H - 14} x2={W - 12} y2={H - 14} stroke="#1f2a4a" />
+      <line x1="16" y1="6" x2="16" y2={H - 14} stroke="#1f2a4a" />
+      {/* target horizontal dashed line + label */}
+      <line
+        x1="16"
+        y1={yOf(target)}
+        x2={W - 12}
+        y2={yOf(target)}
+        stroke="#f4a261"
+        strokeDasharray="3 3"
+        strokeOpacity="0.7"
+      />
+      <text x={W - 12} y={yOf(target) - 2} fill="#f4a261" fontSize="8"
+            fontFamily="monospace" textAnchor="end">
+        α·F∞
+      </text>
+      {/* recommended shots vertical dashed line + label */}
+      <line
+        x1={xOf(recommendedShots)}
+        y1="6"
+        x2={xOf(recommendedShots)}
+        y2={H - 14}
+        stroke="#f4a261"
+        strokeDasharray="3 3"
+        strokeOpacity="0.7"
+      />
+      {/* the convergence curve */}
+      <polyline points={points} fill="none" stroke="#f4a261" strokeWidth="1.6" />
+      {/* the recommended-shot point */}
+      <circle cx={xOf(recommendedShots)} cy={yOf(target)} r="3" fill="#f4a261" />
+      {/* axis labels */}
+      <text x="20" y="16" fill="#8492c7" fontSize="8" fontFamily="monospace">
+        fidelity →
+      </text>
+      <text x={W - 12} y={H - 4} fill="#8492c7" fontSize="8"
+            fontFamily="monospace" textAnchor="end">
+        shots (log) →
+      </text>
+      <text x={xOf(recommendedShots) + 4} y="14" fill="#f4a261" fontSize="8"
+            fontFamily="monospace">
+        recommended
       </text>
     </svg>
   );
