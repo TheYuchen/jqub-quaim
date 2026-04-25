@@ -1,3 +1,4 @@
+import { HelpCircle } from "lucide-react";
 import type { NodeParamSpec } from "../lib/nodeCatalog";
 
 /**
@@ -16,6 +17,11 @@ import type { NodeParamSpec } from "../lib/nodeCatalog";
  *     constraints. We also clamp on the way in (defensive) so the
  *     stored value can never persist outside the declared range, even
  *     if the user types past the spinner buttons.
+ *
+ * Hints don't render inline — they live on a small ⓘ icon next to the
+ * label, surfaced as a native browser tooltip on hover. Keeps the
+ * block compact while still letting plain-language explanations be
+ * arbitrarily long.
  *
  * `nodrag` on the wrapper is critical: without it, dragging a select
  * to make a choice or selecting text in the input would be intercepted
@@ -69,7 +75,7 @@ function SelectField({
   const known = spec.options.some((o) => o.value === value);
   return (
     <label className="block text-[10px] text-mute">
-      <span className="block mb-0.5">{spec.label}</span>
+      <FieldLabel label={spec.label} hint={spec.hint} />
       <select
         value={known ? value : ""}
         onChange={(e) => onChange(e.target.value)}
@@ -86,11 +92,6 @@ function SelectField({
           </option>
         ))}
       </select>
-      {spec.hint && (
-        <span className="block mt-0.5 text-[10px] text-mute/80 leading-tight">
-          {spec.hint}
-        </span>
-      )}
     </label>
   );
 }
@@ -115,8 +116,8 @@ function NumberField({
 
   return (
     <label className="block text-[10px] text-mute">
-      <span className="flex items-baseline justify-between mb-0.5">
-        <span>{spec.label}</span>
+      <span className="flex items-baseline justify-between mb-0.5 gap-1">
+        <FieldLabel label={spec.label} hint={spec.hint} />
         <span className="font-mono text-ink">
           {formatNum(safe, precision)}
         </span>
@@ -139,20 +140,50 @@ function NumberField({
         }}
         className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink font-mono focus:outline-none focus:border-accent/60"
       />
-      {/* Hint and range each get their own line so longer plain-language
-          hints can wrap freely instead of getting truncated. Range stays
-          monospaced and right-aligned for a glanceable bound check. */}
-      {spec.hint && (
-        <span className="block mt-0.5 text-[10px] text-mute/80 leading-tight">
-          {spec.hint}
-        </span>
-      )}
+      {/* Range stays inline as a small mono cue (concrete bounds are
+          worth glancing at every time). Long-form hint hides behind the
+          ⓘ icon in FieldLabel above. */}
       {rangeText && (
         <span className="block mt-0.5 text-[10px] text-mute/70 font-mono text-right">
           range {rangeText}
         </span>
       )}
     </label>
+  );
+}
+
+/** Field label with a small ⓘ icon when the param spec carries a hint.
+ *  Uses the native `title` attribute on the icon so we get a tooltip
+ *  for free — no portal, no positioning math, accessible to keyboard
+ *  focus and screen readers. The icon is wrapped in a `<span>` so the
+ *  label's parent `<label>` doesn't accidentally focus the input when
+ *  the user clicks the icon. */
+function FieldLabel({
+  label,
+  hint,
+}: {
+  label: string;
+  hint?: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 min-w-0">
+      <span className="truncate">{label}</span>
+      {hint && (
+        <span
+          role="img"
+          aria-label={hint}
+          title={hint}
+          className="shrink-0 inline-flex items-center text-mute/70 hover:text-ink cursor-help"
+          onClick={(e) => {
+            // Keep clicking the icon from focusing the wrapped input.
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <HelpCircle className="w-3 h-3" strokeWidth={2} />
+        </span>
+      )}
+    </span>
   );
 }
 
