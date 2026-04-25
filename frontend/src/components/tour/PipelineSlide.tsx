@@ -37,8 +37,9 @@ export function PipelineSlide() {
             State between blocks
           </div>
           <span className="text-mute">
-            Each algorithm block may mutate the circuit in-place (CompressVQC,
-            QuCAD) or emit a metric attached to the output (QuBound, Fidelity).
+            Each algorithm block either rewrites the circuit (QuCAD,
+            CompressVQC) or attaches a number to the output (QuBound's
+            error bound, Qshot's shot count, Fidelity).
           </span>
         </div>
         <div className="panel-alt p-3">

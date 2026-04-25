@@ -35,7 +35,7 @@
 
 import type { Edge, Node } from "@xyflow/react";
 import type { QNodeData } from "../components/QNode";
-import { NODE_BY_KIND, type NodeSpec } from "./nodeCatalog";
+import { NODE_BY_KIND, type NodeKind, type NodeSpec } from "./nodeCatalog";
 
 type Family = NodeSpec["family"];
 
@@ -49,6 +49,34 @@ const FAMILY_ORDER: Family[] = [
   "metric",
   "sink",
 ];
+
+// Per-algorithm dependency on an upstream backend, derived from the
+// runtime handlers in backend/app/services/workflow_service.py. Three
+// possible relationships:
+//
+//   - "required":   handler hard-errors without ctx["backend"]
+//                   (currently only QuCAD).
+//   - "optional":   handler silently falls back to FakeFez when no
+//                   backend is connected (QuBound, CompressVQC).
+//   - "ignored":    handler is self-contained and ignores ctx["backend"]
+//                   even if one is wired (Qshot — uses its own bundled
+//                   noise snapshots).
+//
+// Keeping this here means Auto-connect's warnings can be specific
+// instead of issuing a one-size-fits-all "algorithms that need a noise
+// model will error" line that's wrong for everything except QuCAD.
+const ALGO_BACKEND_DEPENDENCY: Record<NodeKind, "required" | "optional" | "ignored" | undefined> = {
+  qucad: "required",
+  qubound: "optional",
+  compvqc: "optional",
+  qshot: "ignored",
+  // Non-algorithm kinds: undefined (irrelevant to backend dependency).
+  input_circuit: undefined,
+  ibm_backend: undefined,
+  fake_backend: undefined,
+  fidelity: undefined,
+  output: undefined,
+};
 
 export interface AutoConnectResult {
   /** New edge array to replace the current one (empty if nothing to do). */
@@ -129,12 +157,15 @@ export function autoConnect(
 
   // ---- advisory warnings about the composition ----
   //
-  // Semantics rest on two facts about the runner in workflow_service.py:
+  // Semantics rest on three facts about the runner in workflow_service.py:
   //   (1) Every backend handler writes `ctx["backend"] = backend`, so a
   //       later backend node wipes an earlier one — "last wins".
   //   (2) Input-circuit handlers only emit a summary step, they don't
   //       replace `ctx["circuit"]`. So extra Input nodes are merely
   //       redundant (duplicate summary rows), not actively wrong.
+  //   (3) Algorithms differ on whether they need a backend — see
+  //       ALGO_BACKEND_DEPENDENCY above. Auto-connect warns specifically
+  //       per algorithm rather than issuing a blanket "no backend" line.
   if (buckets.source.length === 0) {
     warnings.push("No Input circuit — pipeline has no clear starting point.");
   } else if (buckets.source.length > 1) {
@@ -142,15 +173,57 @@ export function autoConnect(
       `${buckets.source.length} Input circuits — extras produce duplicate summary rows.`,
     );
   }
-  if (buckets.backend.length === 0 && buckets.algorithm.length > 0) {
-    warnings.push(
-      "No backend — algorithms that need a noise model will error at run time.",
+
+  // Backend-dependency warnings, one per offending algorithm. We split
+  // them so the user sees concrete consequences ("QuCAD will error",
+  // "QuBound will fall back to FakeFez") instead of a single vague
+  // bullet.
+  const hasBackend = buckets.backend.length > 0;
+  const algoKinds = buckets.algorithm.map((n) => n.data.kind);
+  if (!hasBackend) {
+    const requiredKinds = algoKinds.filter(
+      (k) => ALGO_BACKEND_DEPENDENCY[k] === "required",
     );
+    const optionalKinds = algoKinds.filter(
+      (k) => ALGO_BACKEND_DEPENDENCY[k] === "optional",
+    );
+    for (const k of requiredKinds) {
+      warnings.push(
+        `${NODE_BY_KIND[k].label} requires a backend node upstream and will error at run time.`,
+      );
+    }
+    if (optionalKinds.length > 0) {
+      const labels = optionalKinds
+        .map((k) => NODE_BY_KIND[k].label)
+        .join(" and ");
+      warnings.push(
+        `${labels} will fall back to FakeFez since no backend is connected.`,
+      );
+    }
   } else if (buckets.backend.length > 1) {
     warnings.push(
       `${buckets.backend.length} backends linked in series — only the rightmost one is used downstream.`,
     );
   }
+
+  // Self-contained algorithms (Qshot) ignore upstream backends. If the
+  // user wired a backend in front of a chain that contains only
+  // self-contained algorithms, that backend node is dead weight —
+  // worth flagging so the user doesn't expect it to influence the
+  // result.
+  if (
+    hasBackend &&
+    algoKinds.length > 0 &&
+    algoKinds.every((k) => ALGO_BACKEND_DEPENDENCY[k] === "ignored")
+  ) {
+    const ignoredLabels = Array.from(new Set(algoKinds))
+      .map((k) => NODE_BY_KIND[k].label)
+      .join(" / ");
+    warnings.push(
+      `${ignoredLabels} is self-contained — the backend node will be ignored at run time.`,
+    );
+  }
+
   if (buckets.sink.length === 0) {
     warnings.push("No Output block — final metrics will not be aggregated.");
   }
@@ -181,6 +254,12 @@ export function autoConnect(
   // so readers of the graph can tell "this block feeds calibration data,
   // not a transformed circuit" at a glance. Inspired by Jovin's original
   // flowChartProto, which dashed the same edge.
+  //
+  // Exception: Qshot (kind === "qshot") is self-contained and ignores
+  // ctx["backend"] entirely. Putting a "noise profile" label on a
+  // backend → qshot edge would be a lie. We still draw the edge so the
+  // chain stays visually connected (and Auto-connect emits the "Qshot
+  // is self-contained" warning above), but with a plain undashed style.
   const edges: Edge[] = [];
   for (let i = 0; i < chain.length - 1; i++) {
     const src = chain[i];
@@ -188,7 +267,9 @@ export function autoConnect(
     const srcFamily = NODE_BY_KIND[src.data.kind]?.family;
     const dstFamily = NODE_BY_KIND[dst.data.kind]?.family;
     const isNoiseSidechain =
-      srcFamily === "backend" && dstFamily === "algorithm";
+      srcFamily === "backend" &&
+      dstFamily === "algorithm" &&
+      ALGO_BACKEND_DEPENDENCY[dst.data.kind] !== "ignored";
     edges.push({
       id: `auto-${src.id}-${dst.id}`,
       source: src.id,

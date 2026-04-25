@@ -16,9 +16,11 @@ export function TrySlide() {
           Pick one of the sample circuits on the left, then hit{" "}
           <span className="kbd">Run pipeline</span> in the canvas toolbar.
           Default pipelines on the built-in samples hit a precomputed cache
-          and return instantly. Switch in <span className="text-ink">QuBound</span>{" "}
-          with a cache miss and the run can take about two minutes on HF's
-          shared CPU while it trains the LSTM — don't close the tab.
+          and return instantly. A cold{" "}
+          <span className="text-ink">QuBound</span> (LSTM training) or{" "}
+          <span className="text-ink">Qshot</span> (HDBSCAN warmup + pilot
+          measurements) run on HF's shared CPU can take 1–3&nbsp;minutes —
+          don't close the tab.
         </p>
       </div>
 
@@ -44,6 +46,10 @@ export function TrySlide() {
               <span className="text-ink">qaoa_maxcut_4</span> + CompressVQC →
               see how many rotations can be folded.
             </li>
+            <li>
+              <span className="text-ink">ry_chain_6q</span> + Qshot →
+              get a recommended shot count for a target fidelity.
+            </li>
           </ul>
         </div>
 
@@ -56,7 +62,11 @@ export function TrySlide() {
           </div>
           <ul className="text-[12px] text-mute space-y-1.5 leading-relaxed">
             <li>Drag blocks from the strip at the top of the canvas.</li>
-            <li>Connect their handles left-to-right.</li>
+            <li>
+              Connect their handles left-to-right, or hit{" "}
+              <span className="kbd">Auto-connect</span> in the toolbar to
+              wire a sensible chain in one click.
+            </li>
             <li>
               Hover a block to reveal the <span className="kbd">×</span>{" "}
               delete button.

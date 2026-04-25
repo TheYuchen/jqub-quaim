@@ -1,8 +1,11 @@
 // Tour slide 1: intro. Big title + tagline + animated atom emblem.
 //
-// Copy avoids hard-coding a specific number of algorithms ("three") — the
-// lab ships new research modules regularly, so anything we write here
-// should survive adding a fourth/fifth block without copy edits.
+// Copy avoids hard-coding a specific number of algorithms ("three" /
+// "four") — the lab ships new research modules regularly, so anything
+// we write here should survive adding the next block without a copy
+// edit. We do list current block names by hand because that's more
+// informative than a generic "research modules"; just remember to add
+// the new name to the list when a new algorithm block lands.
 
 import { Sparkles } from "lucide-react";
 
@@ -29,9 +32,9 @@ export function WelcomeSlide() {
           >
             JQub lab
           </a>{" "}
-          at George Mason University — currently QuCAD, QuBound, and
-          CompressVQC, with more to come — applied to a quantum circuit
-          of your choice.
+          at George Mason University — currently QuCAD, QuBound,
+          CompressVQC, and Qshot, with more to come — applied to a
+          quantum circuit of your choice.
         </p>
         <p className="text-sm text-mute leading-relaxed">
           Build a pipeline by dragging blocks, hit{" "}
