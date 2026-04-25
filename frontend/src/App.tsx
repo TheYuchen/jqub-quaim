@@ -82,6 +82,15 @@ export default function App() {
   const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
 
+  // True while a PaneResizer drag is in flight. We use it to suppress the
+  // CSS `transition-[width]` during dragging: setRightW / setLeftW fire on
+  // every mousemove, so each value change would otherwise kick off a 150ms
+  // animation, causing the visible aside width to lag behind the inner
+  // content's layout — the cards would briefly overflow the aside while it
+  // animates. With the transition off during drag, width tracks the cursor
+  // exactly; we re-enable it for the smooth collapse/expand toggles.
+  const [isResizing, setIsResizing] = useState(false);
+
   // Persist user's preferred widths (desktop only; the values are loaded
   // at mount either way so that toggling screen size restores them).
   useEffect(() => {
@@ -166,9 +175,9 @@ export default function App() {
         <div className="flex-1 flex min-h-0">
           <aside
             style={{ width: leftWidth }}
-            className={`shrink-0 border-r border-edge flex flex-col min-h-0 transition-[width] duration-150 ${
-              leftCollapsed ? "overflow-hidden" : "overflow-y-auto"
-            }`}
+            className={`shrink-0 border-r border-edge flex flex-col min-h-0 ${
+              isResizing ? "" : "transition-[width] duration-150"
+            } ${leftCollapsed ? "overflow-hidden" : "overflow-x-hidden overflow-y-auto"}`}
           >
             {leftCollapsed ? (
               <CollapsedStrip
@@ -186,6 +195,7 @@ export default function App() {
                 setLeftW((w) => Math.min(LEFT_MAX, Math.max(LEFT_MIN, w + dx)))
               }
               onDoubleClick={() => setLeftW(LEFT_DEFAULT)}
+              onDragChange={setIsResizing}
               ariaLabel="Resize pipeline input pane"
             />
           )}
@@ -203,14 +213,15 @@ export default function App() {
                 )
               }
               onDoubleClick={() => setRightW(RIGHT_DEFAULT)}
+              onDragChange={setIsResizing}
               ariaLabel="Resize results pane"
             />
           )}
           <aside
             style={{ width: rightWidth }}
-            className={`shrink-0 border-l border-edge flex flex-col min-h-0 transition-[width] duration-150 ${
-              rightCollapsed ? "overflow-hidden" : ""
-            }`}
+            className={`shrink-0 border-l border-edge flex flex-col min-h-0 overflow-x-hidden ${
+              isResizing ? "" : "transition-[width] duration-150"
+            } ${rightCollapsed ? "overflow-hidden" : ""}`}
           >
             {rightCollapsed ? (
               <CollapsedStrip
@@ -309,14 +320,22 @@ function CollapsedStrip({
  *   relative to the mousedown position. The parent decides whether to add
  *   or subtract dx depending on which edge the handle sits on.
  * - Double-click snaps the parent's width back to its default.
+ * - onDragChange (optional) fires once with `true` on mousedown and once
+ *   with `false` on mouseup. App.tsx uses it to suppress the
+ *   `transition-[width]` on the aside while dragging — every mousemove
+ *   updates state, and an active CSS transition would lag the visual
+ *   width behind the cursor while the inner content is already laid out
+ *   at the new width, briefly overflowing the aside.
  */
 function PaneResizer({
   onResize,
   onDoubleClick,
+  onDragChange,
   ariaLabel,
 }: {
   onResize: (dx: number) => void;
   onDoubleClick?: () => void;
+  onDragChange?: (resizing: boolean) => void;
   ariaLabel: string;
 }) {
   const dragging = useRef(false);
@@ -336,9 +355,10 @@ function PaneResizer({
     dragging.current = false;
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
+    onDragChange?.(false);
     window.removeEventListener("mousemove", onMouseMove);
     window.removeEventListener("mouseup", onMouseUp);
-  }, [onMouseMove]);
+  }, [onMouseMove, onDragChange]);
 
   const onMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -346,6 +366,7 @@ function PaneResizer({
     lastX.current = e.clientX;
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
+    onDragChange?.(true);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
   };
