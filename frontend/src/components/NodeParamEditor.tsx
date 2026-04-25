@@ -153,20 +153,31 @@ function NumberField({
 }
 
 /** Field label with a small ⓘ icon when the param spec carries a hint.
- *  Uses a CSS `group-hover` tooltip rather than the native `title`
- *  attribute — `title` has a ~1-2 second display delay on macOS Chrome
- *  and gets eaten outright in some configurations, which led users to
- *  see the cursor:help affordance with nothing showing up.
  *
- *  The tooltip pops above the icon (`bottom-full mb-1`), is anchored
- *  to the icon's center (`left-1/2 -translate-x-1/2`), capped at 14rem
- *  so it doesn't overflow the canvas, z-50 to clear React Flow's edge
- *  layer, and `pointer-events-none` so the tooltip itself doesn't trap
- *  hovers (i.e. moving the cursor onto the tooltip doesn't extend its
- *  visibility — it's purely read-only).
+ *  Uses a CSS `group-hover` / `group-focus` tooltip — instant, no
+ *  delay, works for keyboard tabs as well as mouse hovers.
  *
- *  `aria-label` on the icon's wrapper still feeds screen readers, and
- *  the icon click is blocked from focusing the wrapped input. */
+ *  Why no `aria-label` or `title` on the icon wrapper:
+ *  - `title` has a 1-2 s display delay on macOS Chrome and races our
+ *    own tooltip.
+ *  - `aria-label` on a `cursor:help` element causes some browsers to
+ *    fall back to the same delayed native tooltip, which is what
+ *    gave users the "wait 2 seconds before anything shows up" bug.
+ *
+ *  Instead, the tooltip's own text is what screen readers read (it's
+ *  a visible `<span role="tooltip">` containing the same words a
+ *  sighted user sees). The icon itself is decorative
+ *  (`aria-hidden="true"`).
+ *
+ *  Geometry: tooltip pops above the icon (`bottom-full mb-1`),
+ *  anchored to the icon's center, capped at 14rem so it doesn't
+ *  overflow narrow nodes, z-50 to clear React Flow's edge layer.
+ *  `pointer-events-none` so the tooltip doesn't trap hovers.
+ *
+ *  `tabIndex={0}` makes the icon keyboard-focusable so users tabbing
+ *  through the form can read each hint without using the mouse;
+ *  `group-focus:block` reuses the same tooltip for the focus state.
+ */
 function FieldLabel({
   label,
   hint,
@@ -179,19 +190,22 @@ function FieldLabel({
       <span className="truncate">{label}</span>
       {hint && (
         <span
-          role="img"
-          aria-label={hint}
-          className="group relative shrink-0 inline-flex items-center text-mute/70 hover:text-ink cursor-help"
+          tabIndex={0}
+          className="group relative shrink-0 inline-flex items-center text-mute/70 hover:text-ink focus:text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/60 rounded-full cursor-help"
           onClick={(e) => {
             // Keep clicking the icon from focusing the wrapped input.
             e.preventDefault();
             e.stopPropagation();
           }}
         >
-          <HelpCircle className="w-3 h-3" strokeWidth={2} />
+          <HelpCircle
+            className="w-3 h-3"
+            strokeWidth={2}
+            aria-hidden="true"
+          />
           <span
             role="tooltip"
-            className="hidden group-hover:block pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 w-max max-w-[14rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left"
+            className="hidden group-hover:block group-focus:block pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 w-max max-w-[14rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left"
           >
             {hint}
           </span>
