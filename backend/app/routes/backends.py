@@ -10,7 +10,8 @@ from app.schemas import BackendInfo
 router = APIRouter()
 
 
-# Static list of the three fake backends Jovin's code already supports.
+# Static list of the three Heron-family fake backends supported by the
+# `_load_fake_backend` helper in workflow_service.
 _FAKE_BACKENDS: list[dict] = [
     {
         "name": "FakeFez",

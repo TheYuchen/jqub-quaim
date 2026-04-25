@@ -228,11 +228,11 @@ def resultsCompressVQC(result: SimpleNamespace, original_qc: QuantumCircuit) -> 
         compressed_qc.append(new_gate, qargs, cargs)
 
     # NOTE: we deliberately do NOT transpile the compressed circuit
-    # here. The original prototype did ``transpile(..., basis_gates=
-    # ['sx', 'rz', 'cx', 'id'], optimization_level=3)`` but that moved
-    # the compression benefit into the transpiler's pocket and made
-    # before/after comparisons confusing. The service layer handles
-    # backend-specific transpilation at the point where it's needed.
+    # here. Doing the obvious ``transpile(..., basis_gates=['sx', 'rz',
+    # 'cx', 'id'], optimization_level=3)`` would move the compression
+    # benefit into the transpiler's pocket and make before/after
+    # comparisons confusing. The service layer handles backend-specific
+    # transpilation at the point where it's needed.
     return compressed_qc
 
 

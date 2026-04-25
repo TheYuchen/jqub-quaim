@@ -278,8 +278,8 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
 def _handle_qshot(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
     """Qshot — noise-aware shot-count recommender.
 
-    Qshot is self-contained by design (Jovin's handover note): it picks
-    its own `AerSimulator`, runs its own transpile pass, and consumes
+    Qshot is self-contained by design: the recommender picks its own
+    `AerSimulator`, runs its own transpile pass, and consumes
     calibration data through a bundled noise JSON. So this handler
     ignores any upstream `ctx["backend"]`; the user steers noise via
     the node's ``noise_snapshot`` parameter.

@@ -24,8 +24,8 @@
 // * **Edge semantics are just execution order.** The backend runs Kahn
 //   topological sort over the graph and shares state via a single ctx
 //   dict; there's no such thing as a "data" vs "side-channel" edge.
-//   So a single flat chain is sufficient — no need for Jovin's old
-//   prototype's "backend → QuCAD noise-profile branch" styling.
+//   So a single flat chain is sufficient — no need to model
+//   "backend → algorithm" as a separate noise-profile branch.
 // * **We never produce a cycle.** Family order is a strict total
 //   order, so edges always point down the order and the graph stays a
 //   DAG.
@@ -252,8 +252,7 @@ export function autoConnect(
   // so the algorithm can read the noise model. That's a side-channel, not
   // a pipeline step. Mark it visually with a dashed stroke + small label
   // so readers of the graph can tell "this block feeds calibration data,
-  // not a transformed circuit" at a glance. Inspired by Jovin's original
-  // flowChartProto, which dashed the same edge.
+  // not a transformed circuit" at a glance.
   //
   // Exception: Qshot (kind === "qshot") is self-contained and ignores
   // ctx["backend"] entirely. Putting a "noise profile" label on a

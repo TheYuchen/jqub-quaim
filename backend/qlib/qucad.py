@@ -43,7 +43,8 @@ QUCAD_DEFAULT_ITERATIONS = 5
 QUCAD_DEFAULT_LAM = 0.01
 QUCAD_DEFAULT_RHO = 500.0
 """ADMM hyperparameters: ``lam`` is the ℓ1 weight, ``rho`` the quadratic
-penalty coefficient. Defaults match Jovin's original Streamlit config."""
+penalty coefficient. Defaults match the values in the QuCAD paper's
+reference implementation."""
 
 COBYLA_MAXITER = 20
 """Inner-loop COBYLA iterations per ADMM outer iteration."""

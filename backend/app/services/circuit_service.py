@@ -104,7 +104,6 @@ SAMPLE_DESCRIPTIONS: dict[str, str] = {
     "vqc_2q_small": "A tiny trainable quantum circuit with 2 tunable angles.",
     "efficient_su2_4q": "A 4-qubit EfficientSU2 ansatz, a classic quantum-ML building block.",
     "qaoa_maxcut_4": "QAOA solving Max-Cut on a 4-node ring graph.",
-    # Batch 2 circuits:
     "w_state_3q": "Another way to entangle 3 qubits: a W state.",
     "qft_3q": "3-qubit Quantum Fourier Transform, a core building block of many algorithms.",
     "ry_chain_6q": "A 6-qubit parameterized RY chain with 12 tunable angles.",

@@ -1,9 +1,9 @@
 """Qshot — Noise-aware shot-count recommender.
 
-Packaged version of the handover snapshot from the JQub lab (author:
-Tong Li). Wraps `QshotRecommender` with a lazy-loaded singleton and a
-stable registry of bundled noise snapshots so the backend's workflow
-service can request a recommendation without worrying about paths or
+Packaged version of the JQub lab's Qshot reference code (author: Tong
+Li). Wraps `QshotRecommender` with a lazy-loaded singleton and a stable
+registry of bundled noise snapshots so the backend's workflow service
+can request a recommendation without worrying about paths or
 construction cost.
 
 Integration notes

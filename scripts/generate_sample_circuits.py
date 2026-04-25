@@ -35,7 +35,7 @@ def bell_state() -> QuantumCircuit:
 
 
 def vqc_2q_small() -> QuantumCircuit:
-    """Tiny 2-qubit parameterised VQC. Jovin's original test circuit."""
+    """Tiny 2-qubit parameterised VQC for smoke-testing the pipeline."""
     qc = QuantumCircuit(2, name="vqc_2q_small")
     theta_0 = Parameter("theta_0")
     theta_1 = Parameter("theta_1")

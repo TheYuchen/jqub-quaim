@@ -1,15 +1,12 @@
 """Small Qiskit helpers used by the pipeline.
 
-Historically this module collected a handful of utility functions ported
-from Jovin's Streamlit prototype; most of them were superseded by the
-FastAPI service layer (circuit loading lives in
-``app/services/circuit_service.py``, transpilation is inlined at the
-call site, and matplotlib drawing is never used in headless serving).
-
-What remains is the one helper still consumed at runtime:
+Currently exports a single helper consumed at runtime:
 ``simpleFidelityEstimator``, called from
 ``workflow_service._handle_fidelity`` to score the output circuit
-against the all-zeros state.
+against the all-zeros state. Other utilities that used to live here
+were absorbed into the service layer (circuit loading in
+``app/services/circuit_service.py``; transpilation inlined at the call
+site; matplotlib drawing dropped, since serving is headless).
 """
 
 from __future__ import annotations
