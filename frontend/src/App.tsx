@@ -68,8 +68,14 @@ export default function App() {
   const [leftCollapsed, setLeftCollapsed] = useState<boolean>(() =>
     loadBool(LS_LEFT_COLLAPSED, false),
   );
+  // Right pane (results) defaults to collapsed on first visit so the
+  // canvas reads cleanly and matches the mobile drawer (also closed by
+  // default). Once the user runs a pipeline, the run-start effect below
+  // expands it; user's preference thereafter is persisted in
+  // localStorage so a power user who likes it permanently expanded
+  // doesn't have to re-expand every visit.
   const [rightCollapsed, setRightCollapsed] = useState<boolean>(() =>
-    loadBool(LS_RIGHT_COLLAPSED, false),
+    loadBool(LS_RIGHT_COLLAPSED, true),
   );
 
   // Mobile drawer state — unused on desktop.
