@@ -128,7 +128,13 @@ export function OpBar({
   );
 }
 
-/** Tiny SVG sparkline. Data assumed to be non-negative integers. */
+/** Tiny SVG sparkline.
+ *
+ * Defensive about input shape: accepts any numeric array (negatives are
+ * fine — the y-axis floor is `Math.min(...data, 0)`), returns null for
+ * fewer than 2 points, and clamps the y-range to ≥1 so a flat trace
+ * doesn't divide-by-zero. In practice the call sites pass strictly
+ * non-negative values (QuCAD loss trace, Qshot pilot fidelities). */
 export function Sparkline({
   data,
   height = 32,

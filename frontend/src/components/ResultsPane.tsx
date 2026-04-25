@@ -66,9 +66,10 @@ function EmptyHint() {
       </p>
       <p className="mt-2 text-[11px]">
         Default pipelines on the built-in samples hit a precomputed cache and
-        return instantly. A cold <span className="text-ink">QuBound</span> run
-        trains an LSTM on the shared HF CPU and can take about 2&nbsp;minutes;
-        every other block finishes within seconds.
+        return instantly. A cold <span className="text-ink">QuBound</span>{" "}
+        (LSTM training) or <span className="text-ink">Qshot</span> (HDBSCAN
+        warmup + pilot measurements) run on the shared HF CPU can take
+        1–3&nbsp;minutes; every other block finishes within seconds.
       </p>
     </div>
   );

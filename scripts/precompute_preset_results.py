@@ -99,6 +99,28 @@ PRESETS: dict[str, dict] = {
             {"source": "n4", "target": "n5"},
         ],
     },
+    # Qshot is self-contained — picks its own AerSimulator and consumes
+    # bundled noise JSONs — so it doesn't need a fake_backend upstream.
+    # The preset defaults match nodeCatalog.ts (pittsburgh_1 snapshot,
+    # alpha=0.95). The frontend preset auto-loads ry_chain_6q (6q HEA) so
+    # the precompute key has to use that same sample to be a useful cache
+    # hit; samples outside Qshot's 5-8q training range will fall through
+    # to the GNN extrapolation path and the result is less informative,
+    # but caching it is still valid.
+    "qshot": {
+        "label": "Qshot",
+        "nodes": [
+            {"id": "n1", "type": "input_circuit", "data": {}},
+            {
+                "id": "n2",
+                "type": "qshot",
+                "data": {"noise_snapshot": "pittsburgh_1", "alpha": 0.95},
+            },
+        ],
+        "edges": [
+            {"source": "n1", "target": "n2"},
+        ],
+    },
     "full": {
         "label": "Full stack",
         "nodes": [

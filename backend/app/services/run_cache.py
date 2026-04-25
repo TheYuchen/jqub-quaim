@@ -41,12 +41,15 @@ CACHE_DIR: Path = (
 
 
 def _normalize_node(n: FlowNode | dict[str, Any]) -> dict[str, Any]:
-    """Strip anything that shouldn't affect semantic equivalence.
+    """Pull the cache-relevant fields out of a node payload.
 
-    In particular we drop the node `id`: the graph topology is what
-    matters, not the auto-generated names. Two runs of the same preset
-    with node ids "n1..n4" vs "na..nd" should still share a cache entry
-    as long as the edges describe the same DAG.
+    Strips React-Flow UI noise (position, selected, dragHandle, …) and
+    keeps only ``id`` / ``type`` / ``data``. The id IS kept on purpose:
+    edges reference nodes by id, so dropping it on the node side without
+    canonicalising ids on the edge side would make the hash meaningless.
+    The frontend presets and the precompute script in
+    ``scripts/precompute_preset_results.py`` both use the same ``n1, n2,
+    …`` convention, which is what makes the cache hit in practice.
     """
     if isinstance(n, FlowNode):
         node_type = n.type
