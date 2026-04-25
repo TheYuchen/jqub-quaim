@@ -1,6 +1,6 @@
 {
   "selection_meta": {
-    "source_file": "/home/yliu71/Shots/fid_idea/create_circuit/ibm_pittsburgh_noise_summary.json",
+    "source_file": "ibm_pittsburgh_noise_summary.json",
     "selected_rank": 3,
     "selected_out_of": 5,
     "selection_method": "sort_by_noise_score_then_uniform_pick",
