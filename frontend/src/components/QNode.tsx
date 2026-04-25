@@ -1,6 +1,12 @@
 import { Handle, Position, useReactFlow, type NodeProps } from "@xyflow/react";
 import { useState } from "react";
-import { AlertTriangle, ChevronDown, FileText, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  FileText,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import {
   NODE_BY_KIND,
   type NodeKind,
@@ -132,9 +138,13 @@ export function QNode({ id, data, selected }: NodeProps) {
       )}
 
       {/* Editable params (schema-driven) start collapsed so the block
-          stays compact on a busy canvas. Header row shows a one-line
-          summary of the current values; click to expand the full
-          editor. Other node kinds fall back to the static read-out. */}
+          stays compact on a busy canvas. Header row is a chip-like
+          button so it reads as obviously clickable: SlidersHorizontal
+          icon + uppercase "PARAMS" label, current-value summary on
+          the right, ChevronDown that rotates on toggle. The whole row
+          gets a hover background + border so newcomers see the
+          affordance without needing to hover over the chevron. Other
+          node kinds fall back to the static read-out. */}
       {spec.params && spec.params.length > 0 ? (
         <div className="mt-2 pt-2 border-t border-edge/60">
           <button
@@ -147,20 +157,30 @@ export function QNode({ id, data, selected }: NodeProps) {
             aria-label={
               paramsOpen ? "Hide parameters" : "Show parameters"
             }
-            className="nodrag w-full flex items-center gap-1.5 text-[10px] text-mute hover:text-ink transition-colors"
+            className={`nodrag w-full flex items-center gap-1.5 px-1.5 py-1 -mx-0.5 rounded-md border text-[10px] transition-colors ${
+              paramsOpen
+                ? "border-edge bg-surfaceAlt text-ink"
+                : "border-transparent text-mute hover:text-ink hover:border-edge/60 hover:bg-surfaceAlt"
+            }`}
           >
+            <SlidersHorizontal
+              className={`w-3 h-3 shrink-0 ${
+                paramsOpen ? "text-accent" : ""
+              }`}
+              strokeWidth={2.2}
+            />
+            <span className="shrink-0 uppercase tracking-wider font-medium">
+              params
+            </span>
+            <span className="font-mono text-ink truncate flex-1 text-right">
+              {!paramsOpen && summariseParams(spec.params, d.params ?? {})}
+            </span>
             <ChevronDown
               className={`w-3 h-3 shrink-0 transition-transform ${
-                paramsOpen ? "rotate-0" : "-rotate-90"
+                paramsOpen ? "rotate-180" : "rotate-0"
               }`}
               strokeWidth={2.5}
             />
-            <span className="shrink-0">params</span>
-            {!paramsOpen && (
-              <span className="font-mono text-ink truncate text-[10px]">
-                {summariseParams(spec.params, d.params ?? {})}
-              </span>
-            )}
           </button>
           {paramsOpen && (
             <NodeParamEditor

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { PanelLeft, PanelRight } from "lucide-react";
 import { api } from "./lib/api";
 import { useApp } from "./lib/store";
 import { useIsDesktop } from "./lib/useMediaQuery";
@@ -277,7 +277,12 @@ function CollapsedStrip({
   side: "left" | "right";
   onExpand: () => void;
 }) {
-  const Chevron = side === "left" ? ChevronRight : ChevronLeft;
+  // Use the same panel-toggle icons the mobile TopBar uses for its
+  // drawer toggles, so the visual cue for "open this side panel" is
+  // consistent across breakpoints. PanelLeft = left edge highlight;
+  // PanelRight = right edge highlight — picks the one that points
+  // *toward* the pane that's about to slide open.
+  const Icon = side === "left" ? PanelLeft : PanelRight;
   return (
     <button
       type="button"
@@ -286,7 +291,7 @@ function CollapsedStrip({
       aria-label={`Expand ${label}`}
       className="flex flex-col items-center gap-2 py-2 px-0 w-full h-full text-mute hover:text-ink hover:bg-surfaceAlt transition-colors"
     >
-      <Chevron className="w-4 h-4 shrink-0" />
+      <Icon className="w-5 h-5 shrink-0" strokeWidth={1.8} />
       <span
         className="text-[11px] uppercase tracking-wider whitespace-nowrap select-none"
         style={{ writingMode: "vertical-rl" }}
