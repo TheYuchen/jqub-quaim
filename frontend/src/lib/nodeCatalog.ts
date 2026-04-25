@@ -128,6 +128,7 @@ export const NODE_CATALOG: NodeSpec[] = [
           { value: "FakeMarrakesh", label: "FakeMarrakesh · 156q (Heron r2)" },
           { value: "FakeTorino", label: "FakeTorino · 133q (Heron r1)" },
         ],
+        hint: "Each option is a simulated copy of a real IBM chip. The choice mainly affects which gate-error rates and qubit connectivity the noise model uses.",
       },
     ],
   },
@@ -164,7 +165,7 @@ export const NODE_CATALOG: NodeSpec[] = [
         min: 1,
         max: 20,
         step: 1,
-        hint: "more iterations → tighter convergence, slower run",
+        hint: "More iterations → tighter convergence, slower run.",
       },
       {
         key: "lam",
@@ -174,7 +175,7 @@ export const NODE_CATALOG: NodeSpec[] = [
         max: 0.05,
         step: 0.001,
         displayPrecision: 4,
-        hint: "larger λ → sparser pruning",
+        hint: "Larger λ → more aggressive pruning (fewer surviving gates).",
       },
       {
         key: "rho",
@@ -184,6 +185,7 @@ export const NODE_CATALOG: NodeSpec[] = [
         max: 5000,
         step: 10,
         displayPrecision: 0,
+        hint: "Internal penalty weight for the ADMM solver; default is usually fine.",
       },
     ],
     paper: {
@@ -280,6 +282,7 @@ export const NODE_CATALOG: NodeSpec[] = [
           value: s.key,
           label: s.label,
         })),
+        hint: "A real IBM chip's calibration captured on a specific date — different days have different noise levels, so the recommended shot count shifts too.",
       },
       {
         key: "alpha",
@@ -289,7 +292,7 @@ export const NODE_CATALOG: NodeSpec[] = [
         max: 0.99,
         step: 0.01,
         displayPrecision: 2,
-        hint: "fraction of converged fidelity to hit",
+        hint: "Fraction of the best-possible accuracy you want. 0.95 = aim for 95% — higher means stricter and more shots.",
       },
     ],
   },

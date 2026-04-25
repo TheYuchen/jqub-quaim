@@ -139,12 +139,17 @@ function NumberField({
         }}
         className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink font-mono focus:outline-none focus:border-accent/60"
       />
-      {(rangeText || spec.hint) && (
-        <span className="flex justify-between mt-0.5 text-[10px] text-mute/80 leading-tight gap-2">
-          {spec.hint && <span className="truncate">{spec.hint}</span>}
-          {rangeText && (
-            <span className="font-mono shrink-0">{rangeText}</span>
-          )}
+      {/* Hint and range each get their own line so longer plain-language
+          hints can wrap freely instead of getting truncated. Range stays
+          monospaced and right-aligned for a glanceable bound check. */}
+      {spec.hint && (
+        <span className="block mt-0.5 text-[10px] text-mute/80 leading-tight">
+          {spec.hint}
+        </span>
+      )}
+      {rangeText && (
+        <span className="block mt-0.5 text-[10px] text-mute/70 font-mono text-right">
+          range {rangeText}
         </span>
       )}
     </label>
