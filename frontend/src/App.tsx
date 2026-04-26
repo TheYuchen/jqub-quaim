@@ -22,6 +22,16 @@ const RIGHT_MIN = 300;
 const RIGHT_MAX = 720;
 const COLLAPSED_W = 32;
 
+// Minimum width we ever want to leave for the canvas (NodePalette + React
+// Flow). Below this, NodePalette tiles (each fixed at 108px and shrink-0)
+// start overflowing horizontally because `<main>` has no overflow clip —
+// they visually escape the canvas column and cover whatever's in the
+// right pane. The dynamic clamp in the resize handler caps the side
+// panes so this never happens, regardless of viewport size.
+const MIN_CANVAS_W = 280;
+// Reserve the side resizer's footprint when computing the canvas budget.
+const RESIZER_W = 4;
+
 const LS_LEFT = "jqub.leftPaneWidth";
 const LS_RIGHT = "jqub.rightPaneWidth";
 const LS_LEFT_COLLAPSED = "jqub.leftPaneCollapsed";
@@ -149,6 +159,34 @@ export default function App() {
     }
   }, [isDesktop]);
 
+  // Window resize → shrink oversized panes back into the safe zone.
+  // The drag-time clamp keeps users from making things too wide; this
+  // covers the case where the user shrinks the window after panes were
+  // already wide. Without it, current widths could exceed the dynamic
+  // max for the new viewport, and NodePalette tiles would overflow into
+  // the side panes again.
+  useEffect(() => {
+    if (!isDesktop) return;
+    const onResize = () => {
+      const ww = window.innerWidth;
+      const leftFoot = leftCollapsed ? COLLAPSED_W : 0; // pane footprint computed below
+      const rightFoot = rightCollapsed ? COLLAPSED_W : 0;
+      // Headroom each pane has, given the *other* pane and resizers.
+      const maxLeft = Math.min(
+        LEFT_MAX,
+        ww - (rightCollapsed ? rightFoot : rightW + RESIZER_W) - RESIZER_W - MIN_CANVAS_W,
+      );
+      const maxRight = Math.min(
+        RIGHT_MAX,
+        ww - (leftCollapsed ? leftFoot : leftW + RESIZER_W) - RESIZER_W - MIN_CANVAS_W,
+      );
+      setLeftW((w) => Math.max(LEFT_MIN, Math.min(w, Math.max(LEFT_MIN, maxLeft))));
+      setRightW((w) => Math.max(RIGHT_MIN, Math.min(w, Math.max(RIGHT_MIN, maxRight))));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [isDesktop, leftCollapsed, rightCollapsed, leftW, rightW]);
+
   useEffect(() => {
     api
       .health()
@@ -192,14 +230,28 @@ export default function App() {
           {!leftCollapsed && (
             <PaneResizer
               onResize={(dx) =>
-                setLeftW((w) => Math.min(LEFT_MAX, Math.max(LEFT_MIN, w + dx)))
+                setLeftW((w) => {
+                  // Dynamic upper bound: never push left pane so wide that
+                  // the canvas falls below MIN_CANVAS_W. Account for the
+                  // right pane's current footprint (collapsed strip when
+                  // collapsed, full width otherwise) and both resizers.
+                  const rightFoot = rightCollapsed ? COLLAPSED_W : rightW + RESIZER_W;
+                  const dynamicMax = Math.min(
+                    LEFT_MAX,
+                    window.innerWidth - rightFoot - RESIZER_W - MIN_CANVAS_W,
+                  );
+                  return Math.min(
+                    Math.max(LEFT_MIN, dynamicMax),
+                    Math.max(LEFT_MIN, w + dx),
+                  );
+                })
               }
               onDoubleClick={() => setLeftW(LEFT_DEFAULT)}
               onDragChange={setIsResizing}
               ariaLabel="Resize pipeline input pane"
             />
           )}
-          <main className="flex-1 min-w-0 flex flex-col min-h-0">
+          <main className="flex-1 min-w-0 flex flex-col min-h-0 overflow-x-hidden">
             <NodePalette />
             <ReactFlowProvider>
               <FlowCanvas />
@@ -208,9 +260,20 @@ export default function App() {
           {!rightCollapsed && (
             <PaneResizer
               onResize={(dx) =>
-                setRightW((w) =>
-                  Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, w - dx)),
-                )
+                setRightW((w) => {
+                  // Dynamic upper bound: never push right pane so wide
+                  // that the canvas falls below MIN_CANVAS_W. Mirror
+                  // logic of the left resizer.
+                  const leftFoot = leftCollapsed ? COLLAPSED_W : leftW + RESIZER_W;
+                  const dynamicMax = Math.min(
+                    RIGHT_MAX,
+                    window.innerWidth - leftFoot - RESIZER_W - MIN_CANVAS_W,
+                  );
+                  return Math.min(
+                    Math.max(RIGHT_MIN, dynamicMax),
+                    Math.max(RIGHT_MIN, w - dx),
+                  );
+                })
               }
               onDoubleClick={() => setRightW(RIGHT_DEFAULT)}
               onDragChange={setIsResizing}
@@ -237,7 +300,7 @@ export default function App() {
       ) : (
         /* =====================  Mobile  ====================== */
         <div className="flex-1 flex flex-col min-h-0">
-          <main className="flex-1 min-w-0 flex flex-col min-h-0">
+          <main className="flex-1 min-w-0 flex flex-col min-h-0 overflow-x-hidden">
             <NodePalette />
             <ReactFlowProvider>
               <FlowCanvas />
