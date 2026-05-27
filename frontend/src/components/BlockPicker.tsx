@@ -15,13 +15,21 @@ import { useApp } from "../lib/store";
  * row, triggered by a button.
  */
 
-const FAMILY_META: { key: NodeSpec["family"]; label: string }[] = [
-  { key: "source", label: "Source" },
-  { key: "backend", label: "Backend" },
-  { key: "algorithm", label: "Algorithm" },
-  { key: "metric", label: "Metric" },
-  { key: "sink", label: "Sink" },
+const FAMILY_META: {
+  key: NodeSpec["family"];
+  label: string;
+  hint: string;
+}[] = [
+  { key: "source", label: "Source", hint: "Required. Feeds a quantum circuit into the pipeline." },
+  { key: "backend", label: "Backend", hint: "Provides a noise model. Required for QuCAD; others fall back to a default." },
+  { key: "algorithm", label: "Algorithm", hint: "Pick one or more research algorithms to apply." },
+  { key: "metric", label: "Metric", hint: "Optional. Scores the output circuit (e.g. fidelity)." },
+  { key: "sink", label: "Sink", hint: "Required. Collects final metrics and the resulting circuit." },
 ];
+
+/** Blocks that are pre-checked when the picker opens, because almost
+ *  every pipeline needs them. The user can still uncheck them. */
+const DEFAULT_CHECKED: NodeKind[] = ["input_circuit", "output"];
 
 export function BlockPicker({
   canvasKinds,
@@ -31,7 +39,7 @@ export function BlockPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [checked, setChecked] = useState<Set<NodeKind>>(new Set());
+  const [checked, setChecked] = useState<Set<NodeKind>>(new Set(DEFAULT_CHECKED));
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const addBlocksToCanvas = useApp((s) => s.addBlocksToCanvas);
@@ -54,9 +62,13 @@ export function BlockPicker({
     };
   }, [open]);
 
-  // Auto-focus search on open.
+  // Reset to defaults + focus search on open.
   useEffect(() => {
-    if (open) searchRef.current?.focus();
+    if (open) {
+      setChecked(new Set(DEFAULT_CHECKED));
+      setSearch("");
+      searchRef.current?.focus();
+    }
   }, [open]);
 
   const filtered = useMemo(() => {
@@ -132,8 +144,13 @@ export function BlockPicker({
               if (items.length === 0) return null;
               return (
                 <div key={fm.key} className="mb-1">
-                  <div className="px-2 py-1 text-[9px] uppercase tracking-widest text-mute/70 font-medium">
-                    {fm.label}
+                  <div className="px-2 pt-1.5 pb-0.5">
+                    <div className="text-[9px] uppercase tracking-widest text-mute/70 font-medium">
+                      {fm.label}
+                    </div>
+                    <div className="text-[9px] text-mute/50 leading-snug">
+                      {fm.hint}
+                    </div>
                   </div>
                   {items.map((n) => {
                     const isChecked = checked.has(n.kind);
