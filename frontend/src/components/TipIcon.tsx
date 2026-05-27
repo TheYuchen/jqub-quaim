@@ -39,13 +39,22 @@ export function TipIcon({
   hint,
   className = "",
   size = 12,
+  position = "above",
 }: {
   hint: string;
   /** Extra classes on the wrapper (e.g. for inline alignment). */
   className?: string;
   /** Pixel size of the icon. Defaults to 12 to match small inline labels. */
   size?: number;
+  /** Tooltip direction. Use `"below"` for elements near the top of the
+   *  viewport (e.g. TopBar chips) so the tooltip doesn't overflow above
+   *  the page. Defaults to `"above"`. */
+  position?: "above" | "below";
 }) {
+  const posClass =
+    position === "below"
+      ? "top-full mt-1"
+      : "bottom-full mb-1";
   return (
     <span
       tabIndex={0}
@@ -62,7 +71,7 @@ export function TipIcon({
       />
       <span
         role="tooltip"
-        className="hidden group-hover/tip:block group-focus/tip:block pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 w-max max-w-[16rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left"
+        className={`hidden group-hover/tip:block group-focus/tip:block pointer-events-none absolute left-1/2 -translate-x-1/2 ${posClass} z-50 w-max max-w-[16rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left`}
       >
         {hint}
       </span>

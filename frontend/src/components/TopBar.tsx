@@ -123,7 +123,7 @@ export function TopBar({
             className={`chip transition-colors gap-1 ${chipClass}`}
           >
             <span>{mobile ? chipLabelShort : chipLabel}</span>
-            <TipIcon hint={chipTitle} size={10} />
+            <TipIcon hint={chipTitle} size={10} position="below" />
           </button>
         </div>
       </div>
