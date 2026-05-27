@@ -91,10 +91,10 @@ export function TopBar({
         </div>
         <div className="leading-tight min-w-0">
           <div className="text-ink font-semibold tracking-tight truncate">
-            QuAIM
+            QuDA Studio
           </div>
           <div className="text-mute text-xs hidden sm:block truncate">
-            Visual pipeline for noise-aware VQC experiments
+            Quantum Design Automation Studio
           </div>
         </div>
         {/* Status chips live in the left cluster — they describe the app's

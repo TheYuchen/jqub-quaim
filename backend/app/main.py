@@ -33,16 +33,16 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
     logger.info(
-        "QuAIM booting (ibm_token=%s, live_ibm=%s)",
+        "QuDA Studio booting (ibm_token=%s, live_ibm=%s)",
         "set" if settings.has_ibm_token else "missing",
         settings.allow_live_ibm,
     )
     yield
-    logger.info("QuAIM shutting down")
+    logger.info("QuDA Studio shutting down")
 
 
 app = FastAPI(
-    title="QuAIM",
+    title="QuDA Studio",
     description="Interactive pipeline over QuCAD / QuBound / CompressVQC / Qshot.",
     version="0.1.0",
     lifespan=lifespan,

@@ -1,4 +1,4 @@
-"""Runtime configuration for the QuAIM backend."""
+"""Runtime configuration for the QuDA Studio backend."""
 
 from __future__ import annotations
 

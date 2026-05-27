@@ -1,19 +1,20 @@
 ---
-title: QuAIM
+title: QuDA Studio
 emoji: ⚛️
 colorFrom: indigo
 colorTo: purple
 sdk: docker
 app_port: 7860
 pinned: false
-short_description: Interactive quantum pipeline builder from JQub lab.
+short_description: Quantum Design Automation Studio
 ---
 
-# QuAIM
+# QuDA Studio
 
-Interactive web demo from the [JQub lab](https://jqub.ece.gmu.edu/) at
-George Mason University, showcasing QuCAD, QuBound, CompressVQC, and
-Qshot on configurable quantum pipelines.
+Interactive workflows for quantum system deployment, from the
+[JQub lab](https://jqub.ece.gmu.edu/) at George Mason University.
+Currently includes QuCAD, QuBound, CompressVQC, and Qshot on
+configurable quantum pipelines.
 
 ## What it does
 
