@@ -1,26 +1,21 @@
 import { useState, useMemo } from "react";
-import { Check, ChevronDown, FileText, Plus, Search, X } from "lucide-react";
+import { ChevronDown, FileText, Search, X } from "lucide-react";
 import { NODE_CATALOG, type NodeKind, type NodeSpec } from "../lib/nodeCatalog";
-import { useApp } from "../lib/store";
+import { BlockPicker } from "./BlockPicker";
 
 /**
  * Categorised block catalog above the canvas.
  *
- * Designed to scale from the current 9 blocks to 30+ without layout
- * breakage. Blocks are grouped by family; each family is a collapsible
- * section with a header chip. A search box filters across all families
- * in real time.
+ * Two complementary interaction modes:
+ *   - **Drag** a tile onto the canvas (quick, for users who know what
+ *     they want).
+ *   - **"Add blocks" dropdown** (BlockPicker) — a categorised
+ *     multi-select list where users browse all available blocks, check
+ *     the ones they want, and batch-add them in one click. Better for
+ *     newcomers or when building a pipeline from scratch.
  *
- * Three interaction modes:
- *   - **Drag** a tile onto the canvas (classic).
- *   - **Click** the checkbox on a tile to select it, then hit "Add N
- *     to canvas" to batch-add all selected blocks at once (the
- *     FlowCanvas picks them up via the Zustand `pendingBlockKinds`
- *     bridge and auto-connects them).
- *   - **Single click** the + icon on a tile to add just that one block.
- *
- * The whole palette collapses to a thin bar ("N blocks available") via
- * a toggle so the canvas can reclaim vertical space.
+ * Blocks are grouped by family; each family section is collapsible. A
+ * search box filters across all families in real time.
  */
 
 const FAMILY_META: {
@@ -39,12 +34,16 @@ const FAMILY_META: {
   { key: "sink", label: "Sink", description: "Aggregates final output" },
 ];
 
-export function NodePalette() {
+export function NodePalette({
+  canvasKinds = new Set(),
+}: {
+  /** Kinds currently on the canvas — passed through to BlockPicker for
+   *  "on canvas" badges. */
+  canvasKinds?: Set<NodeKind>;
+} = {}) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(true);
   const [collapsedFams, setCollapsedFams] = useState<Set<string>>(new Set());
-  const [checked, setChecked] = useState<Set<NodeKind>>(new Set());
-  const addBlocksToCanvas = useApp((s) => s.addBlocksToCanvas);
 
   const toggleFamily = (fam: string) =>
     setCollapsedFams((s) => {
@@ -52,27 +51,6 @@ export function NodePalette() {
       next.has(fam) ? next.delete(fam) : next.add(fam);
       return next;
     });
-
-  const toggleCheck = (kind: NodeKind) =>
-    setChecked((s) => {
-      const next = new Set(s);
-      next.has(kind) ? next.delete(kind) : next.add(kind);
-      return next;
-    });
-
-  const addSingle = (kind: NodeKind) => {
-    addBlocksToCanvas([kind]);
-  };
-
-  const addSelected = () => {
-    if (checked.size === 0) return;
-    // Preserve catalog family order so auto-connect produces a sensible chain.
-    const ordered = NODE_CATALOG.filter((n) => checked.has(n.kind)).map(
-      (n) => n.kind,
-    );
-    addBlocksToCanvas(ordered);
-    setChecked(new Set());
-  };
 
   const filtered = useMemo(() => {
     if (!search.trim()) return NODE_CATALOG;
@@ -109,13 +87,16 @@ export function NodePalette() {
     <div className="shrink-0 border-b border-edge bg-surface/40">
       {/* Header row */}
       <div className="px-3 pt-2 pb-1 flex items-center gap-2">
-        <div className="relative flex-1 max-w-[220px]">
+        {/* Multi-select dropdown picker */}
+        <BlockPicker canvasKinds={canvasKinds} />
+        {/* Search */}
+        <div className="relative flex-1 max-w-[200px]">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-mute pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search blocks..."
+            placeholder="Search..."
             className="w-full text-[11px] bg-surfaceAlt border border-edge rounded-md pl-6 pr-6 py-1 text-ink placeholder:text-mute/60 focus:outline-none focus:border-accent/60"
           />
           {search && (
@@ -151,18 +132,10 @@ export function NodePalette() {
             );
           })}
         </div>
-        {/* Add-selected button (appears when any block is checked) */}
-        {checked.size > 0 && (
-          <button
-            type="button"
-            onClick={addSelected}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-accent text-canvas hover:bg-accent/90 transition-colors whitespace-nowrap"
-          >
-            <Plus className="w-3 h-3" />
-            Add {checked.size} to canvas
-          </button>
-        )}
         <div className="flex-1" />
+        <span className="hidden lg:inline text-[10px] text-mute/60">
+          drag to canvas or use Add blocks
+        </span>
         <button
           type="button"
           onClick={() => setExpanded(false)}
@@ -202,13 +175,7 @@ export function NodePalette() {
               {!isCollapsed && (
                 <div className="flex items-center gap-1 flex-wrap">
                   {items.map((n) => (
-                    <PaletteTile
-                      key={n.kind}
-                      spec={n}
-                      isChecked={checked.has(n.kind)}
-                      onToggleCheck={() => toggleCheck(n.kind)}
-                      onAddSingle={() => addSingle(n.kind)}
-                    />
+                    <PaletteTile key={n.kind} spec={n} />
                   ))}
                 </div>
               )}
@@ -231,17 +198,7 @@ export function NodePalette() {
   );
 }
 
-function PaletteTile({
-  spec,
-  isChecked,
-  onToggleCheck,
-  onAddSingle,
-}: {
-  spec: NodeSpec;
-  isChecked: boolean;
-  onToggleCheck: () => void;
-  onAddSingle: () => void;
-}) {
+function PaletteTile({ spec }: { spec: NodeSpec }) {
   const Icon = spec.icon;
   function onDragStart(e: React.DragEvent) {
     e.dataTransfer.setData("application/reactflow", spec.kind);
@@ -251,48 +208,9 @@ function PaletteTile({
     <div
       draggable
       onDragStart={onDragStart}
-      className={`group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border transition-colors text-center px-1.5 py-1.5 ${
-        isChecked
-          ? "border-accent bg-accent/10"
-          : "border-edge/60 hover:border-edge hover:bg-surfaceAlt"
-      }`}
+      className="group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1.5 py-1.5"
       title={spec.description}
     >
-      {/* Checkbox (top-left) */}
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleCheck();
-        }}
-        draggable={false}
-        onDragStart={(e) => e.stopPropagation()}
-        className={`absolute top-1 left-1 w-4 h-4 rounded flex items-center justify-center transition-colors z-10 ${
-          isChecked
-            ? "bg-accent border border-accent text-canvas"
-            : "border border-edge bg-surface text-transparent hover:border-mute hover:text-mute"
-        }`}
-        aria-label={isChecked ? `Deselect ${spec.label}` : `Select ${spec.label}`}
-      >
-        <Check className="w-2.5 h-2.5" strokeWidth={3} />
-      </button>
-      {/* Quick-add button (top-right, shows on hover when not checked) */}
-      {!isChecked && !spec.paper && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddSingle();
-          }}
-          draggable={false}
-          onDragStart={(e) => e.stopPropagation()}
-          className="absolute top-1 right-1 w-4 h-4 rounded-full border border-edge bg-surface text-mute hover:border-accent hover:text-accent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-          title={`Add ${spec.label} to canvas`}
-          aria-label={`Add ${spec.label} to canvas`}
-        >
-          <Plus className="w-2.5 h-2.5" strokeWidth={2.5} />
-        </button>
-      )}
       {spec.paper && (
         <a
           href={spec.paper.url}
