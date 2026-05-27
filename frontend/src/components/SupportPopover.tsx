@@ -140,18 +140,15 @@ export function SupportPopover() {
                 href={a.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-baseline gap-2 px-2 py-1.5 rounded-md hover:bg-surfaceAlt transition-colors group"
+                className="block px-2 py-1.5 rounded-md hover:bg-surfaceAlt transition-colors group"
               >
-                <span className="shrink-0 font-mono text-[11px] text-accent">
-                  {a.shortName}
+                <span className="text-[12px] text-ink line-clamp-1 group-hover:underline decoration-accent/40 underline-offset-2">
+                  {a.title}
                 </span>
-                <span className="flex-1 min-w-0">
-                  <span className="text-[12px] text-ink line-clamp-1 group-hover:underline decoration-accent/40 underline-offset-2">
-                    {a.title}
-                  </span>
-                  <span className="block text-[10px] text-mute">
-                    NSF #{a.id} · {a.period}
-                  </span>
+                <span className="block text-[10px] text-mute mt-0.5">
+                  NSF #{a.id}{" "}
+                  <span className="font-mono text-accent">({a.shortName})</span>
+                  {" · "}{a.period}
                 </span>
               </a>
             ))}
