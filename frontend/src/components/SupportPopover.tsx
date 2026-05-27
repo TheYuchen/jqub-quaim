@@ -1,5 +1,34 @@
 import { useEffect, useRef, useState } from "react";
-import { Heart } from "lucide-react";
+
+/** Compact NSF globe mark — a blue circle with white "NSF" lettering.
+ *  Captures the essence of the official NSF logo without depending on
+ *  an external image URL. */
+function NsfMark({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 40 40"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="NSF"
+      className="shrink-0"
+    >
+      <circle cx="20" cy="20" r="19" fill="#2160a8" />
+      <text
+        x="20"
+        y="25"
+        textAnchor="middle"
+        fontSize="14"
+        fontWeight="700"
+        fontFamily="ui-sans-serif, system-ui, sans-serif"
+        fill="#fff"
+        letterSpacing="0.5"
+      >
+        NSF
+      </text>
+    </svg>
+  );
+}
 
 /**
  * Popover listing the NSF awards that fund the lab's research.
@@ -93,7 +122,7 @@ export function SupportPopover() {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <Heart className="w-3.5 h-3.5" />
+        <NsfMark size={16} />
         <span className="hidden sm:inline">Support</span>
       </button>
       {open && (

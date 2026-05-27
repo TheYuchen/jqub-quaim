@@ -145,7 +145,6 @@ export function TopBar({
         </a>
         <PapersPopover />
         <DevelopersPopover />
-        <SupportPopover />
         <span
           className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
           aria-hidden="true"
@@ -162,6 +161,11 @@ export function TopBar({
             <span className="hidden sm:inline">Tour</span>
           </button>
         )}
+        <span
+          className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
+          aria-hidden="true"
+        />
+        <SupportPopover />
         {mobile && onOpenRightDrawer && (
           <button
             type="button"
