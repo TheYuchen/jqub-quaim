@@ -507,20 +507,21 @@ function CanvasToast({
   );
 }
 
-// MiniMap node colors keyed to theme variables so they shift alongside the
-// rest of the palette instead of clashing in light or GMU themes.
+// MiniMap node colors — hardcoded vivid hex values so they stay punchy
+// regardless of which theme is active and don't get washed out by the
+// MiniMap's semi-transparent mask layer.
 function colorForKind(kind: NodeKind): string {
   const map: Record<NodeKind, string> = {
-    input_circuit: "rgb(var(--color-accent))",
-    fake_backend: "rgb(var(--color-accent))",
-    ibm_backend: "rgb(var(--color-warn))",
-    qucad: "rgb(var(--color-accent2))",
-    qubound: "rgb(var(--color-accent3))",
-    compvqc: "rgb(var(--color-accent4))",
-    qshot: "rgb(var(--color-warn))",
-    fidelity: "rgb(var(--color-ok))",
-    output: "rgb(var(--color-ink))",
+    input_circuit: "#0284c7",   // sky-600
+    fake_backend: "#0369a1",    // sky-700
+    ibm_backend: "#d97706",     // amber-600
+    qucad: "#7c3aed",           // violet-600
+    qubound: "#db2777",         // pink-600
+    compvqc: "#059669",         // emerald-600
+    qshot: "#ea580c",           // orange-600
+    fidelity: "#0d9488",        // teal-600
+    output: "#1e293b",          // slate-800
   };
-  return map[kind] ?? "rgb(var(--color-mute))";
+  return map[kind] ?? "#94a3b8";
 }
 
