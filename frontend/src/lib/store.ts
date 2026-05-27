@@ -3,6 +3,7 @@
 
 import { create } from "zustand";
 import type { CircuitInfo, RunResponse, HealthResponse } from "./api";
+import type { NodeKind } from "./nodeCatalog";
 
 const LS_USE_LIVE_IBM = "jqub.useLiveIbm";
 
@@ -50,6 +51,15 @@ interface AppState {
    */
   useLiveIbm: boolean;
   setUseLiveIbm: (v: boolean) => void;
+
+  /**
+   * Cross-component bridge: NodePalette pushes block kinds here when the
+   * user checks blocks and clicks "Add to canvas". FlowCanvas watches
+   * this via useEffect, creates the nodes, auto-connects, and clears.
+   */
+  pendingBlockKinds: NodeKind[];
+  addBlocksToCanvas: (kinds: NodeKind[]) => void;
+  clearPendingBlocks: () => void;
 }
 
 export const useApp = create<AppState>((set) => ({
@@ -72,4 +82,7 @@ export const useApp = create<AppState>((set) => ({
     }
     set({ useLiveIbm: v });
   },
+  pendingBlockKinds: [],
+  addBlocksToCanvas: (kinds) => set({ pendingBlockKinds: kinds }),
+  clearPendingBlocks: () => set({ pendingBlockKinds: [] }),
 }));

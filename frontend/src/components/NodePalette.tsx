@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, FileText, Search, X } from "lucide-react";
-import { NODE_CATALOG, type NodeSpec } from "../lib/nodeCatalog";
+import { Check, ChevronDown, FileText, Plus, Search, X } from "lucide-react";
+import { NODE_CATALOG, type NodeKind, type NodeSpec } from "../lib/nodeCatalog";
+import { useApp } from "../lib/store";
 
 /**
  * Categorised block catalog above the canvas.
@@ -10,53 +11,40 @@ import { NODE_CATALOG, type NodeSpec } from "../lib/nodeCatalog";
  * section with a header chip. A search box filters across all families
  * in real time.
  *
- * Two interaction modes, both always available:
- *   - **Drag** a tile onto the canvas (existing behaviour).
- *   - **Click** a tile to add it at the canvas centre (TODO: wire up
- *     in FlowCanvas via an onAddBlock callback when ready).
+ * Three interaction modes:
+ *   - **Drag** a tile onto the canvas (classic).
+ *   - **Click** the checkbox on a tile to select it, then hit "Add N
+ *     to canvas" to batch-add all selected blocks at once (the
+ *     FlowCanvas picks them up via the Zustand `pendingBlockKinds`
+ *     bridge and auto-connects them).
+ *   - **Single click** the + icon on a tile to add just that one block.
  *
  * The whole palette collapses to a thin bar ("N blocks available") via
  * a toggle so the canvas can reclaim vertical space.
  */
 
-/** Family metadata: display label + ordering. */
 const FAMILY_META: {
   key: NodeSpec["family"];
   label: string;
   description: string;
 }[] = [
-  {
-    key: "source",
-    label: "Source",
-    description: "Where the pipeline starts",
-  },
-  {
-    key: "backend",
-    label: "Backend",
-    description: "Provides a noise model",
-  },
+  { key: "source", label: "Source", description: "Where the pipeline starts" },
+  { key: "backend", label: "Backend", description: "Provides a noise model" },
   {
     key: "algorithm",
     label: "Algorithm",
     description: "Research algorithms that transform or analyse the circuit",
   },
-  {
-    key: "metric",
-    label: "Metric",
-    description: "Computes a quantitative score",
-  },
-  {
-    key: "sink",
-    label: "Sink",
-    description: "Aggregates final output",
-  },
+  { key: "metric", label: "Metric", description: "Computes a quantitative score" },
+  { key: "sink", label: "Sink", description: "Aggregates final output" },
 ];
 
 export function NodePalette() {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(true);
-  // Track which families are collapsed; default all expanded.
   const [collapsedFams, setCollapsedFams] = useState<Set<string>>(new Set());
+  const [checked, setChecked] = useState<Set<NodeKind>>(new Set());
+  const addBlocksToCanvas = useApp((s) => s.addBlocksToCanvas);
 
   const toggleFamily = (fam: string) =>
     setCollapsedFams((s) => {
@@ -65,7 +53,27 @@ export function NodePalette() {
       return next;
     });
 
-  // Filter blocks by search query (matches label, tagline, family, kind).
+  const toggleCheck = (kind: NodeKind) =>
+    setChecked((s) => {
+      const next = new Set(s);
+      next.has(kind) ? next.delete(kind) : next.add(kind);
+      return next;
+    });
+
+  const addSingle = (kind: NodeKind) => {
+    addBlocksToCanvas([kind]);
+  };
+
+  const addSelected = () => {
+    if (checked.size === 0) return;
+    // Preserve catalog family order so auto-connect produces a sensible chain.
+    const ordered = NODE_CATALOG.filter((n) => checked.has(n.kind)).map(
+      (n) => n.kind,
+    );
+    addBlocksToCanvas(ordered);
+    setChecked(new Set());
+  };
+
   const filtered = useMemo(() => {
     if (!search.trim()) return NODE_CATALOG;
     const q = search.toLowerCase();
@@ -99,7 +107,7 @@ export function NodePalette() {
 
   return (
     <div className="shrink-0 border-b border-edge bg-surface/40">
-      {/* Header row: search + collapse toggle */}
+      {/* Header row */}
       <div className="px-3 pt-2 pb-1 flex items-center gap-2">
         <div className="relative flex-1 max-w-[220px]">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-mute pointer-events-none" />
@@ -120,7 +128,7 @@ export function NodePalette() {
             </button>
           )}
         </div>
-        {/* Family quick-jump chips */}
+        {/* Family chips */}
         <div className="hidden md:flex items-center gap-1">
           {FAMILY_META.map((fm) => {
             const count = filtered.filter((n) => n.family === fm.key).length;
@@ -143,6 +151,17 @@ export function NodePalette() {
             );
           })}
         </div>
+        {/* Add-selected button (appears when any block is checked) */}
+        {checked.size > 0 && (
+          <button
+            type="button"
+            onClick={addSelected}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium bg-accent text-canvas hover:bg-accent/90 transition-colors whitespace-nowrap"
+          >
+            <Plus className="w-3 h-3" />
+            Add {checked.size} to canvas
+          </button>
+        )}
         <div className="flex-1" />
         <button
           type="button"
@@ -162,7 +181,6 @@ export function NodePalette() {
           const isCollapsed = collapsedFams.has(fm.key);
           return (
             <div key={fm.key} className="shrink-0 flex items-start gap-1">
-              {/* Family label (vertical on desktop, horizontal on mobile) */}
               <button
                 type="button"
                 onClick={() => toggleFamily(fm.key)}
@@ -181,11 +199,16 @@ export function NodePalette() {
                   }`}
                 />
               </button>
-              {/* Tiles */}
               {!isCollapsed && (
                 <div className="flex items-center gap-1 flex-wrap">
                   {items.map((n) => (
-                    <PaletteTile key={n.kind} spec={n} />
+                    <PaletteTile
+                      key={n.kind}
+                      spec={n}
+                      isChecked={checked.has(n.kind)}
+                      onToggleCheck={() => toggleCheck(n.kind)}
+                      onAddSingle={() => addSingle(n.kind)}
+                    />
                   ))}
                 </div>
               )}
@@ -194,7 +217,6 @@ export function NodePalette() {
                   {items.length} hidden
                 </div>
               )}
-              {/* Divider between families */}
               <div className="hidden md:block w-px self-stretch bg-edge/40 mx-0.5" />
             </div>
           );
@@ -209,7 +231,17 @@ export function NodePalette() {
   );
 }
 
-function PaletteTile({ spec }: { spec: NodeSpec }) {
+function PaletteTile({
+  spec,
+  isChecked,
+  onToggleCheck,
+  onAddSingle,
+}: {
+  spec: NodeSpec;
+  isChecked: boolean;
+  onToggleCheck: () => void;
+  onAddSingle: () => void;
+}) {
   const Icon = spec.icon;
   function onDragStart(e: React.DragEvent) {
     e.dataTransfer.setData("application/reactflow", spec.kind);
@@ -219,9 +251,48 @@ function PaletteTile({ spec }: { spec: NodeSpec }) {
     <div
       draggable
       onDragStart={onDragStart}
-      className="group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1.5 py-1.5"
+      className={`group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border transition-colors text-center px-1.5 py-1.5 ${
+        isChecked
+          ? "border-accent bg-accent/10"
+          : "border-edge/60 hover:border-edge hover:bg-surfaceAlt"
+      }`}
       title={spec.description}
     >
+      {/* Checkbox (top-left) */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleCheck();
+        }}
+        draggable={false}
+        onDragStart={(e) => e.stopPropagation()}
+        className={`absolute top-1 left-1 w-4 h-4 rounded flex items-center justify-center transition-colors z-10 ${
+          isChecked
+            ? "bg-accent border border-accent text-canvas"
+            : "border border-edge bg-surface text-transparent hover:border-mute hover:text-mute"
+        }`}
+        aria-label={isChecked ? `Deselect ${spec.label}` : `Select ${spec.label}`}
+      >
+        <Check className="w-2.5 h-2.5" strokeWidth={3} />
+      </button>
+      {/* Quick-add button (top-right, shows on hover when not checked) */}
+      {!isChecked && !spec.paper && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddSingle();
+          }}
+          draggable={false}
+          onDragStart={(e) => e.stopPropagation()}
+          className="absolute top-1 right-1 w-4 h-4 rounded-full border border-edge bg-surface text-mute hover:border-accent hover:text-accent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          title={`Add ${spec.label} to canvas`}
+          aria-label={`Add ${spec.label} to canvas`}
+        >
+          <Plus className="w-2.5 h-2.5" strokeWidth={2.5} />
+        </button>
+      )}
       {spec.paper && (
         <a
           href={spec.paper.url}

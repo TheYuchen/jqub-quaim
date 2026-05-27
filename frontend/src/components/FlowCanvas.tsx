@@ -130,6 +130,8 @@ export function FlowCanvas() {
   const running = useApp((s) => s.running);
   const setRunning = useApp((s) => s.setRunning);
   const useLiveIbm = useApp((s) => s.useLiveIbm);
+  const pendingBlockKinds = useApp((s) => s.pendingBlockKinds);
+  const clearPendingBlocks = useApp((s) => s.clearPendingBlocks);
   const [notice, setNotice] = useState<Notice>(null);
   // Non-danger toasts auto-fade; success is quick, warnings linger a bit
   // longer so the user has time to read every bullet. Runner errors stay
@@ -144,6 +146,58 @@ export function FlowCanvas() {
   }, [notice]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
+
+  // Watch the Zustand pendingBlockKinds queue: NodePalette pushes block
+  // kinds here when the user checks tiles and clicks "Add to canvas" (or
+  // clicks the single-add + icon). We create nodes, append them to the
+  // canvas, and auto-connect the whole graph.
+  useEffect(() => {
+    if (pendingBlockKinds.length === 0) return;
+    const kinds = pendingBlockKinds;
+    clearPendingBlocks();
+
+    // Position new nodes to the right of existing ones.
+    const SPACING_X = 260;
+    const Y = 120;
+    const maxX = nodes.reduce(
+      (mx, n) => Math.max(mx, (n.position?.x ?? 0) + 200),
+      0,
+    );
+    const startX = nodes.length === 0 ? 80 : maxX + 60;
+
+    const newNodes: RFNode[] = kinds.map((kind, i) => ({
+      id: `n${Date.now().toString(36)}${i}`,
+      type: "qnode",
+      position: { x: startX + i * SPACING_X, y: Y },
+      data: {
+        kind,
+        params: { ...(NODE_BY_KIND[kind].defaultData ?? {}) },
+      },
+    }));
+
+    setNodes((ns) => {
+      const merged = [...ns, ...newNodes];
+      const result = autoConnect(merged, []);
+      if (result.connected) {
+        setEdges(result.edges);
+        setNotice(
+          result.warnings.length > 0
+            ? {
+                text: `Added ${kinds.length} block${kinds.length > 1 ? "s" : ""} and auto-connected.`,
+                tone: "warn",
+                detail: result.warnings.join("\n"),
+              }
+            : {
+                text: `Added ${kinds.length} block${kinds.length > 1 ? "s" : ""} and auto-connected.`,
+                tone: "ok",
+              },
+        );
+      }
+      return merged;
+    });
+
+    requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
+  }, [pendingBlockKinds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-load a sample circuit on boot so the canvas has something to chew
   // on. Prefer the share-link's `sk` key if present; fall back to bell_state.
