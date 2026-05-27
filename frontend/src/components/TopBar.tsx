@@ -10,6 +10,7 @@ import {
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { PapersPopover } from "./PapersPopover";
 import { DevelopersPopover } from "./DevelopersPopover";
+import { SupportPopover } from "./SupportPopover";
 import { TipIcon } from "./TipIcon";
 
 /**
@@ -144,6 +145,7 @@ export function TopBar({
         </a>
         <PapersPopover />
         <DevelopersPopover />
+        <SupportPopover />
         <span
           className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
           aria-hidden="true"
