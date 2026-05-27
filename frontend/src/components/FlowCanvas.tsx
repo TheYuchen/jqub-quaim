@@ -434,9 +434,9 @@ export function FlowCanvas() {
               const kind = (n.data as QNodeData).kind;
               return colorForKind(kind);
             }}
-            maskColor="rgb(var(--color-canvas) / 0.65)"
-            maskStrokeColor="rgb(var(--color-accent))"
-            maskStrokeWidth={2}
+            maskColor="rgb(var(--color-canvas) / 0.82)"
+            maskStrokeColor="rgb(var(--color-edge))"
+            maskStrokeWidth={1}
           />
         </ReactFlow>
         {nodes.length === 0 && <EmptyCanvas />}
