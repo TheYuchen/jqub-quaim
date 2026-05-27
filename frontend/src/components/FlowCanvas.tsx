@@ -435,6 +435,8 @@ export function FlowCanvas() {
               return colorForKind(kind);
             }}
             maskColor="rgb(var(--color-canvas) / 0.65)"
+            maskStrokeColor="rgb(var(--color-accent))"
+            maskStrokeWidth={2}
           />
         </ReactFlow>
         {nodes.length === 0 && <EmptyCanvas />}
