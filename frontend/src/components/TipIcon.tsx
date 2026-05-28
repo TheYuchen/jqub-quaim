@@ -71,7 +71,8 @@ export function TipIcon({
       />
       <span
         role="tooltip"
-        className={`hidden group-hover/tip:block group-focus/tip:block pointer-events-none absolute left-1/2 -translate-x-1/2 ${posClass} z-50 w-max max-w-[16rem] rounded-md border border-edge bg-surface text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left`}
+        style={{ backgroundColor: "rgb(var(--color-surface))" }}
+        className={`hidden group-hover/tip:block group-focus/tip:block pointer-events-none absolute left-1/2 -translate-x-1/2 ${posClass} z-[100] w-max max-w-[16rem] rounded-md border border-edge text-ink shadow-lg px-2 py-1 text-[11px] leading-snug normal-case tracking-normal font-normal whitespace-normal text-left`}
       >
         {hint}
       </span>
