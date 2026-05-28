@@ -23,6 +23,22 @@ export function getUserId(): string {
   return fresh;
 }
 
+/** Bump a localStorage counter so other tabs' `storage` listeners fire.
+ *  Plugin lists themselves live in Zustand (in-memory per tab); this
+ *  counter is the only thing that crosses the localStorage boundary
+ *  for cross-tab sync. */
+export function bumpPluginsRev(): void {
+  try {
+    const prev = Number(localStorage.getItem("quda.pluginsRev") || "0");
+    localStorage.setItem(
+      "quda.pluginsRev",
+      String(Number.isFinite(prev) ? prev + 1 : 1),
+    );
+  } catch {
+    /* storage blocked — multi-tab sync is best-effort */
+  }
+}
+
 /** RFC4122-ish random hex, no hyphens — fits the backend regex
  *  `[a-zA-Z0-9_-]{8,64}` without ambiguity. */
 function mintUserId(): string {

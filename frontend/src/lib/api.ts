@@ -202,6 +202,30 @@ export const api = {
       { method: "DELETE" },
     ).then((r) => json<{ removed: boolean; kind: string }>(r)),
 
+  /** Catalog of bundled example .zip plugins users can grab to test
+   *  the upload flow. The server reads each manifest.json inside the
+   *  zip and returns its label / family / tagline. */
+  listExamplePlugins: () =>
+    fetch(`${BASE}/plugins/examples`).then(
+      (r) =>
+        json<
+          Array<{
+            name: string;
+            label: string;
+            family: string;
+            tagline: string;
+            color: string;
+            size_bytes: number;
+          }>
+        >(r),
+    ),
+
+  /** URL the browser can hit (or anchor `download` to) to fetch a
+   *  bundled example plugin .zip. The browser saves it; the user then
+   *  drops the same .zip back into the upload modal to install it. */
+  exampleZipUrl: (name: string) =>
+    `${BASE}/plugins/examples/${encodeURIComponent(name)}.zip`,
+
   /**
    * Stream pipeline execution via SSE. Calls `onStep` for each step as
    * it completes, then calls `onDone` with the assembled RunResponse.

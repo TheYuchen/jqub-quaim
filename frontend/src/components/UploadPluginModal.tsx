@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Upload, X } from "lucide-react";
+import { Download, Loader2, Sparkles, Upload, X, Zap } from "lucide-react";
 import { api } from "../lib/api";
-import { getUserId } from "../lib/userId";
+import { bumpPluginsRev, getUserId } from "../lib/userId";
 import { useApp } from "../lib/store";
+
+type Example = {
+  name: string;
+  label: string;
+  family: string;
+  tagline: string;
+  color: string;
+  size_bytes: number;
+};
 
 /**
  * Plugin upload modal. Accepts a .zip drag-drop or click-to-select,
@@ -26,6 +35,8 @@ export function UploadPluginModal({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [examples, setExamples] = useState<Example[]>([]);
+  const [installingExample, setInstallingExample] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Reset transient state every time the modal reopens.
@@ -35,7 +46,27 @@ export function UploadPluginModal({
       setSuccess(null);
       setBusy(false);
       setDragOver(false);
+      setInstallingExample(null);
     }
+  }, [open]);
+
+  // Fetch the example catalog once per open. We keep this best-effort —
+  // if the backend doesn't expose examples (older deploy / catalog
+  // empty), the section just hides itself.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    api
+      .listExamplePlugins()
+      .then((list) => {
+        if (!cancelled) setExamples(list);
+      })
+      .catch(() => {
+        if (!cancelled) setExamples([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   // Escape closes the modal.
@@ -75,6 +106,7 @@ export function UploadPluginModal({
       // pick the new block up immediately.
       const list = await api.listPlugins(userId);
       setPlugins(list);
+      bumpPluginsRev();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -89,6 +121,49 @@ export function UploadPluginModal({
     if (file) handleFile(file);
   };
 
+  /** Pull the bundled example zip from the backend and pipe it straight
+   *  into the same install path as a manual upload. Saves the user one
+   *  download + drag step when they just want to try the plugin
+   *  workflow end-to-end. */
+  const installExample = async (ex: Example) => {
+    if (busy) return;
+    setError(null);
+    setSuccess(null);
+    setInstallingExample(ex.name);
+    setBusy(true);
+    try {
+      const res = await fetch(api.exampleZipUrl(ex.name));
+      if (!res.ok) {
+        throw new Error(`Could not fetch example: HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const file = new File([blob], `${ex.name}.zip`, { type: "application/zip" });
+      const userId = getUserId();
+      const manifest = await api.uploadPlugin(userId, file);
+      setSuccess(
+        `Installed ${manifest.label} (kind=${manifest.kind}). Find it in the block strip on the canvas.`,
+      );
+      const list = await api.listPlugins(userId);
+      setPlugins(list);
+      bumpPluginsRev();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // The duplicate-install case is friendly here — the user already
+      // has this example, no action needed. Frame it as a hint rather
+      // than an error.
+      if (/already have a plugin/i.test(msg)) {
+        setSuccess(
+          `${ex.label} is already installed in this browser — look for it in the block strip.`,
+        );
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setBusy(false);
+      setInstallingExample(null);
+    }
+  };
+
   return (
     <div
       role="dialog"
@@ -98,7 +173,7 @@ export function UploadPluginModal({
       onClick={() => !busy && onClose()}
     >
       <div
-        className="bg-surface border border-edge rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden"
+        className="bg-surface border border-edge rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
@@ -122,7 +197,7 @@ export function UploadPluginModal({
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3 overflow-y-auto flex-1 min-h-0">
           <label
             onDragOver={(e) => {
               e.preventDefault();
@@ -168,13 +243,103 @@ export function UploadPluginModal({
           </label>
 
           {error && (
-            <div className="text-[12px] text-danger panel-alt p-2 border-danger/40 whitespace-pre-line">
+            <div
+              role="alert"
+              className="text-[12px] text-danger panel-alt p-2 border-danger/40 whitespace-pre-line"
+            >
               {error}
             </div>
           )}
           {success && (
-            <div className="text-[12px] text-ok panel-alt p-2 border-ok/40">
+            <div
+              role="status"
+              aria-live="polite"
+              className="text-[12px] text-ok panel-alt p-2 border-ok/40"
+            >
               {success}
+            </div>
+          )}
+
+          {examples.length > 0 && (
+            <div className="panel-alt p-3 space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-mute">
+                <Sparkles className="w-3 h-3 text-accent2" />
+                Try with a sample
+              </div>
+              <div className="text-[11px] text-mute/80 leading-relaxed">
+                Install a bundled example to see how a plugin looks in your
+                catalog — or download the .zip to crack it open as a
+                starting point for your own.
+              </div>
+              <ul className="space-y-1.5">
+                {examples.map((ex) => {
+                  const installing = installingExample === ex.name;
+                  return (
+                    <li
+                      key={ex.name}
+                      className="flex items-start gap-2 p-2 rounded-md border border-edge bg-surface"
+                    >
+                      <span
+                        className="inline-flex items-center justify-center text-[10px] font-bold text-white rounded shrink-0"
+                        style={{
+                          backgroundColor: ex.color,
+                          width: "1.75rem",
+                          height: "1.75rem",
+                        }}
+                        aria-hidden
+                      >
+                        {ex.label.slice(0, 2).toUpperCase()}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-[12px] font-medium text-ink truncate">
+                            {ex.label}
+                          </span>
+                          <span className="text-[9px] uppercase tracking-wider text-mute/70 border border-edge rounded px-1">
+                            {ex.family}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-mute leading-snug truncate">
+                          {ex.tagline}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => installExample(ex)}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-accent2/15 text-accent2 hover:bg-accent2/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Fetch the example zip and install it directly"
+                          aria-label={
+                            installing
+                              ? `Installing ${ex.label}`
+                              : `Install ${ex.label} example plugin`
+                          }
+                        >
+                          {installing ? (
+                            <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
+                          ) : (
+                            <Zap className="w-3 h-3" aria-hidden />
+                          )}
+                          Install
+                        </button>
+                        <a
+                          href={api.exampleZipUrl(ex.name)}
+                          download={`${ex.name}.zip`}
+                          className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] text-mute hover:text-ink hover:bg-surfaceAlt ${
+                            busy ? "pointer-events-none opacity-50" : ""
+                          }`}
+                          title="Download the .zip to your computer"
+                          aria-label={`Download ${ex.label} as .zip`}
+                        >
+                          <Download className="w-3 h-3" aria-hidden />
+                          .zip
+                        </a>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
 

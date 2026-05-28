@@ -9,7 +9,7 @@ import {
   type PluginNodeSpec,
 } from "../lib/nodeCatalog";
 import { useApp } from "../lib/store";
-import { getUserId } from "../lib/userId";
+import { bumpPluginsRev, getUserId } from "../lib/userId";
 import { BlockPicker } from "./BlockPicker";
 import { UploadPluginModal } from "./UploadPluginModal";
 
@@ -78,6 +78,7 @@ export function NodePalette({
       await api.deletePlugin(getUserId(), kind);
       const fresh = await api.listPlugins(getUserId());
       setPlugins(fresh);
+      bumpPluginsRev();
     } catch {
       /* silent — the tile staying around is harmless */
     }

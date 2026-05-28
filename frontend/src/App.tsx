@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { PanelLeft, PanelRight } from "lucide-react";
 import { api } from "./lib/api";
+import { getUserId } from "./lib/userId";
 import { useApp } from "./lib/store";
 import { useIsDesktop } from "./lib/useMediaQuery";
 import { TopBar } from "./components/TopBar";
@@ -209,14 +210,12 @@ export default function App() {
     // in localStorage). Silent on failure — the user just won't see
     // their previously-uploaded plugins until they re-upload.
     const refreshPlugins = () => {
-      import("./lib/userId").then(({ getUserId }) => {
-        api
-          .listPlugins(getUserId())
-          .then(setPlugins)
-          .catch(() => {
-            /* ignore */
-          });
-      });
+      api
+        .listPlugins(getUserId())
+        .then(setPlugins)
+        .catch(() => {
+          /* ignore */
+        });
     };
     refreshPlugins();
     // Multi-tab sync: if the user uploads/deletes a plugin in another

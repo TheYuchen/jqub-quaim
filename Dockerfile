@@ -55,6 +55,11 @@ COPY --chown=user:user backend/ ./backend/
 # Prebuilt frontend bundle from stage 1
 COPY --chown=user:user --from=frontend /build/dist ./frontend/dist
 
+# Example plugins (small .zip files) — served read-only at
+# /api/plugins/examples so users can grab one to test the upload flow
+# without writing a plugin from scratch.
+COPY --chown=user:user example_plugins/ ./example_plugins/
+
 # Clean caches the user can't write at runtime (HF runs as non-root).
 RUN chown -R user:user ${APP_HOME}
 

@@ -243,11 +243,17 @@ the maintainers.
 
 ## Example plugins
 
-See `backend/example_plugins/` in the GitHub repo for a few worked
-examples:
+The Upload modal in the running app has a **Try with a sample** section
+that lists the bundled examples below. Click **Install** to pull the
+.zip and install it in one shot, or **.zip** to download the archive
+and crack it open as a starting point for your own plugin.
 
-- `count_gates/` — a tiny metric plugin (algorithm-family, returns scalars only)
-- `prefix_x/` — a circuit transformer (algorithm-family, returns new circuit)
+In the repo, the same archives live under `example_plugins/`:
+
+- `count_gates/` — a metric plugin that tallies gate types (returns
+  `summary` + `scalars` only, leaves the circuit untouched).
+- `prefix_x/` — an algorithm plugin that prepends an X gate on a
+  chosen qubit (returns a new `circuit_qpy_bytes`).
 
 ## Troubleshooting
 
