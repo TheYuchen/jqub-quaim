@@ -75,6 +75,40 @@ class RunRequest(BaseModel):
     backend_name: str = "FakeFez"
 
 
+class SweepConfig(BaseModel):
+    """Describes which parameter to sweep and over what range."""
+
+    node_id: str
+    param_key: str
+    values: list[float | int | str]
+
+
+class SweepRequest(BaseModel):
+    """Like RunRequest, but with a sweep config that varies one param."""
+
+    circuit_id: str
+    nodes: list[FlowNode]
+    edges: list[FlowEdge]
+    use_live_ibm: bool = False
+    sweep: SweepConfig
+
+
+class SweepRunResult(BaseModel):
+    """One run within a sweep: the param value + its steps."""
+
+    param_value: float | int | str
+    steps: list[StepResult]
+    ok: bool
+
+
+class SweepResponse(BaseModel):
+    """All runs from a sweep, plus metadata for the comparison chart."""
+
+    sweep_node_id: str
+    sweep_param: str
+    runs: list[SweepRunResult]
+
+
 class StepResult(BaseModel):
     """One stage of the pipeline's output (rendered as a panel in the UI)."""
 

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
-from app.schemas import RunRequest, RunResponse
+from app.schemas import RunRequest, RunResponse, SweepRequest, SweepResponse, SweepRunResult
 from app.services.circuit_service import CircuitNotFoundError, circuit_store
 from app.services.run_cache import compute_cache_key, load_cached_response
 from app.services.workflow_service import run_pipeline, run_pipeline_stream
@@ -108,3 +108,69 @@ def run_workflow_stream(req: RunRequest):
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(step_stream(), media_type="text/event-stream")
+
+
+@router.post("/workflow/sweep")
+def run_workflow_sweep(req: SweepRequest):
+    """Parameter sweep: re-runs the pipeline once per value in
+    ``req.sweep.values``, mutating ``req.sweep.param_key`` of the
+    target node each time.
+
+    Yields one Server-Sent Event per completed run, plus a trailing
+    ``[DONE]`` sentinel. Heavy use of the per-node intermediate cache
+    means steps upstream of the swept block are computed once and
+    reused across every sweep iteration, so an N-value sweep of the
+    last block's parameter takes roughly N × (last-block cost) rather
+    than N × (whole-pipeline cost).
+    """
+    try:
+        qc = circuit_store.get(req.circuit_id)
+    except CircuitNotFoundError:
+        raise HTTPException(status_code=404, detail="Unknown circuit_id") from None
+
+    settings = get_settings()
+    if req.use_live_ibm and not (settings.has_ibm_token and settings.allow_live_ibm):
+        raise HTTPException(status_code=403, detail="Live IBM execution is disabled.")
+
+    # Verify the swept node exists.
+    target_node = next((n for n in req.nodes if n.id == req.sweep.node_id), None)
+    if target_node is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Sweep target node {req.sweep.node_id!r} not found in pipeline.",
+        )
+    if not req.sweep.values:
+        raise HTTPException(status_code=400, detail="Sweep values list is empty.")
+    if len(req.sweep.values) > 50:
+        raise HTTPException(
+            status_code=400,
+            detail="Sweep capped at 50 values to keep server load bounded.",
+        )
+
+    def sweep_stream():
+        for i, value in enumerate(req.sweep.values):
+            # Clone the nodes list with the swept value patched into the
+            # target node's data dict. We don't mutate req.nodes in place
+            # because Pydantic models are reused across iterations.
+            patched_nodes = []
+            for n in req.nodes:
+                if n.id == req.sweep.node_id:
+                    patched_data = {**n.data, req.sweep.param_key: value}
+                    patched_nodes.append(n.model_copy(update={"data": patched_data}))
+                else:
+                    patched_nodes.append(n)
+
+            steps = list(
+                run_pipeline_stream(
+                    circuit=qc,
+                    nodes=patched_nodes,
+                    edges=req.edges,
+                    settings=settings,
+                )
+            )
+            ok = all(s.status != "error" for s in steps)
+            run_result = SweepRunResult(param_value=value, steps=steps, ok=ok)
+            yield f"data: {run_result.model_dump_json()}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(sweep_stream(), media_type="text/event-stream")
