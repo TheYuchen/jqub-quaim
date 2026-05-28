@@ -3,6 +3,7 @@ import {
   Code2,
   Link as LinkIcon,
   MoreHorizontal,
+  Sliders,
   Trash2,
   Wand2,
 } from "lucide-react";
@@ -30,9 +31,11 @@ export function MoreMenu({
   hasEdgesToReplace,
   canClear,
   canExport,
+  canSweep,
   onAutoConnect,
   onShare,
   onExport,
+  onSweep,
   onClear,
 }: {
   className?: string;
@@ -40,9 +43,11 @@ export function MoreMenu({
   hasEdgesToReplace: boolean;
   canClear: boolean;
   canExport: boolean;
+  canSweep: boolean;
   onAutoConnect: () => void;
   onShare: () => void;
   onExport: () => void;
+  onSweep: () => void;
   onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -114,6 +119,14 @@ export function MoreMenu({
       sub: "Download pipeline as a Python script",
       disabled: !canExport,
       onClick: onExport,
+    },
+    {
+      key: "sweep",
+      icon: <Sliders className="w-4 h-4" />,
+      label: "Parameter sweep",
+      sub: "Vary one parameter across a range and compare results",
+      disabled: !canSweep,
+      onClick: onSweep,
     },
     {
       key: "clear",

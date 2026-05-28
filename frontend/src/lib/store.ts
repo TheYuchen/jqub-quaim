@@ -60,6 +60,14 @@ interface AppState {
   pendingBlockKinds: NodeKind[];
   addBlocksToCanvas: (kinds: NodeKind[]) => void;
   clearPendingBlocks: () => void;
+
+  /**
+   * Quick-start trigger from TrySlide: load a preset + sample
+   * combination in one action. FlowCanvas watches this and applies it.
+   */
+  pendingQuickStart: { presetKey: string; sampleKey: string } | null;
+  triggerQuickStart: (presetKey: string, sampleKey: string) => void;
+  clearQuickStart: () => void;
 }
 
 export const useApp = create<AppState>((set) => ({
@@ -85,4 +93,8 @@ export const useApp = create<AppState>((set) => ({
   pendingBlockKinds: [],
   addBlocksToCanvas: (kinds) => set({ pendingBlockKinds: kinds }),
   clearPendingBlocks: () => set({ pendingBlockKinds: [] }),
+  pendingQuickStart: null,
+  triggerQuickStart: (presetKey, sampleKey) =>
+    set({ pendingQuickStart: { presetKey, sampleKey } }),
+  clearQuickStart: () => set({ pendingQuickStart: null }),
 }));

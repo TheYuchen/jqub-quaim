@@ -136,6 +136,8 @@ export function FlowCanvas() {
   const useLiveIbm = useApp((s) => s.useLiveIbm);
   const pendingBlockKinds = useApp((s) => s.pendingBlockKinds);
   const clearPendingBlocks = useApp((s) => s.clearPendingBlocks);
+  const pendingQuickStart = useApp((s) => s.pendingQuickStart);
+  const clearQuickStart = useApp((s) => s.clearQuickStart);
   const [notice, setNotice] = useState<Notice>(null);
   const [sweepOpen, setSweepOpen] = useState(false);
   // Non-danger toasts auto-fade; success is quick, warnings linger a bit
@@ -204,6 +206,20 @@ export function FlowCanvas() {
     requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
   }, [pendingBlockKinds]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Watch the quick-start trigger from TrySlide. When set, load the
+  // preset + sample combination, fit the view, and clear the trigger.
+  useEffect(() => {
+    if (!pendingQuickStart) return;
+    const { presetKey, sampleKey: sk } = pendingQuickStart;
+    clearQuickStart();
+    loadPreset(presetKey, sk);
+    setNotice({
+      text: `Loaded ${presetKey} preset with ${sk}. Hit Run pipeline to try it.`,
+      tone: "ok",
+    });
+    requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
+  }, [pendingQuickStart]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-load a sample circuit on boot so the canvas has something to chew
   // on. Prefer the share-link's `sk` key if present; fall back to bell_state.
   useEffect(() => {
@@ -253,7 +269,7 @@ export function FlowCanvas() {
   // sample, depending on which network call resolved last.
   const presetGenerationRef = useRef(0);
 
-  const loadPreset = (key: string) => {
+  const loadPreset = (key: string, sampleOverride?: string) => {
     const preset = PRESET_BY_KEY[key];
     if (!preset) return;
     const myGen = ++presetGenerationRef.current;
@@ -262,20 +278,20 @@ export function FlowCanvas() {
     setEdges(g.edges);
     setRun(null);
     setNotice(null);
-    // If the preset declares a default sample, also swap the active
-    // circuit. Lets Qshot land users on a 5-8q circuit by default
-    // (ry_chain_6q) instead of bell_state. Skip the network round-trip
-    // when we're already on the requested sample.
-    if (preset.defaultCircuit && preset.defaultCircuit !== sampleKey) {
-      const target = preset.defaultCircuit;
+    // Sample selection: explicit override (e.g. from tour quick-start)
+    // beats the preset's defaultCircuit, which beats keeping the
+    // current sample. Skip the network round-trip if we're already on
+    // the requested sample.
+    const targetSample = sampleOverride ?? preset.defaultCircuit;
+    if (targetSample && targetSample !== sampleKey) {
       api
-        .loadSample(target)
+        .loadSample(targetSample)
         .then((c) => {
           // Drop the result if the user has clicked another preset in the
           // meantime — that newer click owns the sample state now.
           if (presetGenerationRef.current !== myGen) return;
           useApp.getState().setCircuit(c);
-          useApp.getState().setSampleKey(target);
+          useApp.getState().setSampleKey(targetSample);
         })
         .catch(() => {
           /* silent — leaves the previous circuit in place */
@@ -495,9 +511,11 @@ export function FlowCanvas() {
             hasEdgesToReplace={edges.length > 0}
             canClear={nodes.length > 0 || edges.length > 0}
             canExport={nodes.length > 0}
+            canSweep={nodes.length > 0 && !!circuit}
             onAutoConnect={runAutoConnect}
             onShare={handleShareFromMenu}
             onExport={exportPython}
+            onSweep={() => setSweepOpen(true)}
             onClear={clearGraph}
           />
 

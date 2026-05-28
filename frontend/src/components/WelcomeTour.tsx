@@ -87,7 +87,7 @@ export function WelcomeTour({
           {slide === "welcome" && <WelcomeSlide />}
           {slide === "algorithms" && <AlgorithmsSlide />}
           {slide === "pipeline" && <PipelineSlide />}
-          {slide === "try" && <TrySlide />}
+          {slide === "try" && <TrySlide onClose={onClose} />}
         </div>
 
         {/* Footer: progress dots + nav */}
