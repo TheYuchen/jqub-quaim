@@ -43,14 +43,11 @@ export function NodePalette({
 } = {}) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(true);
-  const [collapsedFams, setCollapsedFams] = useState<Set<string>>(new Set());
+  // null = show all families; a family key = show only that family.
+  const [activeFamily, setActiveFamily] = useState<NodeSpec["family"] | null>(null);
 
-  const toggleFamily = (fam: string) =>
-    setCollapsedFams((s) => {
-      const next = new Set(s);
-      next.has(fam) ? next.delete(fam) : next.add(fam);
-      return next;
-    });
+  const toggleFamily = (fam: NodeSpec["family"]) =>
+    setActiveFamily((cur) => (cur === fam ? null : fam));
 
   const filtered = useMemo(() => {
     if (!search.trim()) return NODE_CATALOG;
@@ -120,9 +117,11 @@ export function NodePalette({
                 type="button"
                 onClick={() => toggleFamily(fm.key)}
                 className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                  collapsedFams.has(fm.key)
-                    ? "border-edge/40 text-mute/60 bg-transparent"
-                    : "border-edge bg-surfaceAlt text-mute hover:text-ink"
+                  activeFamily === fm.key
+                    ? "border-accent/60 bg-accent/10 text-accent"
+                    : activeFamily !== null
+                      ? "border-edge/40 text-mute/40 bg-transparent"
+                      : "border-edge bg-surfaceAlt text-mute hover:text-ink"
                 }`}
                 title={`${fm.description} (${count})`}
               >
@@ -148,16 +147,19 @@ export function NodePalette({
 
       {/* Block grid grouped by family */}
       <div className="px-3 pb-2 flex flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible items-start gap-x-1 gap-y-1">
-        {FAMILY_META.map((fm) => {
+        {FAMILY_META.map((fm, famIdx) => {
+          // When a family filter is active, only show that family.
+          if (activeFamily !== null && activeFamily !== fm.key) return null;
           const items = filtered.filter((n) => n.family === fm.key);
           if (items.length === 0) return null;
-          const isCollapsed = collapsedFams.has(fm.key);
           return (
             <div key={fm.key} className="shrink-0 flex items-start gap-1">
               <button
                 type="button"
                 onClick={() => toggleFamily(fm.key)}
-                className="hidden md:flex flex-col items-center justify-center py-1 px-0.5 gap-0.5 text-mute/60 hover:text-mute transition-colors self-stretch"
+                className={`hidden md:flex flex-col items-center justify-center py-1 px-0.5 gap-0.5 hover:text-mute transition-colors self-stretch ${
+                  activeFamily === fm.key ? "text-accent" : "text-mute/60"
+                }`}
                 title={`${fm.label}: ${fm.description}`}
               >
                 <span
@@ -166,25 +168,16 @@ export function NodePalette({
                 >
                   {fm.label}
                 </span>
-                <ChevronDown
-                  className={`w-2.5 h-2.5 transition-transform ${
-                    isCollapsed ? "-rotate-90" : "rotate-0"
-                  }`}
-                />
               </button>
-              {!isCollapsed && (
-                <div className="flex items-center gap-1 flex-wrap">
-                  {items.map((n) => (
-                    <PaletteTile key={n.kind} spec={n} />
-                  ))}
-                </div>
+              <div className="flex items-center gap-1 flex-wrap">
+                {items.map((n) => (
+                  <PaletteTile key={n.kind} spec={n} />
+                ))}
+              </div>
+              {/* Divider between visible families (not after the last) */}
+              {activeFamily === null && famIdx < FAMILY_META.length - 1 && (
+                <div className="hidden md:block w-px self-stretch bg-edge/40 mx-0.5" />
               )}
-              {isCollapsed && (
-                <div className="flex items-center h-[76px] px-2 text-[10px] text-mute/50 italic">
-                  {items.length} hidden
-                </div>
-              )}
-              <div className="hidden md:block w-px self-stretch bg-edge/40 mx-0.5" />
             </div>
           );
         })}
