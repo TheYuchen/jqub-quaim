@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Code2,
   Link as LinkIcon,
   MoreHorizontal,
   Trash2,
@@ -28,16 +29,20 @@ export function MoreMenu({
   canAutoConnect,
   hasEdgesToReplace,
   canClear,
+  canExport,
   onAutoConnect,
   onShare,
+  onExport,
   onClear,
 }: {
   className?: string;
   canAutoConnect: boolean;
   hasEdgesToReplace: boolean;
   canClear: boolean;
+  canExport: boolean;
   onAutoConnect: () => void;
   onShare: () => void;
+  onExport: () => void;
   onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -101,6 +106,14 @@ export function MoreMenu({
       label: "Copy share link",
       sub: "Copies a URL that restores this pipeline",
       onClick: onShare,
+    },
+    {
+      key: "export",
+      icon: <Code2 className="w-4 h-4" />,
+      label: "Export .py",
+      sub: "Download pipeline as a Python script",
+      disabled: !canExport,
+      onClick: onExport,
     },
     {
       key: "clear",

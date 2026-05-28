@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Box,
   Check,
+  Code2,
   Link2,
   Loader2,
   Play,
@@ -28,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { copyToClipboard } from "../lib/clipboard";
+import { generatePythonScript } from "../lib/exportPython";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
 import {
   DEFAULT_PRESET_KEY,
@@ -309,6 +311,23 @@ export function FlowCanvas() {
     setNotice({ text: "Share link copied to clipboard.", tone: "ok" });
   };
 
+  const exportPython = () => {
+    if (nodes.length === 0) {
+      setNotice({ text: "Nothing to export — add some blocks first.", tone: "warn" });
+      return;
+    }
+    const script = generatePythonScript(nodes, edges, sampleKey);
+    // Download as .py file
+    const blob = new Blob([script], { type: "text/x-python" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pipeline.py";
+    a.click();
+    URL.revokeObjectURL(url);
+    setNotice({ text: "Python script downloaded as pipeline.py", tone: "ok" });
+  };
+
   const runAutoConnect = () => {
     const result = autoConnect(nodes, edges);
     if (!result.connected) {
@@ -418,6 +437,16 @@ export function FlowCanvas() {
             labelBreakpoint="lg"
           />
           <button
+            onClick={exportPython}
+            disabled={nodes.length === 0}
+            className="btn hidden md:inline-flex disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Export this pipeline as a runnable Python script"
+            aria-label="Export Python script"
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">Export .py</span>
+          </button>
+          <button
             onClick={clearGraph}
             className="btn hidden md:inline-flex"
             title="Clear the canvas"
@@ -434,8 +463,10 @@ export function FlowCanvas() {
             canAutoConnect={nodes.length >= 2}
             hasEdgesToReplace={edges.length > 0}
             canClear={nodes.length > 0 || edges.length > 0}
+            canExport={nodes.length > 0}
             onAutoConnect={runAutoConnect}
             onShare={handleShareFromMenu}
+            onExport={exportPython}
             onClear={clearGraph}
           />
 
