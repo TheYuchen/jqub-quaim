@@ -16,17 +16,67 @@ fails to import.
 
 from __future__ import annotations
 
+import hashlib
+import io
+import json
+import logging
 import time
+from collections import OrderedDict
 from typing import Callable, Generator
 
-from qiskit import QuantumCircuit, transpile
+from qiskit import QuantumCircuit, qpy, transpile
 
 from app.config import Settings, ibm_history_cache_path
 from app.schemas import FlowEdge, FlowNode, StepResult
 
+logger = logging.getLogger(__name__)
+
 
 def _now() -> float:
     return time.time()
+
+
+# ---- Per-node intermediate result cache --------------------------------
+#
+# After each step, we snapshot the StepResult + the ctx dict (shallow
+# copy — QuantumCircuit/backend objects stay in memory by reference).
+# The cache key is a hash of (original_circuit_qpy, node_types_and_
+# params up to this step), so if the user changes only the last block
+# the first N-1 steps are instant cache hits.
+#
+# The cache lives in process memory — it resets on container restart.
+# An LRU cap prevents unbounded growth.
+
+_STEP_CACHE_MAX = 200
+_step_cache: OrderedDict[str, tuple[StepResult, dict]] = OrderedDict()
+
+
+def _qpy_bytes_for_hash(qc: QuantumCircuit) -> bytes:
+    buf = io.BytesIO()
+    qpy.dump(qc, buf)
+    return buf.getvalue()
+
+
+def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode]) -> str:
+    """Hash the pipeline prefix up to and including the last node in
+    ``nodes_so_far``. Two runs with the same circuit + same node
+    sequence (types and params) will produce the same prefix hash at
+    each step, enabling cache hits for unchanged prefixes."""
+    h = hashlib.sha256(circuit_qpy)
+    for n in nodes_so_far:
+        h.update(
+            json.dumps(
+                {"type": n.type, "data": n.data}, sort_keys=True, default=str,
+            ).encode()
+        )
+    return h.hexdigest()[:16]
+
+
+def _cache_put(key: str, result: StepResult, ctx: dict) -> None:
+    _step_cache[key] = (result, dict(ctx))  # shallow copy of ctx
+    _step_cache.move_to_end(key)
+    while len(_step_cache) > _STEP_CACHE_MAX:
+        _step_cache.popitem(last=False)
 
 
 def _make_step(
@@ -482,12 +532,41 @@ def run_pipeline_stream(
     settings: Settings,
 ) -> Generator[StepResult, None, None]:
     """Generator version of run_pipeline: yields each StepResult as it
-    completes, enabling Server-Sent Events in the route layer."""
+    completes, enabling Server-Sent Events in the route layer.
+
+    Uses an in-memory per-node prefix cache so that unchanged pipeline
+    prefixes resolve instantly. If the user changes only the last block
+    and re-runs, all preceding steps are served from cache (~0 ms each)
+    instead of re-executing (which can take minutes for QuBound/Qshot).
+    """
     ctx: dict = {"circuit": circuit}
     ordered = topological_order(nodes, edges)
+
+    # Compute the circuit's QPY hash once (expensive) — reused for
+    # every prefix hash in this run.
+    circuit_qpy = _qpy_bytes_for_hash(circuit)
+    nodes_so_far: list[FlowNode] = []
+
     for node in ordered:
+        nodes_so_far.append(node)
+        prefix_key = _prefix_hash(circuit_qpy, nodes_so_far)
+
+        # ---- cache hit: return saved result + restore ctx ----
+        if prefix_key in _step_cache:
+            cached_result, cached_ctx = _step_cache[prefix_key]
+            ctx.update(cached_ctx)
+            _step_cache.move_to_end(prefix_key)  # refresh LRU
+            logger.debug("Step cache HIT for %s (%s)", node.type, prefix_key[:8])
+            # Return a copy with from_step_cache flag so the UI can
+            # show which steps were instant.
+            yield cached_result.model_copy(update={"from_step_cache": True})
+            continue
+
+        # ---- cache miss: execute the step ----
+        logger.debug("Step cache MISS for %s (%s)", node.type, prefix_key[:8])
+
         if node.type == "input_circuit":
-            yield _make_step(
+            result = _make_step(
                 node,
                 "ok",
                 summary={
@@ -496,13 +575,21 @@ def run_pipeline_stream(
                     "num_parameters": circuit.num_parameters,
                 },
             )
+            _cache_put(prefix_key, result, ctx)
+            yield result
             continue
+
         handler = _HANDLERS.get(node.type)
         if handler is None:
-            yield _make_step(node, "skipped", message=f"No handler for node type {node.type!r}")
+            result = _make_step(node, "skipped", message=f"No handler for node type {node.type!r}")
+            _cache_put(prefix_key, result, ctx)
+            yield result
             continue
         try:
-            yield handler(node, ctx, settings)
+            result = handler(node, ctx, settings)
+            _cache_put(prefix_key, result, ctx)
+            yield result
         except Exception as exc:
-            yield _make_step(node, "error", message=f"{type(exc).__name__}: {exc}")
+            result = _make_step(node, "error", message=f"{type(exc).__name__}: {exc}")
+            yield result
             break

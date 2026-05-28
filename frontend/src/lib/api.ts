@@ -55,6 +55,9 @@ export interface StepResult {
   finished_at: number;
   summary: Record<string, unknown>;
   message: string | null;
+  /** True when this step was served from the per-node intermediate
+   *  cache (pipeline prefix unchanged since last run). */
+  from_step_cache?: boolean;
 }
 
 export interface RunResponse {

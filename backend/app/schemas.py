@@ -86,6 +86,7 @@ class StepResult(BaseModel):
     finished_at: float
     summary: dict[str, Any] = Field(default_factory=dict)
     message: str | None = None
+    from_step_cache: bool = False
 
 
 class RunResponse(BaseModel):

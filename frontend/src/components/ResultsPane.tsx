@@ -125,6 +125,11 @@ function StepCard({ step }: { step: StepResult }) {
             <span className={`chip ${statusClass}`}>
               {statusIcon} {step.status}
             </span>
+            {step.from_step_cache && (
+              <span className="chip !border-accent/30 !text-accent text-[9px]">
+                cached
+              </span>
+            )}
           </div>
           <div className="text-[11px] text-mute">
             {dur.toFixed(2)}s · node <span className="font-mono">{step.node_id}</span>
