@@ -79,8 +79,11 @@ export function NodePalette({
       const fresh = await api.listPlugins(getUserId());
       setPlugins(fresh);
       bumpPluginsRev();
-    } catch {
-      /* silent — the tile staying around is harmless */
+    } catch (err) {
+      // Destructive actions failing silently look like the click
+      // didn't register. Surface the error so the user knows to retry.
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Could not delete plugin "${kind}": ${msg}`);
     }
   };
 

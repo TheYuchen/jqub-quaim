@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Cloud, LogIn, LogOut, User } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../lib/store";
-import { bumpPluginsRev } from "../lib/userId";
+import { bumpPluginsRev, bumpSessionRev } from "../lib/userId";
 
 /**
  * Compact user-state control in the TopBar:
@@ -93,6 +93,7 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
     setPlugins([]); // Visible plugins were tied to the session; clear.
     setMenuOpen(false);
     bumpPluginsRev();
+    bumpSessionRev();
   };
 
   return (

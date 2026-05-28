@@ -56,10 +56,22 @@ export function displayUserId(): string {
  *  counter is the only thing that crosses the localStorage boundary
  *  for cross-tab sync. */
 export function bumpPluginsRev(): void {
+  bumpRev("quda.pluginsRev");
+}
+
+/** Same idea, but for session changes (login / logout). Without this
+ *  Tab B's avatar stays in the wrong state for up to 5 min after
+ *  Tab A signs in or out (we still poll /me on that cadence as a
+ *  belt). */
+export function bumpSessionRev(): void {
+  bumpRev("quda.sessionRev");
+}
+
+function bumpRev(key: string): void {
   try {
-    const prev = Number(localStorage.getItem("quda.pluginsRev") || "0");
+    const prev = Number(localStorage.getItem(key) || "0");
     localStorage.setItem(
-      "quda.pluginsRev",
+      key,
       String(Number.isFinite(prev) ? prev + 1 : 1),
     );
   } catch {

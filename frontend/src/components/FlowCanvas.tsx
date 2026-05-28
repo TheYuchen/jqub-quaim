@@ -241,15 +241,101 @@ export function FlowCanvas() {
     [setEdges],
   );
 
-  const onDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
+  // Drag-to-insert: when the user drags a block from the palette and
+  // the cursor passes over an existing edge, we mark that edge so it
+  // can render with a "drop target" highlight. On drop, if the marked
+  // edge is still set, we splice the block into it instead of just
+  // landing it at the cursor position. Threshold below is in flow
+  // coordinates, so it scales with zoom.
+  const [dropTargetEdgeId, setDropTargetEdgeId] = useState<string | null>(null);
+  const EDGE_HIT_RADIUS = 60;
+
+  /** Distance from point (px,py) to the line segment (ax,ay)-(bx,by). */
+  const pointToSegmentDistance = (
+    px: number, py: number, ax: number, ay: number, bx: number, by: number,
+  ): number => {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return Math.hypot(px - ax, py - ay);
+    let t = ((px - ax) * dx + (py - ay) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+  };
+
+  /** Pick the edge whose source→target segment passes closest to the
+   *  cursor, within EDGE_HIT_RADIUS. Falls back to null if no edge is
+   *  near enough — caller treats that as "drop on empty canvas". */
+  const findClosestEdge = useCallback(
+    (clientX: number, clientY: number): string | null => {
+      if (!edges.length) return null;
+      const flowPos = screenToFlowPosition({ x: clientX, y: clientY });
+      // Default node footprint when React Flow hasn't measured yet.
+      const FALLBACK_W = 200;
+      const FALLBACK_H = 56;
+      let best: { id: string; dist: number } | null = null;
+      for (const edge of edges) {
+        const src = nodes.find((n) => n.id === edge.source);
+        const tgt = nodes.find((n) => n.id === edge.target);
+        if (!src || !tgt) continue;
+        const sw = src.measured?.width ?? FALLBACK_W;
+        const sh = src.measured?.height ?? FALLBACK_H;
+        const th = tgt.measured?.height ?? FALLBACK_H;
+        // Approximate the edge as the line from source-right-center
+        // to target-left-center (matches the default smoothstep
+        // routing closely enough for hit testing). Target width
+        // isn't needed because we anchor on its left edge.
+        const sx = src.position.x + sw;
+        const sy = src.position.y + sh / 2;
+        const tx = tgt.position.x;
+        const ty = tgt.position.y + th / 2;
+        const dist = pointToSegmentDistance(flowPos.x, flowPos.y, sx, sy, tx, ty);
+        if (best === null || dist < best.dist) {
+          best = { id: edge.id, dist };
+        }
+      }
+      return best && best.dist < EDGE_HIT_RADIUS ? best.id : null;
+    },
+    [edges, nodes, screenToFlowPosition],
+  );
+
+  const onDragOver = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      // Only track edge-targeting during a palette drag (i.e. there's
+      // actually a kind being dragged). The dataTransfer payload isn't
+      // readable here (browser security), so we use the presence of
+      // application/reactflow in types as a proxy.
+      const types = e.dataTransfer.types;
+      const isPaletteDrag =
+        types && Array.from(types).includes("application/reactflow");
+      if (!isPaletteDrag) return;
+      const next = findClosestEdge(e.clientX, e.clientY);
+      setDropTargetEdgeId((prev) => (prev === next ? prev : next));
+    },
+    [findClosestEdge],
+  );
+
+  // Clear the target highlight if the drag leaves the canvas without
+  // a drop — otherwise the dashed edge stays lit after the user
+  // abandons the drag outside the canvas.
+  const onDragLeave = useCallback((e: React.DragEvent) => {
+    // dragleave fires when crossing child element boundaries too;
+    // only clear when leaving the canvas wrapper itself.
+    if (e.currentTarget === e.target) {
+      setDropTargetEdgeId(null);
+    }
   }, []);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       const kind = e.dataTransfer.getData("application/reactflow");
+      // Capture and clear the target BEFORE early returns so a stray
+      // highlight doesn't linger on a failed drop.
+      const targetEdgeId = dropTargetEdgeId;
+      setDropTargetEdgeId(null);
       if (!kind) return;
       const plugins = useApp.getState().plugins;
       const spec = resolveNodeSpec(kind, plugins);
@@ -265,10 +351,53 @@ export function FlowCanvas() {
           params: { ...((spec.defaultData as Record<string, unknown>) ?? {}) },
         },
       };
+
+      // Splice path: dropped near an existing edge. Remove the old
+      // edge and insert two new edges through the freshly-added node.
+      // We don't gate this on family compatibility — the user can
+      // always re-arrange if the resulting graph is invalid, and
+      // requiring strict family matching here would surprise users
+      // who want to experiment.
+      if (targetEdgeId) {
+        const target = edges.find((edge) => edge.id === targetEdgeId);
+        if (target) {
+          setNodes((ns) => ns.concat(node));
+          setEdges((es) => {
+            const withoutOld = es.filter((edge) => edge.id !== targetEdgeId);
+            return withoutOld.concat(
+              { id: `e${id}-in`, source: target.source, target: id },
+              { id: `e${id}-out`, source: id, target: target.target },
+            );
+          });
+          return;
+        }
+      }
+
+      // Default: drop at cursor with no splice.
       setNodes((ns) => ns.concat(node));
     },
-    [screenToFlowPosition, setNodes],
+    [screenToFlowPosition, setNodes, setEdges, edges, dropTargetEdgeId],
   );
+
+  /** Style override for the targeted edge — animated dashed accent so
+   *  it's visually obvious you're about to splice into it. */
+  const styledEdges = useMemo(() => {
+    if (!dropTargetEdgeId) return edges;
+    return edges.map((edge) =>
+      edge.id === dropTargetEdgeId
+        ? {
+            ...edge,
+            style: {
+              ...(edge.style ?? {}),
+              stroke: "rgb(var(--color-accent2))",
+              strokeWidth: 3,
+              strokeDasharray: "8 4",
+            },
+            animated: true,
+          }
+        : edge,
+    );
+  }, [edges, dropTargetEdgeId]);
 
   // Monotonic counter so we can tell stale `loadSample` resolutions
   // (from a prior preset click) from the most recent one. Without this,
@@ -544,10 +673,16 @@ export function FlowCanvas() {
           </button>
         </div>
       </div>
-      <div ref={wrapperRef} className="flex-1 relative" onDragOver={onDragOver} onDrop={onDrop}>
+      <div
+        ref={wrapperRef}
+        className="flex-1 relative"
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onDragLeave={onDragLeave}
+      >
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={styledEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}

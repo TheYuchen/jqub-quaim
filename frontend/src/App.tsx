@@ -232,12 +232,18 @@ export default function App() {
         });
     };
     refreshPlugins();
-    // Multi-tab sync: every upload/delete in another tab bumps the
-    // pluginsRev counter; we listen for just that key so unrelated
-    // localStorage writes (pane widths, theme, etc.) don't trigger
-    // unnecessary refetches.
+    // Multi-tab sync. Tab A upload/delete bumps pluginsRev → Tab B
+    // refetches its plugin list. Tab A login/logout bumps sessionRev
+    // → Tab B refetches /me so the avatar reflects reality.
+    const refreshSession = () => {
+      api
+        .authMe()
+        .then(setSession)
+        .catch(() => setSession(null));
+    };
     const onStorage = (e: StorageEvent) => {
       if (e.key === "quda.pluginsRev") refreshPlugins();
+      if (e.key === "quda.sessionRev") refreshSession();
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);

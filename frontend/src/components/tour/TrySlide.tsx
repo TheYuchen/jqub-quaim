@@ -119,6 +119,12 @@ export function TrySlide({ onClose }: { onClose?: () => void } = {}) {
               in one click.
             </li>
             <li>
+              Drag a block onto an existing edge to{" "}
+              <span className="text-ink">splice it between</span> two
+              connected blocks — the target edge lights up while
+              you're hovering it.
+            </li>
+            <li>
               Hover a block to reveal the <span className="kbd">×</span>{" "}
               delete button.
             </li>

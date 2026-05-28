@@ -143,7 +143,9 @@ export function UploadPluginModal({
     try {
       const userId = getUserId();
       const manifest = await api.uploadPlugin(userId, file);
-      setSuccess(`Installed ${manifest.label} (kind=${manifest.kind}).`);
+      setSuccess(
+        `Installed ${manifest.label} — find it in the ${manifest.family} row of the block strip.`,
+      );
       // Refresh the global plugin list so NodePalette + BlockPicker
       // pick the new block up immediately.
       const list = await api.listPlugins(userId);
@@ -196,7 +198,9 @@ export function UploadPluginModal({
       const file = new File([blob], `${ex.name}.zip`, { type: "application/zip" });
       const userId = getUserId();
       const manifest = await api.uploadPlugin(userId, file);
-      setSuccess(`Installed ${manifest.label} (kind=${manifest.kind}).`);
+      setSuccess(
+        `Installed ${manifest.label} — find it in the ${manifest.family} row of the block strip.`,
+      );
       const list = await api.listPlugins(userId);
       setPlugins(list);
       bumpPluginsRev();
@@ -266,7 +270,10 @@ export function UploadPluginModal({
             or click to browse.
           </span>
           <span className="text-[10px] text-mute/70">
-            Max 1 MB · 5 plugins per browser · stays on this device
+            Max 1 MB · {installedPlugins.length}/5 plugins used ·{" "}
+            {session?.persistence_enabled
+              ? "saved to your HF account"
+              : "stays on this device"}
           </span>
         </div>
       )}

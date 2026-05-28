@@ -193,6 +193,18 @@ function StepCard({ step }: { step: StepResult }) {
       {step.status === "ok" && step.summary && Object.keys(step.summary).length > 0 && (
         <StepBody step={step} />
       )}
+      {step.status === "ok" &&
+        isPlugin &&
+        (!step.summary || Object.keys(step.summary).length === 0) && (
+          // Without this hint, a plugin author who forgot to return a
+          // summary dict sees a card with just the header — they can't
+          // tell "ran fine but quiet" apart from "broken plugin".
+          <div className="mt-2 text-[11px] text-mute italic leading-relaxed">
+            Plugin ran OK but returned no summary fields. Add a{" "}
+            <span className="font-mono not-italic">"summary"</span> dict
+            to your handler's return value to display data here.
+          </div>
+        )}
     </div>
   );
 }
