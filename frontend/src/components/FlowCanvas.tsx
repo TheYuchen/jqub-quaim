@@ -376,11 +376,19 @@ export function FlowCanvas() {
 
   const runPipeline = async () => {
     if (!circuit) {
-      setNotice({ text: "Please pick or upload a circuit first.", tone: "danger" });
+      // Open the left pane so the user can see where to pick a circuit.
+      useApp.getState().bumpHintExpandLeftPane();
+      setNotice({
+        text: "Pick a circuit first — see the Pipeline input pane that just opened on the left.",
+        tone: "danger",
+      });
       return;
     }
     if (nodes.length === 0) {
-      setNotice({ text: "Canvas is empty. Drag some blocks in.", tone: "danger" });
+      setNotice({
+        text: "Canvas is empty. Drag blocks from the strip above, click \"Add blocks\" for a multi-select list, or pick a preset.",
+        tone: "danger",
+      });
       return;
     }
     setRunning(true);

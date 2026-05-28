@@ -68,6 +68,14 @@ interface AppState {
   pendingQuickStart: { presetKey: string; sampleKey: string } | null;
   triggerQuickStart: (presetKey: string, sampleKey: string) => void;
   clearQuickStart: () => void;
+
+  /**
+   * Hint flag set by FlowCanvas error paths: tells App.tsx to open
+   * the left CircuitPicker pane (desktop: expand; mobile: open
+   * drawer) so the user can see where to pick a circuit.
+   */
+  hintExpandLeftPane: number;  // counter so consecutive triggers re-fire
+  bumpHintExpandLeftPane: () => void;
 }
 
 export const useApp = create<AppState>((set) => ({
@@ -97,4 +105,7 @@ export const useApp = create<AppState>((set) => ({
   triggerQuickStart: (presetKey, sampleKey) =>
     set({ pendingQuickStart: { presetKey, sampleKey } }),
   clearQuickStart: () => set({ pendingQuickStart: null }),
+  hintExpandLeftPane: 0,
+  bumpHintExpandLeftPane: () =>
+    set((s) => ({ hintExpandLeftPane: s.hintExpandLeftPane + 1 })),
 }));

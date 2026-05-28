@@ -92,6 +92,15 @@ export default function App() {
   const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
 
+  // FlowCanvas can ask us to surface the CircuitPicker when the user
+  // tries to run without a circuit selected.
+  const hintExpandLeftPane = useApp((s) => s.hintExpandLeftPane);
+  useEffect(() => {
+    if (hintExpandLeftPane === 0) return;
+    if (isDesktop) setLeftCollapsed(false);
+    else setLeftDrawerOpen(true);
+  }, [hintExpandLeftPane, isDesktop]);
+
   // True while a PaneResizer drag is in flight. We use it to suppress the
   // CSS `transition-[width]` during dragging: setRightW / setLeftW fire on
   // every mousemove, so each value change would otherwise kick off a 150ms

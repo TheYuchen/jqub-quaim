@@ -7,7 +7,16 @@
 import { useApp } from "../lib/store";
 import type { StepResult } from "../lib/api";
 import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
-import { AlertCircle, Check, ChevronRight, CircleDot, Clock } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  ChevronRight,
+  CircleDot,
+  Clock,
+  Code2,
+  Sliders,
+  Sparkles,
+} from "lucide-react";
 import { StepBody } from "./results/cards";
 
 export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
@@ -50,6 +59,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
         {running && <RunningHint />}
         {run && run.steps.map((s) => <StepCard key={s.node_id} step={s} />)}
         {run && run.final_metrics && <FinalMetrics metrics={run.final_metrics} />}
+        {run && !running && run.ok && <NextStepsHint />}
       </div>
     </div>
   );
@@ -58,13 +68,16 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
 function EmptyHint() {
   return (
     <div className="panel-alt p-4 text-sm text-mute leading-relaxed">
-      <p className="text-ink font-medium mb-1.5">Ready when you are.</p>
-      <p>
-        Pick a circuit on the left, arrange your pipeline, and hit{" "}
-        <span className="kbd">Run pipeline</span>. Each block you traverse will render a
-        result card here: noise bounds, fidelity, compression stats, transpiled depth.
-      </p>
-      <p className="mt-2 text-[11px]">
+      <p className="text-ink font-medium mb-2">Ready when you are.</p>
+      <ol className="space-y-1 text-[12px] list-decimal list-inside marker:text-mute/60">
+        <li>Pick a circuit on the left (or upload your own).</li>
+        <li>Arrange your pipeline on the canvas, or load a preset.</li>
+        <li>
+          Hit <span className="kbd">Run pipeline</span> — one result card
+          will appear here per block as it finishes.
+        </li>
+      </ol>
+      <p className="mt-3 text-[11px]">
         Default pipelines on the built-in samples hit a precomputed cache and
         return instantly. A cold <span className="text-ink">QuBound</span>{" "}
         (LSTM training) or <span className="text-ink">Qshot</span> (HDBSCAN
@@ -88,6 +101,36 @@ function RunningHint() {
         <span className="text-ink">Qshot</span> (HDBSCAN warmup + pilot
         measurements) runs can take 1–3&nbsp;minutes on HF's shared CPU —
         please don't close the tab.
+      </div>
+    </div>
+  );
+}
+
+/** Subtle "what next" prompt shown at the bottom of the results pane
+ *  after a successful run. Surfaces Sweep + Export .py since those
+ *  are the natural follow-ups (compare across params, take it home). */
+function NextStepsHint() {
+  return (
+    <div className="panel-alt p-3 text-[11px] leading-relaxed">
+      <div className="flex items-center gap-1.5 text-mute mb-2">
+        <Sparkles className="w-3 h-3 text-accent" />
+        <span className="uppercase tracking-wider">Where to go from here</span>
+      </div>
+      <div className="space-y-1.5 text-mute">
+        <div className="flex items-start gap-1.5">
+          <Sliders className="w-3 h-3 mt-0.5 text-accent shrink-0" />
+          <span>
+            <span className="text-ink">Sweep</span> a parameter across a
+            range to compare how it changes the result.
+          </span>
+        </div>
+        <div className="flex items-start gap-1.5">
+          <Code2 className="w-3 h-3 mt-0.5 text-accent shrink-0" />
+          <span>
+            <span className="text-ink">Export .py</span> to keep iterating
+            in your own Jupyter / slurm setup.
+          </span>
+        </div>
       </div>
     </div>
   );

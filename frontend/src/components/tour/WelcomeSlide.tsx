@@ -22,8 +22,15 @@ export function WelcomeSlide() {
             QuDA Studio
           </span>
         </h1>
-        <p className="text-mute leading-relaxed mb-4">
-          A visual playground for research algorithms from the{" "}
+        <p className="text-ink/80 leading-relaxed mb-3">
+          <span className="text-ink font-medium">Q</span>uantum{" "}
+          <span className="text-ink font-medium">D</span>esign{" "}
+          <span className="text-ink font-medium">A</span>utomation{" "}
+          <span className="text-ink font-medium">Studio</span> — interactive
+          workflows for quantum system deployment.
+        </p>
+        <p className="text-mute leading-relaxed mb-4 text-sm">
+          From the{" "}
           <a
             href="https://jqub.ece.gmu.edu/"
             target="_blank"
@@ -32,12 +39,12 @@ export function WelcomeSlide() {
           >
             JQub lab
           </a>{" "}
-          at George Mason University — currently QuCAD, QuBound,
-          CompressVQC, and Qshot, with more to come — applied to a
-          quantum circuit of your choice.
+          at George Mason University. Build noise-aware quantum pipelines
+          visually with research algorithms from the lab — currently QuCAD,
+          QuBound, CompressVQC, and Qshot, with more to come.
         </p>
         <p className="text-sm text-mute leading-relaxed">
-          Build a pipeline by dragging blocks, hit{" "}
+          Drag blocks onto the canvas, hit{" "}
           <span className="kbd">Run pipeline</span>, and see what happens when
           each algorithm meets real IBM hardware noise.
         </p>
