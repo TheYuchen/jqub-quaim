@@ -4,15 +4,36 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
 from app.schemas import RunRequest, RunResponse
+from app.services import auth_service
 from app.services.circuit_service import CircuitNotFoundError, circuit_store
 from app.services.plugin_service import RESERVED_KINDS as BUILTIN_KINDS
 from app.services.run_cache import compute_cache_key, load_cached_response
 from app.services.workflow_service import run_pipeline, run_pipeline_stream
+
+
+def _effective_user_id(request: Request, body_user_id: str | None) -> str | None:
+    """Same precedence as the plugin routes: session-derived hf_<username>
+    wins if the user is logged in; otherwise we take the body field
+    (the anon UUID from localStorage). Returning None is fine — the
+    workflow runner only consults user_id when it encounters a plugin
+    node, which only logged-in or anon users with uploaded plugins
+    would hit anyway.
+
+    Defence-in-depth: refuse body-supplied hf_* ids, matching the
+    plugin route's anon-squat guard."""
+    user = auth_service.decode_session(
+        request.cookies.get(auth_service.SESSION_COOKIE)
+    )
+    if user is not None:
+        return auth_service.hf_user_id(user.username)
+    if body_user_id and body_user_id.startswith("hf_"):
+        return None
+    return body_user_id
 
 
 def _uses_plugins(nodes) -> bool:
@@ -23,13 +44,14 @@ router = APIRouter()
 
 
 @router.post("/workflow/run", response_model=RunResponse)
-def run_workflow(req: RunRequest) -> RunResponse:
+def run_workflow(req: RunRequest, request: Request) -> RunResponse:
     try:
         qc = circuit_store.get(req.circuit_id)
     except CircuitNotFoundError:
         raise HTTPException(status_code=404, detail="Unknown circuit_id") from None
 
     settings = get_settings()
+    effective_user_id = _effective_user_id(request, req.user_id)
 
     # If caller requests live IBM but the server forbids it, refuse loudly
     # (better UX than silently swapping in a fake backend for the whole run).
@@ -60,7 +82,7 @@ def run_workflow(req: RunRequest) -> RunResponse:
         nodes=req.nodes,
         edges=req.edges,
         settings=settings,
-        user_id=req.user_id,
+        user_id=effective_user_id,
     )
 
     ok = all(s.status != "error" for s in steps)
@@ -80,7 +102,7 @@ def run_workflow(req: RunRequest) -> RunResponse:
 
 
 @router.post("/workflow/run-stream")
-def run_workflow_stream(req: RunRequest):
+def run_workflow_stream(req: RunRequest, request: Request):
     """SSE endpoint: yields each StepResult as a Server-Sent Event as
     soon as it completes, instead of waiting for the whole pipeline.
 
@@ -95,6 +117,7 @@ def run_workflow_stream(req: RunRequest):
         raise HTTPException(status_code=404, detail="Unknown circuit_id") from None
 
     settings = get_settings()
+    effective_user_id = _effective_user_id(request, req.user_id)
 
     if req.use_live_ibm and not (settings.has_ibm_token and settings.allow_live_ibm):
         raise HTTPException(status_code=403, detail="Live IBM execution is disabled.")
@@ -114,7 +137,7 @@ def run_workflow_stream(req: RunRequest):
     def step_stream():
         for step in run_pipeline_stream(
             circuit=qc, nodes=req.nodes, edges=req.edges,
-            settings=settings, user_id=req.user_id,
+            settings=settings, user_id=effective_user_id,
         ):
             yield f"data: {step.model_dump_json()}\n\n"
         yield "data: [DONE]\n\n"

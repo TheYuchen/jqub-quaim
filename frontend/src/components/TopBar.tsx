@@ -12,6 +12,7 @@ import { PapersPopover } from "./PapersPopover";
 import { DevelopersPopover } from "./DevelopersPopover";
 import { SupportPopover } from "./SupportPopover";
 import { TipIcon } from "./TipIcon";
+import { AuthButton } from "./AuthButton";
 
 /**
  * Top application bar.
@@ -166,6 +167,7 @@ export function TopBar({
           aria-hidden="true"
         />
         <SupportPopover />
+        <AuthButton mobile={mobile} />
         {mobile && onOpenRightDrawer && (
           <button
             type="button"

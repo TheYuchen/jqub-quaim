@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,10 +32,37 @@ class Settings:
     allow_live_ibm: bool
     cors_allow_origins: tuple[str, ...]
     log_level: str
+    # ---- OAuth (HF Sign-in) ----
+    # HF sets these env vars automatically when `hf_oauth: true` is in
+    # the Space README frontmatter. Empty when running locally outside
+    # an HF Space (the auth routes degrade to "feature unavailable").
+    oauth_client_id: str | None
+    oauth_client_secret: str | None
+    openid_provider_url: str
+    space_host: str | None
+    # Server-side secret for signing session cookies. HF Space secret,
+    # falls back to a per-process random in dev (sessions don't survive
+    # restart locally — fine).
+    session_secret: str
+    # ---- HF Datasets persistence ----
+    # Write-capable token for the per-user plugin dataset repo. Without
+    # it, OAuth still works but plugins remain volatile (live in /tmp
+    # only). Set as a Space secret named HF_TOKEN.
+    hf_token: str | None
+    # Owner/name of the dataset repo where user plugins are persisted.
+    user_data_repo: str
 
     @property
     def has_ibm_token(self) -> bool:
         return bool(self.ibm_token)
+
+    @property
+    def oauth_enabled(self) -> bool:
+        return bool(self.oauth_client_id and self.oauth_client_secret)
+
+    @property
+    def persistence_enabled(self) -> bool:
+        return bool(self.hf_token and self.user_data_repo)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -67,5 +95,22 @@ def get_settings() -> Settings:
                 default=("http://localhost:5173", "http://127.0.0.1:5173"),
             ),
             log_level=os.environ.get("LOG_LEVEL", "INFO"),
+            oauth_client_id=os.environ.get("OAUTH_CLIENT_ID") or None,
+            oauth_client_secret=os.environ.get("OAUTH_CLIENT_SECRET") or None,
+            openid_provider_url=os.environ.get(
+                "OPENID_PROVIDER_URL", "https://huggingface.co"
+            ),
+            space_host=os.environ.get("SPACE_HOST") or None,
+            # In dev we generate a fresh random secret per process so
+            # sessions don't survive a restart — that's fine for dev.
+            # In prod we expect SESSION_SECRET to be set as an HF Space
+            # secret so cookies survive container restarts.
+            session_secret=(
+                os.environ.get("SESSION_SECRET") or secrets.token_urlsafe(48)
+            ),
+            hf_token=os.environ.get("HF_TOKEN") or None,
+            user_data_repo=os.environ.get(
+                "USER_DATA_REPO", "qudastudio/quda-user-data"
+            ),
         )
     return _settings

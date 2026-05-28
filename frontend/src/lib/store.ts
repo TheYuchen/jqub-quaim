@@ -3,10 +3,12 @@
 
 import { create } from "zustand";
 import type {
+  AuthStatus,
   CircuitInfo,
   HealthResponse,
   PluginManifest,
   RunResponse,
+  SessionUser,
 } from "./api";
 import type { NodeKind } from "./nodeCatalog";
 
@@ -88,6 +90,23 @@ interface AppState {
    *  built-in blocks. */
   plugins: PluginManifest[];
   setPlugins: (p: PluginManifest[]) => void;
+
+  /**
+   * OAuth + persistence capability of this deployment. Probed once at
+   * boot via /api/auth/status. When `oauth_enabled` is false (e.g.
+   * local dev without HF_OAUTH metadata), the TopBar hides the Login
+   * button entirely.
+   */
+  authStatus: AuthStatus | null;
+  setAuthStatus: (s: AuthStatus | null) => void;
+
+  /**
+   * The current signed-in HF user, or null when running as guest.
+   * Drives the avatar/dropdown in TopBar and propagates to userId.ts
+   * so plugin requests use the hf_<username> namespace.
+   */
+  session: SessionUser | null;
+  setSession: (u: SessionUser | null) => void;
 }
 
 export const useApp = create<AppState>((set) => ({
@@ -122,4 +141,8 @@ export const useApp = create<AppState>((set) => ({
     set((s) => ({ hintExpandLeftPane: s.hintExpandLeftPane + 1 })),
   plugins: [],
   setPlugins: (p) => set({ plugins: p }),
+  authStatus: null,
+  setAuthStatus: (s) => set({ authStatus: s }),
+  session: null,
+  setSession: (u) => set({ session: u }),
 }));

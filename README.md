@@ -7,6 +7,8 @@ sdk: docker
 app_port: 7860
 pinned: false
 short_description: Quantum Design Automation Studio
+hf_oauth: true
+hf_oauth_expiration_minutes: 480
 ---
 
 # QuDA Studio

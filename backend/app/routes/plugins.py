@@ -22,10 +22,10 @@ import re
 import zipfile
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
 
-from app.services import plugin_service
+from app.services import auth_service, plugin_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -41,21 +41,59 @@ _EXAMPLES_DIR = Path(__file__).resolve().parents[3] / "example_plugins"
 _SAFE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,30}$")
 
 
-@router.get("/plugins")
-def list_plugins(user_id: str = Query(...)) -> list[dict]:
-    """List all plugins this browser has uploaded. Frontend merges
-    these into the NodeCatalog so they appear in the BlockPicker."""
+def _effective_user_id(request: Request, query_user_id: str | None) -> str:
+    """Resolve which namespace this request operates on.
+
+    Precedence:
+      1. Session-derived ``hf_<username>`` (cookie present + valid).
+         The server always wins — a logged-in user can't spoof someone
+         else's namespace by passing a different ``user_id`` query.
+      2. The client-supplied anon UUID for non-logged-in browsers. We
+         REFUSE any query value starting with ``hf_`` because that
+         prefix is reserved for authenticated users; without this
+         check an anonymous client could squat on a real HF username's
+         namespace, polluting their plugin list on next login.
+    """
+    user = auth_service.decode_session(
+        request.cookies.get(auth_service.SESSION_COOKIE)
+    )
+    if user is not None:
+        return auth_service.hf_user_id(user.username)
+    if not query_user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No session cookie and no user_id query parameter.",
+        )
+    if query_user_id.startswith("hf_"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The hf_ user_id prefix is reserved for authenticated "
+                "sessions. Sign in with Hugging Face or use a non-prefixed id."
+            ),
+        )
     try:
-        plugin_service.validate_user_id(user_id)
+        plugin_service.validate_user_id(query_user_id)
     except plugin_service.PluginError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
-    manifests = plugin_service.list_user_plugins(user_id)
+    return query_user_id
+
+
+@router.get("/plugins")
+def list_plugins(request: Request, user_id: str | None = Query(None)) -> list[dict]:
+    """List all plugins this browser/account has uploaded."""
+    effective = _effective_user_id(request, user_id)
+    # For logged-in users whose /tmp was wiped by a container restart,
+    # hydrate from the HF Datasets backing store before listing.
+    plugin_service.hydrate_from_dataset_if_needed(effective)
+    manifests = plugin_service.list_user_plugins(effective)
     return [plugin_service.manifest_to_frontend(m) for m in manifests]
 
 
 @router.post("/plugins/upload")
 async def upload_plugin(
-    user_id: str = Query(...),
+    request: Request,
+    user_id: str | None = Query(None),
     file: UploadFile = File(...),
 ) -> dict:
     """Upload a plugin .zip. Returns the validated manifest on success.
@@ -68,17 +106,19 @@ async def upload_plugin(
       * kind doesn't collide with built-ins or existing plugins
       * user is under their 5-plugin cap
     """
-    try:
-        plugin_service.validate_user_id(user_id)
-    except plugin_service.PluginError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from None
+    effective = _effective_user_id(request, user_id)
+    # For logged-in users on a restarted Space, hydrate the namespace
+    # before the cap check so we don't let them exceed the 5-plugin cap
+    # by uploading a 6th while their dataset-persisted plugins are
+    # waiting to be pulled in.
+    plugin_service.hydrate_from_dataset_if_needed(effective)
 
     # Read the upload — FastAPI streams it but we want it in memory
     # so we can size-check before doing anything else. The size cap
     # in plugin_service will reject if it's >1 MB.
     blob = await file.read()
     try:
-        manifest = plugin_service.install_plugin_zip(user_id, blob)
+        manifest = plugin_service.install_plugin_zip(effective, blob)
     except plugin_service.PluginError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     except Exception as exc:
@@ -91,13 +131,13 @@ async def upload_plugin(
 
 
 @router.delete("/plugins/{kind}")
-def delete_plugin(kind: str, user_id: str = Query(...)) -> dict:
+def delete_plugin(
+    kind: str, request: Request, user_id: str | None = Query(None)
+) -> dict:
     """Remove a plugin from this user's namespace."""
-    try:
-        plugin_service.validate_user_id(user_id)
-    except plugin_service.PluginError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from None
-    removed = plugin_service.delete_plugin(user_id, kind)
+    effective = _effective_user_id(request, user_id)
+    plugin_service.hydrate_from_dataset_if_needed(effective)
+    removed = plugin_service.delete_plugin(effective, kind)
     if not removed:
         raise HTTPException(status_code=404, detail=f"No plugin with kind={kind!r}.")
     return {"removed": True, "kind": kind}

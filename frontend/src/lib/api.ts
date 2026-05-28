@@ -98,6 +98,24 @@ export interface RunRequest {
   user_id?: string;
 }
 
+/** /api/auth/status — public capability probe. The frontend uses
+ *  this to decide whether to render the Login button at all (e.g.
+ *  hide it in local dev where OAuth isn't wired up). */
+export interface AuthStatus {
+  oauth_enabled: boolean;
+  persistence_enabled: boolean;
+  provider: string;
+}
+
+/** /api/auth/me payload (when logged in). */
+export interface SessionUser {
+  username: string;
+  avatar_url: string | null;
+  expires_at: number;
+  persistence_enabled: boolean;
+  user_data_repo: string | null;
+}
+
 /** Plugin manifest returned by the server. Mirrors PluginManifest in
  *  backend/app/services/plugin_service.py + a `is_plugin: true` flag
  *  the frontend uses to tell user-uploaded blocks apart from
@@ -134,43 +152,79 @@ async function json<T>(res: Response): Promise<T> {
   return res.json();
 }
 
+/** Shorthand for fetch with credentials always included so the session
+ *  cookie travels on the dev Vite proxy (5173 → 7860 is technically
+ *  cross-origin even with proxy_pass). In prod same-origin this flag
+ *  is a no-op. */
+function authedFetch(input: RequestInfo, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, { credentials: "include", ...init });
+}
+
 export const api = {
-  health: () => fetch(`${BASE}/health`).then((r) => json<HealthResponse>(r)),
+  health: () => authedFetch(`${BASE}/health`).then((r) => json<HealthResponse>(r)),
 
-  backends: () => fetch(`${BASE}/backends`).then((r) => json<BackendInfo[]>(r)),
+  backends: () => authedFetch(`${BASE}/backends`).then((r) => json<BackendInfo[]>(r)),
 
-  listSamples: () => fetch(`${BASE}/circuits/samples`).then((r) => json<SampleCircuit[]>(r)),
+  listSamples: () =>
+    authedFetch(`${BASE}/circuits/samples`).then((r) => json<SampleCircuit[]>(r)),
 
   loadSample: (key: string) =>
-    fetch(`${BASE}/circuits/samples/${encodeURIComponent(key)}`, { method: "POST" }).then(
-      (r) => json<CircuitInfo>(r),
-    ),
+    authedFetch(`${BASE}/circuits/samples/${encodeURIComponent(key)}`, {
+      method: "POST",
+    }).then((r) => json<CircuitInfo>(r)),
 
   upload: (file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    return fetch(`${BASE}/circuits/upload`, { method: "POST", body: fd }).then(
+    return authedFetch(`${BASE}/circuits/upload`, { method: "POST", body: fd }).then(
       (r) => json<CircuitInfo>(r),
     );
   },
 
   getCircuit: (circuit_id: string) =>
-    fetch(`${BASE}/circuits/${encodeURIComponent(circuit_id)}`).then(
+    authedFetch(`${BASE}/circuits/${encodeURIComponent(circuit_id)}`).then(
       (r) => json<CircuitInfo>(r),
     ),
 
   run: (body: RunRequest) =>
-    fetch(`${BASE}/workflow/run`, {
+    authedFetch(`${BASE}/workflow/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => json<RunResponse>(r)),
 
+  // ---- auth ----
+
+  /** Public capability probe: is OAuth wired up on this deployment? */
+  authStatus: () =>
+    authedFetch(`${BASE}/auth/status`).then((r) => json<AuthStatus>(r)),
+
+  /** Current session or null if not logged in. */
+  authMe: async (): Promise<SessionUser | null> => {
+    const r = await authedFetch(`${BASE}/auth/me`);
+    if (r.status === 401) return null;
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  },
+
+  /** URL the browser should navigate to (full page navigation, NOT
+   *  fetch) to start the OAuth dance. */
+  authLoginUrl: () => `${BASE}/auth/login`,
+
+  /** Clear the session cookie. */
+  authLogout: () =>
+    authedFetch(`${BASE}/auth/logout`, { method: "POST" }).then(
+      (r) => json<{ ok: boolean }>(r),
+    ),
+
   // ---- plugin endpoints ----
 
-  /** List the plugin manifests this browser has uploaded. */
+  /** List the plugin manifests this browser/account has uploaded.
+   *  The server prefers the session cookie's hf_<username> over the
+   *  query-string user_id; we still send the anon UUID for the case
+   *  where there's no session. */
   listPlugins: (userId: string) =>
-    fetch(`${BASE}/plugins?user_id=${encodeURIComponent(userId)}`)
+    authedFetch(`${BASE}/plugins?user_id=${encodeURIComponent(userId)}`)
       .then((r) => json<PluginManifest[]>(r)),
 
   /** Upload a plugin .zip. Resolves to the parsed manifest on success;
@@ -178,7 +232,7 @@ export const api = {
   uploadPlugin: async (userId: string, file: File): Promise<PluginManifest> => {
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch(
+    const res = await authedFetch(
       `${BASE}/plugins/upload?user_id=${encodeURIComponent(userId)}`,
       { method: "POST", body: fd },
     );
@@ -195,9 +249,9 @@ export const api = {
     return res.json();
   },
 
-  /** Remove a plugin from this browser's namespace. */
+  /** Remove a plugin from this browser/account's namespace. */
   deletePlugin: (userId: string, kind: string) =>
-    fetch(
+    authedFetch(
       `${BASE}/plugins/${encodeURIComponent(kind)}?user_id=${encodeURIComponent(userId)}`,
       { method: "DELETE" },
     ).then((r) => json<{ removed: boolean; kind: string }>(r)),
@@ -206,7 +260,7 @@ export const api = {
    *  the upload flow. The server reads each manifest.json inside the
    *  zip and returns its label / family / tagline. */
   listExamplePlugins: () =>
-    fetch(`${BASE}/plugins/examples`).then(
+    authedFetch(`${BASE}/plugins/examples`).then(
       (r) =>
         json<
           Array<{
@@ -238,7 +292,7 @@ export const api = {
     onError: (err: Error) => void,
   ) => {
     try {
-      const res = await fetch(`${BASE}/workflow/run-stream`, {
+      const res = await authedFetch(`${BASE}/workflow/run-stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

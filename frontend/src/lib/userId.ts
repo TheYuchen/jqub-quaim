@@ -1,10 +1,28 @@
-// Anonymous browser-scoped identifier. Used as a namespace key for
-// per-user plugin storage on the server. Generated on first visit
-// and persisted in localStorage; not tied to any actual user account.
+// Browser/account identifier used as the user_id query parameter on
+// plugin API calls. Two flavours:
+//
+//   * For a guest (no HF session): a per-browser anonymous UUID
+//     persisted in localStorage. Plugins stored under this id live in
+//     /tmp on the Space (volatile, per-browser).
+//   * For a signed-in HF user: never read by getUserId() directly —
+//     the server overrides the query value with the session-derived
+//     hf_<username> whenever it sees a session cookie. We still send
+//     the anon UUID as a fallback so the route works without cookies.
+//
+// In other words: the frontend always sends the anon UUID. The server
+// decides which namespace to operate on (session > query).
+
+import { useApp } from "./store";
 
 const LS_KEY = "quda.userId";
 
-/** Read the current user id, or mint one on first visit. */
+/** Read the current anonymous user id, or mint one on first visit.
+ *
+ * Even when the user is signed in, we still surface the anon id —
+ * the server treats it as the fallback namespace for unauthenticated
+ * routes. The actual logged-in namespace is server-derived, not
+ * client-controlled (anti-spoofing).
+ */
 export function getUserId(): string {
   try {
     const existing = localStorage.getItem(LS_KEY);
@@ -21,6 +39,16 @@ export function getUserId(): string {
     /* if storage is blocked the id is still valid for this tab */
   }
   return fresh;
+}
+
+/** Convenience: the namespace label the server is currently treating
+ *  the caller as. Returns "hf_<username>" when signed in, the anon
+ *  UUID otherwise. Used only for display (e.g. tooltips); the actual
+ *  authoritative resolution happens on the server. */
+export function displayUserId(): string {
+  const session = useApp.getState().session;
+  if (session?.username) return `hf_${session.username}`;
+  return getUserId();
 }
 
 /** Bump a localStorage counter so other tabs' `storage` listeners fire.

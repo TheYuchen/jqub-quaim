@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import FRONTEND_DIST, get_settings
+from app.routes import auth as auth_route
 from app.routes import backends as backends_route
 from app.routes import circuits as circuits_route
 from app.routes import health as health_route
@@ -51,12 +52,27 @@ app = FastAPI(
 
 _settings = get_settings()
 
+# Safety net: with allow_credentials=True a wildcard origin would let
+# any malicious page on the internet read /api/auth/me with the user's
+# session cookie. CORSMiddleware itself refuses `["*"]` in that
+# combination, but we also strip any literal "*" upstream so a typo in
+# CORS_ALLOW_ORIGINS becomes "no cross-origin" rather than silently
+# enabling it. In production the React bundle is served by the same
+# FastAPI process — no cross-origin reads needed at all.
+_safe_origins = [o for o in _settings.cors_allow_origins if o != "*"]
+if len(_safe_origins) != len(_settings.cors_allow_origins):
+    logger.warning(
+        "CORS_ALLOW_ORIGINS contained '*'; dropped because allow_credentials=True."
+    )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(_settings.cors_allow_origins),
+    allow_origins=_safe_origins,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=False,
+    # We need cookies on cross-origin requests for the Vite dev server
+    # (5173) to talk to the API (7860). In production both bundles
+    # come from the same origin so this doesn't relax anything.
+    allow_credentials=True,
 )
 
 # API routes
@@ -65,6 +81,7 @@ app.include_router(backends_route.router, prefix="/api")
 app.include_router(circuits_route.router, prefix="/api")
 app.include_router(workflow_route.router, prefix="/api")
 app.include_router(plugins_route.router, prefix="/api")
+app.include_router(auth_route.router, prefix="/api")
 
 
 # ---------- Static frontend ----------

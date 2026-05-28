@@ -198,6 +198,9 @@ export default function App() {
   }, [isDesktop, leftCollapsed, rightCollapsed, leftW, rightW]);
 
   const setPlugins = useApp((s) => s.setPlugins);
+  const setSession = useApp((s) => s.setSession);
+  const setAuthStatus = useApp((s) => s.setAuthStatus);
+  const session = useApp((s) => s.session);
   useEffect(() => {
     api
       .health()
@@ -206,9 +209,20 @@ export default function App() {
         setReady(true);
       })
       .catch(() => setReady(true));
-    // Fetch this browser's plugin manifests (anonymous user_id stored
-    // in localStorage). Silent on failure — the user just won't see
-    // their previously-uploaded plugins until they re-upload.
+    // Capability probe — does this deployment have OAuth wired up?
+    api
+      .authStatus()
+      .then(setAuthStatus)
+      .catch(() => setAuthStatus(null));
+    // Current session (may be null when no cookie present).
+    api
+      .authMe()
+      .then(setSession)
+      .catch(() => setSession(null));
+
+    // Fetch the current namespace's plugin manifests. We re-run this
+    // whenever the session changes (login → reloads plugins under the
+    // hf_<username> namespace; logout → reloads under the anon UUID).
     const refreshPlugins = () => {
       api
         .listPlugins(getUserId())
@@ -227,7 +241,78 @@ export default function App() {
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [setHealth, setPlugins]);
+  }, [setHealth, setPlugins, setSession, setAuthStatus]);
+
+  // Whenever the session changes (post-login redirect or post-logout)
+  // refetch the plugin list — the namespace just changed under us.
+  useEffect(() => {
+    api
+      .listPlugins(getUserId())
+      .then(setPlugins)
+      .catch(() => {
+        /* ignore */
+      });
+  }, [session?.username, setPlugins]);
+
+  // Session-expiry detection. Without this the avatar dropdown would
+  // claim "signed in" while the server has long since started serving
+  // the anon namespace. We arm a timer for the cookie's expires_at and
+  // clear the local session state when it fires. We also probe /me
+  // every 5 minutes so a server-side invalidation propagates fast.
+  useEffect(() => {
+    if (!session) return;
+    const msUntil = session.expires_at * 1000 - Date.now();
+    if (msUntil <= 0) {
+      setSession(null);
+      return;
+    }
+    const expiryTimer = window.setTimeout(() => {
+      setSession(null);
+    }, msUntil);
+    const probeTimer = window.setInterval(() => {
+      api
+        .authMe()
+        .then((u) => {
+          if (!u) setSession(null);
+        })
+        .catch(() => {
+          /* network blip — leave the session alone */
+        });
+    }, 5 * 60 * 1000);
+    return () => {
+      window.clearTimeout(expiryTimer);
+      window.clearInterval(probeTimer);
+    };
+  }, [session?.expires_at, setSession, session]);
+
+  // Surface an auth error if the OAuth callback redirected with
+  // ?auth_error=... — strip it from the URL afterwards so a reload
+  // doesn't re-trigger the alert.
+  const [authErr, setAuthErr] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("auth_error");
+    if (err) {
+      setAuthErr(err);
+      params.delete("auth_error");
+      params.delete("logged_in");
+      const newQs = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname + (newQs ? "?" + newQs : ""),
+      );
+    } else if (params.has("logged_in")) {
+      params.delete("logged_in");
+      const newQs = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname + (newQs ? "?" + newQs : ""),
+      );
+    }
+  }, []);
 
   const leftWidth = leftCollapsed ? COLLAPSED_W : leftW;
   const rightWidth = rightCollapsed ? COLLAPSED_W : rightW;
@@ -240,6 +325,22 @@ export default function App() {
         onOpenLeftDrawer={() => setLeftDrawerOpen(true)}
         onOpenRightDrawer={() => setRightDrawerOpen(true)}
       />
+      {authErr && (
+        <div
+          role="alert"
+          className="px-4 py-2 text-xs text-warn bg-warn/10 border-b border-warn/30 flex items-center justify-between"
+        >
+          <span>Sign-in didn't complete: {authErr}</span>
+          <button
+            type="button"
+            onClick={() => setAuthErr(null)}
+            className="text-warn hover:text-ink px-2"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {isDesktop ? (
         /* =====================  Desktop  ===================== */
         <div className="flex-1 flex min-h-0">

@@ -49,6 +49,8 @@ export function UploadPluginModal({
 }) {
   const setPlugins = useApp((s) => s.setPlugins);
   const installedPlugins = useApp((s) => s.plugins);
+  const session = useApp((s) => s.session);
+  const authStatus = useApp((s) => s.authStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -173,7 +175,9 @@ export function UploadPluginModal({
     setInstallingExample(ex.name);
     setBusy(true);
     try {
-      const res = await fetch(api.exampleZipUrl(ex.name));
+      const res = await fetch(api.exampleZipUrl(ex.name), {
+        credentials: "include",
+      });
       if (!res.ok) {
         throw new Error(`Could not fetch example: HTTP ${res.status}`);
       }
@@ -367,8 +371,24 @@ export function UploadPluginModal({
               Upload your own block
             </div>
             <div className="text-[11px] text-mute">
-              Add a custom source/algorithm/metric/sink to your catalog. Only
-              you see it.
+              {session?.persistence_enabled ? (
+                <>
+                  Add a custom source/algorithm/metric/sink to{" "}
+                  <span className="text-ink">your account</span>. Persisted
+                  to your private HF Datasets repo — survives restarts and
+                  follows you across devices.
+                </>
+              ) : (
+                <>
+                  Add a custom source/algorithm/metric/sink to your
+                  catalog. Only you see it.{" "}
+                  {authStatus?.oauth_enabled && (
+                    <span className="text-mute/80">
+                      Sign in to keep plugins across restarts.
+                    </span>
+                  )}
+                </>
+              )}
             </div>
           </div>
           <button

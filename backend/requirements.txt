@@ -8,6 +8,15 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 pydantic==2.9.2
 python-multipart==0.0.12
+# OAuth + session: itsdangerous signs the session cookie, httpx is used
+# to POST to HF's OAuth /token endpoint. (FastAPI already pulls httpx
+# transitively for TestClient, but pinning it here makes the runtime
+# dependency explicit.)
+itsdangerous==2.2.0
+httpx==0.27.2
+# HF Datasets sync — used to persist authenticated users' plugins to
+# a private dataset repo so they survive container restarts.
+huggingface_hub==0.27.1
 
 # Qiskit stack (Jovin's working combo for Qiskit 2.3)
 qiskit==2.3.0
