@@ -73,7 +73,16 @@ def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode]) -> str:
 
 
 def _cache_put(key: str, result: StepResult, ctx: dict) -> None:
-    _step_cache[key] = (result, dict(ctx))  # shallow copy of ctx
+    # Deep-copy QuantumCircuit objects to prevent a future handler that
+    # mutates in-place from silently corrupting the cached snapshot.
+    # Other ctx values (backend, floats) are either immutable or cheap.
+    snapshot = {}
+    for k, v in ctx.items():
+        if isinstance(v, QuantumCircuit):
+            snapshot[k] = v.copy()
+        else:
+            snapshot[k] = v
+    _step_cache[key] = (result, snapshot)
     _step_cache.move_to_end(key)
     while len(_step_cache) > _STEP_CACHE_MAX:
         _step_cache.popitem(last=False)

@@ -206,9 +206,9 @@ export function generatePythonScript(
         lines.push(`        comp_backend = FakeFezV2()`);
         lines.push(`    lut = get_LUT(qc, comp_backend)`);
         lines.push(`    if lut:`);
-        lines.push(`        qp = quadraticProgram_luttoqp(lut)`);
-        lines.push(`        result = admmOptimizedCompVQC(qp, lut)`);
-        lines.push(`        qc = resultsCompressVQC(qc, result, lut)`);
+        lines.push(`        qp = quadraticProgram_luttoqp(qc, lut)`);
+        lines.push(`        result = admmOptimizedCompVQC(qp)`);
+        lines.push(`        qc = resultsCompressVQC(result, qc)`);
         lines.push(`        print(f"CompressVQC: compressed circuit depth {qc.depth()}")`);
         lines.push(`    else:`);
         lines.push(`        print("CompressVQC: no compressible pairs found")`);

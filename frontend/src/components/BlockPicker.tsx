@@ -106,13 +106,20 @@ export function BlockPicker({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border border-accent/50 text-accent hover:bg-accent/10 transition-colors whitespace-nowrap"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Add blocks to canvas"
       >
         <Plus className="w-3 h-3" />
         Add blocks
       </button>
 
       {open && (
-        <div className="fixed left-3 top-14 sm:absolute sm:left-0 sm:top-full sm:mt-1 z-40 w-[min(320px,calc(100vw-1.5rem))] max-h-[70vh] rounded-lg border border-edge bg-surface shadow-xl flex flex-col">
+        <div
+          role="menu"
+          aria-label="Block catalog"
+          className="fixed left-3 top-14 sm:absolute sm:left-0 sm:top-full sm:mt-1 z-40 w-[min(320px,calc(100vw-1.5rem))] max-h-[70vh] rounded-lg border border-edge bg-surface shadow-xl flex flex-col"
+        >
           {/* Search */}
           <div className="p-2 border-b border-edge">
             <div className="relative">
