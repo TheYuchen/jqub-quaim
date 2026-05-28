@@ -17,7 +17,7 @@ fails to import.
 from __future__ import annotations
 
 import time
-from typing import Callable
+from typing import Callable, Generator
 
 from qiskit import QuantumCircuit, transpile
 
@@ -472,3 +472,37 @@ def run_pipeline(
             break
 
     return steps
+
+
+def run_pipeline_stream(
+    *,
+    circuit: QuantumCircuit,
+    nodes: list[FlowNode],
+    edges: list[FlowEdge],
+    settings: Settings,
+) -> Generator[StepResult, None, None]:
+    """Generator version of run_pipeline: yields each StepResult as it
+    completes, enabling Server-Sent Events in the route layer."""
+    ctx: dict = {"circuit": circuit}
+    ordered = topological_order(nodes, edges)
+    for node in ordered:
+        if node.type == "input_circuit":
+            yield _make_step(
+                node,
+                "ok",
+                summary={
+                    "num_qubits": circuit.num_qubits,
+                    "depth": circuit.depth(),
+                    "num_parameters": circuit.num_parameters,
+                },
+            )
+            continue
+        handler = _HANDLERS.get(node.type)
+        if handler is None:
+            yield _make_step(node, "skipped", message=f"No handler for node type {node.type!r}")
+            continue
+        try:
+            yield handler(node, ctx, settings)
+        except Exception as exc:
+            yield _make_step(node, "error", message=f"{type(exc).__name__}: {exc}")
+            break

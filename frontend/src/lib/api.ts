@@ -130,4 +130,84 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => json<RunResponse>(r)),
+
+  /**
+   * Stream pipeline execution via SSE. Calls `onStep` for each step as
+   * it completes, then calls `onDone` with the assembled RunResponse.
+   * Falls back to the non-streaming endpoint if the server errors.
+   */
+  runStream: async (
+    body: RunRequest,
+    onStep: (step: StepResult, stepIndex: number) => void,
+    onDone: (response: RunResponse) => void,
+    onError: (err: Error) => void,
+  ) => {
+    try {
+      const res = await fetch(`${BASE}/workflow/run-stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const steps: StepResult[] = [];
+      let cachedResponse: RunResponse | null = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE lines: "data: {...}\n\n"
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (payload === "[DONE]" || payload === "[CACHED]") continue;
+          try {
+            const parsed = JSON.parse(payload);
+            // Cache hit sends a full RunResponse object (has .steps array)
+            if (Array.isArray(parsed.steps)) {
+              cachedResponse = parsed as RunResponse;
+            } else {
+              // Individual StepResult
+              steps.push(parsed as StepResult);
+              onStep(parsed as StepResult, steps.length - 1);
+            }
+          } catch {
+            // Ignore malformed lines
+          }
+        }
+      }
+
+      if (cachedResponse) {
+        onDone(cachedResponse);
+        return;
+      }
+
+      // Assemble the final RunResponse
+      const ok = steps.every((s) => s.status !== "error");
+      let finalMetrics: Record<string, unknown> = {};
+      for (let i = steps.length - 1; i >= 0; i--) {
+        if (steps[i].node_type === "output" && steps[i].status === "ok") {
+          finalMetrics = steps[i].summary;
+          break;
+        }
+      }
+      onDone({
+        circuit_id: body.circuit_id,
+        ok,
+        from_cache: false,
+        steps,
+        final_metrics: finalMetrics,
+      });
+    } catch (err) {
+      onError(err instanceof Error ? err : new Error(String(err)));
+    }
+  },
 };

@@ -365,25 +365,42 @@ export function FlowCanvas() {
       return;
     }
     setRunning(true);
+    setRun(null);
     setNotice(null);
-    try {
-      const body = {
-        circuit_id: circuit.circuit_id,
-        nodes: nodes.map((n) => ({
-          id: n.id,
-          type: (n.data as QNodeData).kind,
-          data: (n.data as QNodeData).params ?? {},
-        })),
-        edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
-        use_live_ibm: useLiveIbm,
-      };
-      const res = await api.run(body);
-      setRun(res);
-    } catch (e) {
-      setNotice({ text: (e as Error).message, tone: "danger" });
-    } finally {
-      setRunning(false);
-    }
+    const body = {
+      circuit_id: circuit.circuit_id,
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        type: (n.data as QNodeData).kind,
+        data: (n.data as QNodeData).params ?? {},
+      })),
+      edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
+      use_live_ibm: useLiveIbm,
+    };
+    // Use the SSE streaming endpoint so the user sees each step
+    // appear in the results pane as it completes.
+    api.runStream(
+      body,
+      (step, idx) => {
+        // Incrementally build the run response as steps arrive.
+        setRun((prev) => ({
+          circuit_id: body.circuit_id,
+          ok: prev?.ok !== false && step.status !== "error",
+          from_cache: false,
+          steps: [...(prev?.steps ?? []), step],
+          final_metrics: prev?.final_metrics ?? {},
+        }));
+      },
+      (response) => {
+        // Streaming complete: set the final assembled response.
+        setRun(response);
+        setRunning(false);
+      },
+      (err) => {
+        setNotice({ text: err.message, tone: "danger" });
+        setRunning(false);
+      },
+    );
   };
 
   return (

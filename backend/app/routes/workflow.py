@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
 from app.schemas import RunRequest, RunResponse
 from app.services.circuit_service import CircuitNotFoundError, circuit_store
 from app.services.run_cache import compute_cache_key, load_cached_response
-from app.services.workflow_service import run_pipeline
+from app.services.workflow_service import run_pipeline, run_pipeline_stream
 
 router = APIRouter()
 
@@ -64,3 +67,44 @@ def run_workflow(req: RunRequest) -> RunResponse:
         steps=steps,
         final_metrics=final_metrics,
     )
+
+
+@router.post("/workflow/run-stream")
+def run_workflow_stream(req: RunRequest):
+    """SSE endpoint: yields each StepResult as a Server-Sent Event as
+    soon as it completes, instead of waiting for the whole pipeline.
+
+    The frontend can show incremental progress: "Step 1 done... Step 2
+    running..." instead of a single spinner followed by all results at
+    once. Cache hits still return instantly (as a single event with all
+    steps + a ``[CACHED]`` sentinel).
+    """
+    try:
+        qc = circuit_store.get(req.circuit_id)
+    except CircuitNotFoundError:
+        raise HTTPException(status_code=404, detail="Unknown circuit_id") from None
+
+    settings = get_settings()
+
+    if req.use_live_ibm and not (settings.has_ibm_token and settings.allow_live_ibm):
+        raise HTTPException(status_code=403, detail="Live IBM execution is disabled.")
+
+    # Cache hit → emit all steps at once and close.
+    if not req.use_live_ibm:
+        key = compute_cache_key(qc, req.nodes, req.edges, use_live_ibm=False)
+        cached = load_cached_response(key, circuit_id=req.circuit_id)
+        if cached is not None:
+            def cached_stream():
+                yield f"data: {cached.model_dump_json()}\n\n"
+                yield "data: [CACHED]\n\n"
+            return StreamingResponse(cached_stream(), media_type="text/event-stream")
+
+    # Cache miss → stream steps one by one.
+    def step_stream():
+        for step in run_pipeline_stream(
+            circuit=qc, nodes=req.nodes, edges=req.edges, settings=settings,
+        ):
+            yield f"data: {step.model_dump_json()}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(step_stream(), media_type="text/event-stream")
