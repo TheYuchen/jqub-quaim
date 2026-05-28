@@ -22,6 +22,7 @@ from app.config import FRONTEND_DIST, get_settings
 from app.routes import backends as backends_route
 from app.routes import circuits as circuits_route
 from app.routes import health as health_route
+from app.routes import plugins as plugins_route
 from app.routes import workflow as workflow_route
 
 
@@ -63,6 +64,7 @@ app.include_router(health_route.router, prefix="/api")
 app.include_router(backends_route.router, prefix="/api")
 app.include_router(circuits_route.router, prefix="/api")
 app.include_router(workflow_route.router, prefix="/api")
+app.include_router(plugins_route.router, prefix="/api")
 
 
 # ---------- Static frontend ----------
