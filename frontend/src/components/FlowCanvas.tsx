@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { copyToClipboard } from "../lib/clipboard";
 import { generatePythonScript } from "../lib/exportPython";
-import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
+import { NODE_BY_KIND, resolveNodeSpec, type NodeKind } from "../lib/nodeCatalog";
 import {
   DEFAULT_PRESET_KEY,
   PRESET_BY_KEY,
@@ -170,19 +170,23 @@ export function FlowCanvas() {
     );
     const startX = nodes.length === 0 ? 80 : maxX + 60;
 
-    const newNodes: RFNode[] = kinds.map((kind, i) => ({
-      id: `n${Date.now().toString(36)}${i}`,
-      type: "qnode",
-      position: { x: startX + i * SPACING_X, y: Y },
-      data: {
-        kind,
-        params: { ...(NODE_BY_KIND[kind].defaultData ?? {}) },
-      },
-    }));
+    const plugins = useApp.getState().plugins;
+    const newNodes: RFNode[] = kinds.map((kind, i) => {
+      const spec = resolveNodeSpec(kind, plugins);
+      return {
+        id: `n${Date.now().toString(36)}${i}`,
+        type: "qnode",
+        position: { x: startX + i * SPACING_X, y: Y },
+        data: {
+          kind,
+          params: { ...((spec?.defaultData as Record<string, unknown>) ?? {}) },
+        },
+      };
+    });
 
     setNodes((ns) => {
       const merged = [...ns, ...newNodes];
-      const result = autoConnect(merged, []);
+      const result = autoConnect(merged, [], useApp.getState().plugins);
       if (result.connected) {
         setEdges(result.edges);
         setNotice(
@@ -245,15 +249,21 @@ export function FlowCanvas() {
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const kind = e.dataTransfer.getData("application/reactflow") as NodeKind;
-      if (!kind || !NODE_BY_KIND[kind]) return;
+      const kind = e.dataTransfer.getData("application/reactflow");
+      if (!kind) return;
+      const plugins = useApp.getState().plugins;
+      const spec = resolveNodeSpec(kind, plugins);
+      if (!spec) return;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const id = `n${Date.now().toString(36)}`;
       const node: RFNode = {
         id,
         type: "qnode",
         position,
-        data: { kind, params: { ...(NODE_BY_KIND[kind].defaultData ?? {}) } },
+        data: {
+          kind: kind as NodeKind,
+          params: { ...((spec.defaultData as Record<string, unknown>) ?? {}) },
+        },
       };
       setNodes((ns) => ns.concat(node));
     },
@@ -346,7 +356,7 @@ export function FlowCanvas() {
   };
 
   const runAutoConnect = () => {
-    const result = autoConnect(nodes, edges);
+    const result = autoConnect(nodes, edges, useApp.getState().plugins);
     if (!result.connected) {
       // Nothing to wire (empty/single/all-unknown canvas): just surface
       // the advisory without touching the edges.

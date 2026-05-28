@@ -8,10 +8,11 @@ import {
   X,
 } from "lucide-react";
 import {
-  NODE_BY_KIND,
+  resolveNodeSpec,
   type NodeKind,
   type NodeParamSpec,
   type NodeSpec,
+  type PluginNodeSpec,
 } from "../lib/nodeCatalog";
 import { NodeParamEditor } from "./NodeParamEditor";
 import { TipIcon } from "./TipIcon";
@@ -52,7 +53,6 @@ export interface QNodeData extends Record<string, unknown> {
  */
 export function QNode({ id, data, selected }: NodeProps) {
   const d = data as QNodeData;
-  const spec = NODE_BY_KIND[d.kind];
   const flow = useReactFlow();
   const { deleteElements } = flow;
   // Subscribe to the active circuit so source/algorithm blocks can
@@ -63,6 +63,10 @@ export function QNode({ id, data, selected }: NodeProps) {
   // shallow comparison keeps the cost cheap.
   const circuit = useApp((s) => s.circuit);
   const sampleKey = useApp((s) => s.sampleKey);
+  const plugins = useApp((s) => s.plugins);
+  // Spec resolution — built-in OR user plugin. Hook order requires
+  // this stay above any early return.
+  const spec = resolveNodeSpec(d.kind, plugins);
   // Per-instance disclosure state for the param editor. Default to
   // collapsed so the canvas stays scannable; users click the chevron
   // to reveal the controls. State lives in component-local React
@@ -115,13 +119,36 @@ export function QNode({ id, data, selected }: NodeProps) {
         </a>
       )}
       <div className="flex items-center gap-2">
-        <span
-          className={`w-7 h-7 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent} shrink-0`}
-        >
-          <Icon className="w-3.5 h-3.5" strokeWidth={2} />
-        </span>
+        {"isPlugin" in spec && spec.isPlugin ? (
+          // Plugin badge: filled square in plugin's chosen color +
+          // first-letter(s) so users can distinguish multiple plugins
+          // at a glance.
+          <span
+            className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-[11px] font-bold text-white"
+            style={{ backgroundColor: (spec as PluginNodeSpec).pluginColor }}
+            title={`User plugin (${spec.kind})`}
+          >
+            {(spec as PluginNodeSpec).initials}
+          </span>
+        ) : (
+          <span
+            className={`w-7 h-7 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent} shrink-0`}
+          >
+            <Icon className="w-3.5 h-3.5" strokeWidth={2} />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-ink text-sm">{spec.label}</div>
+          <div className="font-medium text-ink text-sm flex items-center gap-1">
+            <span className="truncate">{spec.label}</span>
+            {"isPlugin" in spec && spec.isPlugin && (
+              <span
+                className="text-[9px] px-1 py-0.5 rounded border border-edge text-mute/70 shrink-0"
+                title="User-uploaded plugin"
+              >
+                plugin
+              </span>
+            )}
+          </div>
           <div className="text-[10px] text-mute uppercase tracking-wider flex items-center gap-1">
             <span>{spec.family}</span>
             <TipIcon hint={FAMILY_HINTS[spec.family]} size={10} />

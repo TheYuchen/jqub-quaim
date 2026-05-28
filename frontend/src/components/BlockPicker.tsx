@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Plus, Search, X } from "lucide-react";
-import { NODE_CATALOG, type NodeKind, type NodeSpec } from "../lib/nodeCatalog";
+import {
+  NODE_CATALOG,
+  synthesizePluginSpec,
+  type NodeKind,
+  type NodeSpec,
+  type PluginNodeSpec,
+} from "../lib/nodeCatalog";
 import { useApp } from "../lib/store";
 
 /**
@@ -71,17 +77,25 @@ export function BlockPicker({
     }
   }, [open]);
 
+  // Merge built-in catalog with the user's plugin manifests so the
+  // picker shows everything in one list, grouped by family.
+  const plugins = useApp((s) => s.plugins);
+  const combined: (NodeSpec | PluginNodeSpec)[] = useMemo(
+    () => [...NODE_CATALOG, ...plugins.map(synthesizePluginSpec)],
+    [plugins],
+  );
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return NODE_CATALOG;
+    if (!search.trim()) return combined;
     const q = search.toLowerCase();
-    return NODE_CATALOG.filter(
+    return combined.filter(
       (n) =>
         n.label.toLowerCase().includes(q) ||
         n.tagline.toLowerCase().includes(q) ||
         n.family.toLowerCase().includes(q) ||
         n.kind.toLowerCase().includes(q),
     );
-  }, [search]);
+  }, [search, combined]);
 
   const toggle = (kind: NodeKind) =>
     setChecked((s) => {
@@ -92,9 +106,11 @@ export function BlockPicker({
 
   const addSelected = () => {
     if (checked.size === 0) return;
-    const ordered = NODE_CATALOG.filter((n) => checked.has(n.kind)).map(
-      (n) => n.kind,
-    );
+    // Preserve catalog order (built-ins first, then plugins) so
+    // auto-connect lays them out left-to-right sensibly.
+    const ordered = combined
+      .filter((n) => checked.has(n.kind as NodeKind))
+      .map((n) => n.kind as NodeKind);
     addBlocksToCanvas(ordered);
     setChecked(new Set());
     setOpen(false);
@@ -160,14 +176,15 @@ export function BlockPicker({
                     </div>
                   </div>
                   {items.map((n) => {
-                    const isChecked = checked.has(n.kind);
-                    const onCanvas = canvasKinds.has(n.kind);
+                    const isChecked = checked.has(n.kind as NodeKind);
+                    const onCanvas = canvasKinds.has(n.kind as NodeKind);
+                    const isPlugin = "isPlugin" in n && n.isPlugin;
                     const Icon = n.icon;
                     return (
                       <button
                         key={n.kind}
                         type="button"
-                        onClick={() => toggle(n.kind)}
+                        onClick={() => toggle(n.kind as NodeKind)}
                         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors ${
                           isChecked
                             ? "bg-accent/10"
@@ -186,16 +203,34 @@ export function BlockPicker({
                             <Check className="w-2.5 h-2.5" strokeWidth={3} />
                           )}
                         </span>
-                        {/* Icon */}
-                        <span
-                          className={`shrink-0 w-5 h-5 rounded border ${n.accentRing} bg-surface flex items-center justify-center ${n.accent}`}
-                        >
-                          <Icon className="w-2.5 h-2.5" strokeWidth={2} />
-                        </span>
+                        {/* Icon — built-in uses Lucide; plugin uses
+                            initials badge with custom color so users
+                            can tell theirs apart. */}
+                        {isPlugin ? (
+                          <span
+                            className="shrink-0 w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold text-white"
+                            style={{
+                              backgroundColor: (n as PluginNodeSpec).pluginColor,
+                            }}
+                          >
+                            {(n as PluginNodeSpec).initials}
+                          </span>
+                        ) : (
+                          <span
+                            className={`shrink-0 w-5 h-5 rounded border ${n.accentRing} bg-surface flex items-center justify-center ${n.accent}`}
+                          >
+                            <Icon className="w-2.5 h-2.5" strokeWidth={2} />
+                          </span>
+                        )}
                         {/* Label + tagline */}
                         <span className="flex-1 min-w-0">
                           <span className="text-[11px] text-ink block truncate">
                             {n.label}
+                            {isPlugin && (
+                              <span className="ml-1 text-[8px] uppercase tracking-wider text-mute/60">
+                                plugin
+                              </span>
+                            )}
                           </span>
                           <span className="text-[9px] text-mute block truncate">
                             {n.tagline}

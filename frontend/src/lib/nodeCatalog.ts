@@ -322,3 +322,95 @@ export const NODE_CATALOG: NodeSpec[] = [
 export const NODE_BY_KIND = Object.fromEntries(
   NODE_CATALOG.map((n) => [n.kind, n]),
 ) as Record<NodeKind, NodeSpec>;
+
+// ---------------------------------------------------------------------
+// User-plugin support
+// ---------------------------------------------------------------------
+//
+// Plugin manifests come from the backend at runtime; we synthesize a
+// NodeSpec on the fly so the rest of the UI can treat them like a
+// built-in block.
+
+import { Package } from "lucide-react";
+import type { PluginManifest } from "./api";
+
+/** A NodeSpec extension marker so render code knows this is user-
+ *  uploaded (renders generic icon + first-letter badge with the
+ *  plugin's chosen color, and shows a "delete" affordance). */
+export interface PluginNodeSpec extends NodeSpec {
+  isPlugin: true;
+  /** First letter or two of the label, shown as a colored badge. */
+  initials: string;
+  /** Plugin's chosen accent colour (raw hex). */
+  pluginColor: string;
+}
+
+/** Build a NodeSpec from a backend-served plugin manifest. The
+ *  resulting spec slots into NODE_CATALOG-shaped consumers without
+ *  conditionals at the call site — only render code that wants the
+ *  plugin badge needs to check ``isPlugin``. */
+export function synthesizePluginSpec(m: PluginManifest): PluginNodeSpec {
+  const initials = m.label
+    .replace(/[^A-Za-z0-9]/g, "")
+    .slice(0, 2)
+    .toUpperCase() || "?";
+  // We deliberately don't carry the plugin's colour through the
+  // existing Tailwind ``accent``/``accentRing`` slots (those expect
+  // class names); instead the QNode render uses ``pluginColor``
+  // directly as an inline style on the badge.
+  return {
+    kind: m.kind as NodeKind,
+    label: m.label,
+    family: m.family,
+    tagline: m.tagline,
+    description: m.description || `User plugin (${m.kind}).`,
+    icon: Package,
+    accent: "text-ink",
+    accentRing: "border-edge",
+    // Plugin manifest params share the same shape as NodeParamSpec.
+    params: m.params.length > 0 ? (m.params as NodeParamSpec[]) : undefined,
+    defaultData: {},
+    isPlugin: true,
+    initials,
+    pluginColor: m.color,
+  };
+}
+
+/** Look up the spec for a node kind, falling back to a synthesized
+ *  plugin spec if it's user-uploaded. Returns undefined for unknown
+ *  kinds (so callers can show an "orphan plugin" state — e.g. the
+ *  user opened a share-link that references a plugin they don't
+ *  have installed). */
+export function resolveNodeSpec(
+  kind: string,
+  plugins: PluginManifest[],
+): NodeSpec | PluginNodeSpec | undefined {
+  const builtin = NODE_BY_KIND[kind as NodeKind];
+  if (builtin) return builtin;
+  const m = plugins.find((p) => p.kind === kind);
+  return m ? synthesizePluginSpec(m) : undefined;
+}
+
+/** Same as resolveNodeSpec but never returns undefined — produces a
+ *  best-effort "missing plugin" placeholder so render code doesn't
+ *  have to handle nulls. */
+export function resolveNodeSpecOrPlaceholder(
+  kind: string,
+  plugins: PluginManifest[],
+): NodeSpec | PluginNodeSpec {
+  const found = resolveNodeSpec(kind, plugins);
+  if (found) return found;
+  return {
+    kind: kind as NodeKind,
+    label: kind,
+    family: "algorithm",
+    tagline: "missing plugin",
+    description: `No plugin with kind="${kind}" is installed in this browser.`,
+    icon: Package,
+    accent: "text-danger",
+    accentRing: "border-danger/40",
+    isPlugin: true,
+    initials: "?",
+    pluginColor: "#dc2626",
+  } as PluginNodeSpec;
+}

@@ -1,7 +1,17 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, FileText, Search, X } from "lucide-react";
-import { NODE_CATALOG, type NodeKind, type NodeSpec } from "../lib/nodeCatalog";
+import { ChevronDown, FileText, Search, Upload, X } from "lucide-react";
+import { api } from "../lib/api";
+import {
+  NODE_CATALOG,
+  synthesizePluginSpec,
+  type NodeKind,
+  type NodeSpec,
+  type PluginNodeSpec,
+} from "../lib/nodeCatalog";
+import { useApp } from "../lib/store";
+import { getUserId } from "../lib/userId";
 import { BlockPicker } from "./BlockPicker";
+import { UploadPluginModal } from "./UploadPluginModal";
 
 /**
  * Categorised block catalog above the canvas.
@@ -43,25 +53,49 @@ export function NodePalette({
 } = {}) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(true);
+  const [uploadOpen, setUploadOpen] = useState(false);
   // null = show all families; a family key = show only that family.
   const [activeFamily, setActiveFamily] = useState<NodeSpec["family"] | null>(null);
+
+  // Plugin manifests this browser has uploaded — merged with NODE_CATALOG
+  // so plugins show up under their declared family alongside built-ins.
+  const plugins = useApp((s) => s.plugins);
+  const setPlugins = useApp((s) => s.setPlugins);
+  const pluginSpecs: PluginNodeSpec[] = useMemo(
+    () => plugins.map(synthesizePluginSpec),
+    [plugins],
+  );
+  const combined: (NodeSpec | PluginNodeSpec)[] = useMemo(
+    () => [...NODE_CATALOG, ...pluginSpecs],
+    [pluginSpecs],
+  );
 
   const toggleFamily = (fam: NodeSpec["family"]) =>
     setActiveFamily((cur) => (cur === fam ? null : fam));
 
+  const handleDeletePlugin = async (kind: string) => {
+    try {
+      await api.deletePlugin(getUserId(), kind);
+      const fresh = await api.listPlugins(getUserId());
+      setPlugins(fresh);
+    } catch {
+      /* silent — the tile staying around is harmless */
+    }
+  };
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return NODE_CATALOG;
+    if (!search.trim()) return combined;
     const q = search.toLowerCase();
-    return NODE_CATALOG.filter(
+    return combined.filter(
       (n) =>
         n.label.toLowerCase().includes(q) ||
         n.tagline.toLowerCase().includes(q) ||
         n.family.toLowerCase().includes(q) ||
         n.kind.toLowerCase().includes(q),
     );
-  }, [search]);
+  }, [search, combined]);
 
-  const totalCount = NODE_CATALOG.length;
+  const totalCount = combined.length;
 
   if (!expanded) {
     return (
@@ -86,6 +120,16 @@ export function NodePalette({
       <div className="px-3 pt-2 pb-1 flex items-center gap-2">
         {/* Multi-select dropdown picker */}
         <BlockPicker canvasKinds={canvasKinds} />
+        <button
+          type="button"
+          onClick={() => setUploadOpen(true)}
+          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border border-edge text-mute hover:border-accent/40 hover:text-ink transition-colors whitespace-nowrap"
+          title="Upload your own plugin block (.zip)"
+          aria-label="Upload plugin"
+        >
+          <Upload className="w-3 h-3" />
+          <span className="hidden lg:inline">Upload</span>
+        </button>
         {/* Search */}
         <div className="relative flex-1 max-w-[200px]">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-mute pointer-events-none" />
@@ -171,7 +215,15 @@ export function NodePalette({
               </button>
               <div className="flex items-center gap-1 flex-wrap">
                 {items.map((n) => (
-                  <PaletteTile key={n.kind} spec={n} />
+                  <PaletteTile
+                    key={n.kind}
+                    spec={n}
+                    onDelete={
+                      "isPlugin" in n && n.isPlugin
+                        ? () => handleDeletePlugin(n.kind)
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
               {/* Divider between visible families (not after the last) */}
@@ -187,11 +239,21 @@ export function NodePalette({
           </div>
         )}
       </div>
+      <UploadPluginModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </div>
   );
 }
 
-function PaletteTile({ spec }: { spec: NodeSpec }) {
+function PaletteTile({
+  spec,
+  onDelete,
+}: {
+  spec: NodeSpec | PluginNodeSpec;
+  /** When set, shows a red × in the corner that calls back on click —
+   *  used for user-uploaded plugins. */
+  onDelete?: () => void;
+}) {
+  const isPlugin = "isPlugin" in spec && spec.isPlugin;
   const Icon = spec.icon;
   function onDragStart(e: React.DragEvent) {
     e.dataTransfer.setData("application/reactflow", spec.kind);
@@ -201,10 +263,15 @@ function PaletteTile({ spec }: { spec: NodeSpec }) {
     <div
       draggable
       onDragStart={onDragStart}
-      className="group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border border-edge/60 hover:border-edge hover:bg-surfaceAlt transition-colors text-center px-1.5 py-1.5"
+      className={`group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border transition-colors text-center px-1.5 py-1.5 ${
+        isPlugin
+          ? "border-edge bg-surface/60 hover:bg-surfaceAlt"
+          : "border-edge/60 hover:border-edge hover:bg-surfaceAlt"
+      }`}
       title={spec.description}
     >
-      {spec.paper && (
+      {/* Top-right corner badge: paper link, delete button, or nothing */}
+      {spec.paper && !isPlugin && (
         <a
           href={spec.paper.url}
           target="_blank"
@@ -219,11 +286,36 @@ function PaletteTile({ spec }: { spec: NodeSpec }) {
           <FileText className="w-2.5 h-2.5" strokeWidth={2} />
         </a>
       )}
-      <span
-        className={`w-6 h-6 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent}`}
-      >
-        <Icon className="w-3 h-3" strokeWidth={2} />
-      </span>
+      {isPlugin && onDelete && (
+        <button
+          type="button"
+          draggable={false}
+          onDragStart={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (window.confirm(`Delete plugin "${spec.label}"?`)) onDelete();
+          }}
+          className="absolute top-1 right-1 w-4 h-4 rounded-full border border-edge bg-surface text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          title={`Delete plugin ${spec.label}`}
+          aria-label={`Delete plugin ${spec.label}`}
+        >
+          <X className="w-2.5 h-2.5" strokeWidth={2.5} />
+        </button>
+      )}
+      {isPlugin ? (
+        <span
+          className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
+          style={{ backgroundColor: (spec as PluginNodeSpec).pluginColor }}
+        >
+          {(spec as PluginNodeSpec).initials}
+        </span>
+      ) : (
+        <span
+          className={`w-6 h-6 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent}`}
+        >
+          <Icon className="w-3 h-3" strokeWidth={2} />
+        </span>
+      )}
       <span className="text-[10px] text-ink truncate max-w-full leading-tight">
         {spec.label}
       </span>

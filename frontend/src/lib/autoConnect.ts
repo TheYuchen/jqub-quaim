@@ -35,7 +35,13 @@
 
 import type { Edge, Node } from "@xyflow/react";
 import type { QNodeData } from "../components/QNode";
-import { NODE_BY_KIND, type NodeKind, type NodeSpec } from "./nodeCatalog";
+import {
+  NODE_BY_KIND,
+  resolveNodeSpec,
+  type NodeKind,
+  type NodeSpec,
+} from "./nodeCatalog";
+import type { PluginManifest } from "./api";
 
 type Family = NodeSpec["family"];
 
@@ -98,6 +104,7 @@ export interface AutoConnectResult {
 export function autoConnect(
   nodes: Node<QNodeData>[],
   existingEdges: Edge[],
+  plugins: PluginManifest[] = [],
 ): AutoConnectResult {
   const warnings: string[] = [];
   const replacedCount = existingEdges.length;
@@ -130,11 +137,12 @@ export function autoConnect(
   };
   const unknown: Node<QNodeData>[] = [];
   for (const n of nodes) {
-    const spec = NODE_BY_KIND[n.data.kind];
+    const spec = resolveNodeSpec(n.data.kind, plugins);
     if (!spec) {
       // Forward-compat: unrecognised kinds (e.g. a node kind added in a
-      // newer build loaded via a stale share link) are preserved on the
-      // canvas but left out of the chain rather than silently dropped.
+      // newer build loaded via a stale share link, or a plugin missing
+      // from this browser) are preserved on the canvas but left out of
+      // the chain rather than silently dropped.
       unknown.push(n);
       continue;
     }
@@ -263,8 +271,8 @@ export function autoConnect(
   for (let i = 0; i < chain.length - 1; i++) {
     const src = chain[i];
     const dst = chain[i + 1];
-    const srcFamily = NODE_BY_KIND[src.data.kind]?.family;
-    const dstFamily = NODE_BY_KIND[dst.data.kind]?.family;
+    const srcFamily = resolveNodeSpec(src.data.kind, plugins)?.family;
+    const dstFamily = resolveNodeSpec(dst.data.kind, plugins)?.family;
     const isNoiseSidechain =
       srcFamily === "backend" &&
       dstFamily === "algorithm" &&

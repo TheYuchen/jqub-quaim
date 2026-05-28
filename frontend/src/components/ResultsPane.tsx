@@ -6,7 +6,10 @@
 
 import { useApp } from "../lib/store";
 import type { StepResult } from "../lib/api";
-import { NODE_BY_KIND, type NodeKind } from "../lib/nodeCatalog";
+import {
+  resolveNodeSpec,
+  type PluginNodeSpec,
+} from "../lib/nodeCatalog";
 import {
   AlertCircle,
   Check,
@@ -128,7 +131,9 @@ function NextStepsHint() {
 }
 
 function StepCard({ step }: { step: StepResult }) {
-  const spec = NODE_BY_KIND[step.node_type as NodeKind];
+  const plugins = useApp((s) => s.plugins);
+  const spec = resolveNodeSpec(step.node_type, plugins);
+  const isPlugin = spec && "isPlugin" in spec && spec.isPlugin;
   const Icon = spec?.icon ?? CircleDot;
   const dur = step.finished_at - step.started_at;
 
@@ -146,13 +151,23 @@ function StepCard({ step }: { step: StepResult }) {
   return (
     <div className="panel-alt p-3">
       <div className="flex items-center gap-2">
-        <span
-          className={`w-7 h-7 rounded-md border bg-surface flex items-center justify-center shrink-0 ${
-            spec?.accent ?? "text-mute"
-          } ${spec?.accentRing ?? "border-edge"}`}
-        >
-          <Icon className="w-3.5 h-3.5" strokeWidth={2} />
-        </span>
+        {isPlugin ? (
+          <span
+            className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-[11px] font-bold text-white"
+            style={{ backgroundColor: (spec as PluginNodeSpec).pluginColor }}
+            title={`User plugin (${step.node_type})`}
+          >
+            {(spec as PluginNodeSpec).initials}
+          </span>
+        ) : (
+          <span
+            className={`w-7 h-7 rounded-md border bg-surface flex items-center justify-center shrink-0 ${
+              spec?.accent ?? "text-mute"
+            } ${spec?.accentRing ?? "border-edge"}`}
+          >
+            <Icon className="w-3.5 h-3.5" strokeWidth={2} />
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="font-medium text-ink text-sm">{step.label}</span>
