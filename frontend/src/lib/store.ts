@@ -5,7 +5,7 @@ import { create } from "zustand";
 import type { CircuitInfo, RunResponse, HealthResponse } from "./api";
 import type { NodeKind } from "./nodeCatalog";
 
-const LS_USE_LIVE_IBM = "jqub.useLiveIbm";
+const LS_USE_LIVE_IBM = "quda.useLiveIbm";
 
 function loadUseLiveIbm(): boolean {
   if (typeof window === "undefined") return false;

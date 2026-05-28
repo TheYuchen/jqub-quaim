@@ -46,7 +46,7 @@ export const THEME_BY_KEY: Record<ThemeKey, ThemeSpec> = Object.fromEntries(
 ) as Record<ThemeKey, ThemeSpec>;
 
 export const DEFAULT_THEME: ThemeKey = "light";
-const LS_THEME = "jqub.theme";
+const LS_THEME = "quda.theme";
 
 export function loadStoredTheme(): ThemeKey {
   if (typeof window === "undefined") return DEFAULT_THEME;

@@ -32,10 +32,10 @@ const MIN_CANVAS_W = 280;
 // Reserve the side resizer's footprint when computing the canvas budget.
 const RESIZER_W = 4;
 
-const LS_LEFT = "jqub.leftPaneWidth";
-const LS_RIGHT = "jqub.rightPaneWidth";
-const LS_LEFT_COLLAPSED = "jqub.leftPaneCollapsed";
-const LS_RIGHT_COLLAPSED = "jqub.rightPaneCollapsed";
+const LS_LEFT = "quda.leftPaneWidth";
+const LS_RIGHT = "quda.rightPaneWidth";
+const LS_LEFT_COLLAPSED = "quda.leftPaneCollapsed";
+const LS_RIGHT_COLLAPSED = "quda.rightPaneCollapsed";
 
 function loadWidth(key: string, def: number, min: number, max: number): number {
   if (typeof window === "undefined") return def;

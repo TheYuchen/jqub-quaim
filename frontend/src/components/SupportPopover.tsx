@@ -128,7 +128,7 @@ export function SupportPopover() {
       {open && (
         <div
           role="menu"
-          className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-3 w-[min(26rem,calc(100vw-1.5rem))]"
+          className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-40 p-3 w-[min(26rem,calc(100vw-1.5rem))]"
         >
           <div className="text-xs uppercase tracking-wider text-mute mb-2">
             Supported by NSF

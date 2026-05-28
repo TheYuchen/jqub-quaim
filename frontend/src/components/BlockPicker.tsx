@@ -112,7 +112,7 @@ export function BlockPicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-[320px] max-h-[70vh] rounded-lg border border-edge bg-surface shadow-xl flex flex-col">
+        <div className="fixed left-3 top-14 sm:absolute sm:left-0 sm:top-full sm:mt-1 z-40 w-[min(320px,calc(100vw-1.5rem))] max-h-[70vh] rounded-lg border border-edge bg-surface shadow-xl flex flex-col">
           {/* Search */}
           <div className="p-2 border-b border-edge">
             <div className="relative">

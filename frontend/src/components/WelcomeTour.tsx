@@ -14,7 +14,7 @@ import { AlgorithmsSlide } from "./tour/AlgorithmsSlide";
 import { PipelineSlide } from "./tour/PipelineSlide";
 import { TrySlide } from "./tour/TrySlide";
 
-const TOUR_FLAG = "jqub-tour-seen-v1";
+const TOUR_FLAG = "quda-tour-seen-v1";
 
 type Slide = "welcome" | "algorithms" | "pipeline" | "try";
 const ORDER: Slide[] = ["welcome", "algorithms", "pipeline", "try"];

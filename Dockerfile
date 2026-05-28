@@ -1,4 +1,4 @@
-# QuAIM — two-stage image.
+# QuDA Studio — two-stage image.
 #   stage 1 (node): vite build of the React frontend
 #   stage 2 (python): backend deps + qlib + the built frontend/dist
 #
