@@ -218,11 +218,12 @@ export default function App() {
         });
     };
     refreshPlugins();
-    // Multi-tab sync: if the user uploads/deletes a plugin in another
-    // tab the storage event lets this tab pick the change up. We
-    // listen for any quda.* key to be safe.
+    // Multi-tab sync: every upload/delete in another tab bumps the
+    // pluginsRev counter; we listen for just that key so unrelated
+    // localStorage writes (pane widths, theme, etc.) don't trigger
+    // unnecessary refetches.
     const onStorage = (e: StorageEvent) => {
-      if (!e.key || e.key.startsWith("quda.")) refreshPlugins();
+      if (e.key === "quda.pluginsRev") refreshPlugins();
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);

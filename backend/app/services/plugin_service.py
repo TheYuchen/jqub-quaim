@@ -94,7 +94,12 @@ class PluginManifest(BaseModel):
     plugin zip, and surfaced via /api/plugins so the front-end can
     render the block tile and the param editor."""
 
-    kind: str = Field(..., min_length=2, max_length=32)
+    # max_length matches _KIND_RE's upper bound (1 leading lowercase
+    # letter + up to 30 of the same charset = 31 max). Pydantic would
+    # also catch a too-long value via the regex, but keeping the length
+    # constraint in sync surfaces a clear length error before the
+    # regex one.
+    kind: str = Field(..., min_length=2, max_length=31)
     label: str = Field(..., min_length=1, max_length=40)
     family: PluginFamily
     tagline: str = Field(default="custom user block", max_length=80)

@@ -11,30 +11,12 @@ import {
   resolveNodeSpec,
   type NodeKind,
   type NodeParamSpec,
-  type NodeSpec,
   type PluginNodeSpec,
 } from "../lib/nodeCatalog";
 import { NodeParamEditor } from "./NodeParamEditor";
 import { TipIcon } from "./TipIcon";
 import { useApp } from "../lib/store";
-
-/** Plain-language description of each node-family role, surfaced as a
- *  tooltip on the small family badge under the node label. The 5 words
- *  (SOURCE / BACKEND / ALGORITHM / METRIC / SINK) make sense to anyone
- *  who's seen a workflow editor before, but not to the quantum-only or
- *  newcomer audience this demo gets. */
-const FAMILY_HINTS: Record<NodeSpec["family"], string> = {
-  source:
-    "Where the pipeline starts — feeds your quantum circuit to the rest of the graph.",
-  backend:
-    "Provides a noise model. Algorithm blocks downstream use it to simulate hardware behaviour.",
-  algorithm:
-    "A research algorithm. Reads the circuit (and noise) from upstream, may transform the circuit or attach a metric.",
-  metric:
-    "Computes a quantitative score on the current circuit (e.g. fidelity).",
-  sink:
-    "Where the pipeline ends — aggregates final metrics and the resulting circuit.",
-};
+import { FAMILY_HINTS } from "../lib/familyHints";
 
 export interface QNodeData extends Record<string, unknown> {
   kind: NodeKind;
