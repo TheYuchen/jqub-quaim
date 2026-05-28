@@ -2,7 +2,12 @@
 // Graph state (nodes/edges) lives inside the FlowCanvas component via React Flow hooks.
 
 import { create } from "zustand";
-import type { CircuitInfo, RunResponse, HealthResponse } from "./api";
+import type {
+  CircuitInfo,
+  HealthResponse,
+  PluginManifest,
+  RunResponse,
+} from "./api";
 import type { NodeKind } from "./nodeCatalog";
 
 const LS_USE_LIVE_IBM = "quda.useLiveIbm";
@@ -76,6 +81,13 @@ interface AppState {
    */
   hintExpandLeftPane: number;  // counter so consecutive triggers re-fire
   bumpHintExpandLeftPane: () => void;
+
+  /** Plugin manifests this user has uploaded. Refreshed on app boot
+   *  and after every upload/delete. NodePalette + BlockPicker merge
+   *  these into the canonical NodeCatalog so they appear alongside
+   *  built-in blocks. */
+  plugins: PluginManifest[];
+  setPlugins: (p: PluginManifest[]) => void;
 }
 
 export const useApp = create<AppState>((set) => ({
@@ -108,4 +120,6 @@ export const useApp = create<AppState>((set) => ({
   hintExpandLeftPane: 0,
   bumpHintExpandLeftPane: () =>
     set((s) => ({ hintExpandLeftPane: s.hintExpandLeftPane + 1 })),
+  plugins: [],
+  setPlugins: (p) => set({ plugins: p }),
 }));

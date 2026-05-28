@@ -196,6 +196,7 @@ export default function App() {
     return () => window.removeEventListener("resize", onResize);
   }, [isDesktop, leftCollapsed, rightCollapsed, leftW, rightW]);
 
+  const setPlugins = useApp((s) => s.setPlugins);
   useEffect(() => {
     api
       .health()
@@ -204,7 +205,18 @@ export default function App() {
         setReady(true);
       })
       .catch(() => setReady(true));
-  }, [setHealth]);
+    // Fetch this browser's plugin manifests (anonymous user_id stored
+    // in localStorage). Silent on failure — the user just won't see
+    // their previously-uploaded plugins until they re-upload.
+    import("./lib/userId").then(({ getUserId }) => {
+      api
+        .listPlugins(getUserId())
+        .then(setPlugins)
+        .catch(() => {
+          /* ignore */
+        });
+    });
+  }, [setHealth, setPlugins]);
 
   const leftWidth = leftCollapsed ? COLLAPSED_W : leftW;
   const rightWidth = rightCollapsed ? COLLAPSED_W : rightW;

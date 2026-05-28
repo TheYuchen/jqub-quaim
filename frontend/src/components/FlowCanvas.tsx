@@ -39,6 +39,7 @@ import {
 import { autoConnect } from "../lib/autoConnect";
 import { useApp } from "../lib/store";
 import { api } from "../lib/api";
+import { getUserId } from "../lib/userId";
 import {
   buildSharePayload,
   buildShareUrl,
@@ -400,6 +401,7 @@ export function FlowCanvas() {
       })),
       edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
       use_live_ibm: useLiveIbm,
+      user_id: getUserId(),
     };
     // Use the SSE streaming endpoint so the user sees each step
     // appear in the results pane as it completes.

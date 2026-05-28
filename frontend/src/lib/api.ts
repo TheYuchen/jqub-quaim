@@ -92,6 +92,37 @@ export interface RunRequest {
    * both conditions are met.
    */
   use_live_ibm?: boolean;
+  /** Anonymous browser id (see lib/userId.ts) so the server can look
+   *  up the right user's uploaded plugins when dispatching nodes
+   *  whose `type` isn't a built-in kind. */
+  user_id?: string;
+}
+
+/** Plugin manifest returned by the server. Mirrors PluginManifest in
+ *  backend/app/services/plugin_service.py + a `is_plugin: true` flag
+ *  the frontend uses to tell user-uploaded blocks apart from
+ *  built-ins. */
+export interface PluginManifest {
+  kind: string;
+  label: string;
+  family: "source" | "backend" | "algorithm" | "metric" | "sink";
+  tagline: string;
+  description: string;
+  color: string;
+  params: Array<{
+    key: string;
+    label: string;
+    type: "number" | "int" | "select";
+    min?: number;
+    max?: number;
+    step?: number;
+    displayPrecision?: number;
+    options?: Array<{ value: string; label: string }>;
+    hint?: string;
+  }>;
+  writes: string[];
+  author: string | null;
+  is_plugin: true;
 }
 
 
@@ -134,6 +165,42 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then((r) => json<RunResponse>(r)),
+
+  // ---- plugin endpoints ----
+
+  /** List the plugin manifests this browser has uploaded. */
+  listPlugins: (userId: string) =>
+    fetch(`${BASE}/plugins?user_id=${encodeURIComponent(userId)}`)
+      .then((r) => json<PluginManifest[]>(r)),
+
+  /** Upload a plugin .zip. Resolves to the parsed manifest on success;
+   *  rejects with an Error whose message is the backend's 400 detail. */
+  uploadPlugin: async (userId: string, file: File): Promise<PluginManifest> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(
+      `${BASE}/plugins/upload?user_id=${encodeURIComponent(userId)}`,
+      { method: "POST", body: fd },
+    );
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const body = await res.json();
+        detail = body?.detail ?? "";
+      } catch {
+        detail = await res.text().catch(() => "");
+      }
+      throw new Error(detail || `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+
+  /** Remove a plugin from this browser's namespace. */
+  deletePlugin: (userId: string, kind: string) =>
+    fetch(
+      `${BASE}/plugins/${encodeURIComponent(kind)}?user_id=${encodeURIComponent(userId)}`,
+      { method: "DELETE" },
+    ).then((r) => json<{ removed: boolean; kind: string }>(r)),
 
   /**
    * Stream pipeline execution via SSE. Calls `onStep` for each step as
