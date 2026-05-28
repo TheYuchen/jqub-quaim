@@ -13,7 +13,7 @@
 
 import type { Node, Edge } from "@xyflow/react";
 import type { QNodeData } from "../components/QNode";
-import { NODE_BY_KIND, type NodeKind } from "./nodeCatalog";
+import type { NodeKind } from "./nodeCatalog";
 
 interface PipelineNode {
   kind: NodeKind;
@@ -79,34 +79,11 @@ export function generatePythonScript(
   imports.add("from qiskit import QuantumCircuit");
 
   let hasBackend = false;
-  let hasQucad = false;
-  let hasQubound = false;
-  let hasCompvqc = false;
-  let hasQshot = false;
-  let hasFidelity = false;
 
-  // Scan what we need
+  // Scan what we need for imports.
   for (const b of blocks) {
-    switch (b.kind) {
-      case "fake_backend":
-      case "ibm_backend":
-        hasBackend = true;
-        break;
-      case "qucad":
-        hasQucad = true;
-        break;
-      case "qubound":
-        hasQubound = true;
-        break;
-      case "compvqc":
-        hasCompvqc = true;
-        break;
-      case "qshot":
-        hasQshot = true;
-        break;
-      case "fidelity":
-        hasFidelity = true;
-        break;
+    if (b.kind === "fake_backend" || b.kind === "ibm_backend") {
+      hasBackend = true;
     }
   }
 

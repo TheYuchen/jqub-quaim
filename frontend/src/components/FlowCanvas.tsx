@@ -381,18 +381,19 @@ export function FlowCanvas() {
     // appear in the results pane as it completes.
     api.runStream(
       body,
-      (step, idx) => {
+      (step) => {
         // Incrementally build the run response as steps arrive.
-        setRun((prev) => ({
+        const prev = useApp.getState().run;
+        const steps = [...(prev?.steps ?? []), step];
+        setRun({
           circuit_id: body.circuit_id,
-          ok: prev?.ok !== false && step.status !== "error",
+          ok: steps.every((s) => s.status !== "error"),
           from_cache: false,
-          steps: [...(prev?.steps ?? []), step],
+          steps,
           final_metrics: prev?.final_metrics ?? {},
-        }));
+        });
       },
       (response) => {
-        // Streaming complete: set the final assembled response.
         setRun(response);
         setRunning(false);
       },
