@@ -629,6 +629,19 @@ def run_pipeline(
     ctx: dict = {"circuit": circuit}
     steps: list[StepResult] = []
 
+    # If any node in the graph is a plugin and we know the user, make
+    # sure their plugins are hydrated from the HF Datasets backing
+    # store before dispatching. Without this, an authenticated user
+    # running a pipeline on a freshly-restarted Space (or on the OTHER
+    # Space mirroring the same dataset) would see "plugin not found"
+    # even though it's safely in their dataset.
+    if user_id and any(n.type not in _HANDLERS and n.type != "input_circuit" for n in nodes):
+        from app.services import plugin_service
+        try:
+            plugin_service.hydrate_from_dataset_if_needed(user_id)
+        except Exception:
+            logger.exception("Pre-run plugin hydration failed for %s (continuing)", user_id)
+
     ordered = topological_order(nodes, edges)
     for node in ordered:
         if node.type == "input_circuit":
@@ -694,6 +707,17 @@ def run_pipeline_stream(
     """
     ctx: dict = {"circuit": circuit}
     ordered = topological_order(nodes, edges)
+
+    # Same hydration as run_pipeline — without this, a logged-in user
+    # running a pipeline on a freshly-restarted Space or on the OTHER
+    # mirror Space would see "plugin not found" even though it sits
+    # in their HF Datasets backing store.
+    if user_id and any(n.type not in _HANDLERS and n.type != "input_circuit" for n in nodes):
+        from app.services import plugin_service
+        try:
+            plugin_service.hydrate_from_dataset_if_needed(user_id)
+        except Exception:
+            logger.exception("Pre-stream plugin hydration failed for %s (continuing)", user_id)
 
     # Compute the circuit's QPY hash once (expensive) — reused for
     # every prefix hash in this run.

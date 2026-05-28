@@ -22,7 +22,7 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  // Click-outside closes the dropdown.
+  // Click-outside + Escape close the dropdown.
   useEffect(() => {
     if (!menuOpen) return;
     const onClick = (e: MouseEvent) => {
@@ -33,24 +33,52 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
         setMenuOpen(false);
       }
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [menuOpen]);
 
-  // Don't render anything if this deployment can't do OAuth at all
-  // (e.g. local dev without README hf_oauth metadata).
-  if (!authStatus?.oauth_enabled) return null;
+  // While we haven't probed /api/auth/status yet, reserve the slot
+  // with an invisible placeholder so the TopBar's right cluster
+  // doesn't shift when the button materialises. Once the probe
+  // resolves we either render the real button or vanish for good
+  // (oauth_enabled=false in dev).
+  if (authStatus === null) {
+    return <span className="inline-block w-[7.5rem] h-7" aria-hidden />;
+  }
+  if (!authStatus.oauth_enabled) return null;
 
   if (!session) {
     return (
       <a
         href={api.authLoginUrl()}
-        className="btn-ghost"
-        title="Sign in with your Hugging Face account to keep plugins across devices and restarts"
-        aria-label="Sign in with Hugging Face"
+        // Slight visual lift vs btn-ghost so the value of signing in
+        // (persistence) is more discoverable. Same height as
+        // surrounding controls; just a colored border + soft tint.
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-accent/50 bg-accent/10 text-accent hover:bg-accent/20 hover:border-accent text-xs font-medium"
+        title="Sign in with your Hugging Face account to persist plugins across container restarts and devices"
+        aria-label="Sign in with Hugging Face to keep plugins across restarts and devices"
+        onClick={() => {
+          // Show a brief 'redirecting' UI by setting a session-storage
+          // flag the next page render reads. Without this, slow HF
+          // redirects (cold pods can take 1-3s) leave the user
+          // wondering if their click registered.
+          try {
+            sessionStorage.setItem("quda.loggingIn", "1");
+          } catch {
+            /* storage blocked is fine */
+          }
+        }}
       >
         <LogIn className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">Sign in</span>
+        <span className="hidden sm:inline">Sign in to keep plugins</span>
+        <span className="sm:hidden">Sign in</span>
       </a>
     );
   }
@@ -83,6 +111,12 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
             alt=""
             className="w-5 h-5 rounded-full bg-surface object-cover"
             aria-hidden
+            onError={(e) => {
+              // Avatar URL 404 → swap in the User icon fallback by
+              // hiding the broken image. Without this the user sees
+              // a broken-image glyph.
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
         ) : (
           <User className="w-3.5 h-3.5" aria-hidden />
@@ -111,20 +145,24 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
               {session.persistence_enabled ? (
                 <>
                   <Cloud className="w-3 h-3 inline-block mr-1 -mt-0.5 text-accent2" />
-                  Plugins you upload are saved to your private HF Datasets
-                  repo (<span className="font-mono">{session.user_data_repo}</span>),
-                  so they survive container restarts.
+                  Your plugins are saved under{" "}
+                  <span className="font-mono break-all">
+                    {session.user_data_repo}/users/{session.username}/
+                  </span>
+                  {" "}— a private folder only you and the QuDA server
+                  can read. They survive container restarts and follow
+                  you to any device you sign in on.
                 </>
               ) : (
-                <span className="text-warn/80">
+                <span className="text-warn">
                   Persistence is not configured on this deployment, so
                   your plugins will still vanish on container restart.
                 </span>
               )}
             </div>
             <div className="text-[10px] text-mute/70 leading-snug">
-              If you uploaded plugins before signing in, they're still
-              under your anonymous browser id — sign out to access them.
+              Plugins you uploaded before signing in remain under your
+              anonymous browser id — sign out to access them.
             </div>
           </div>
           <button

@@ -28,6 +28,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import math
 import os
 import resource
 import subprocess
@@ -223,13 +224,22 @@ def _set_resource_limits() -> None:
 def _scrub_scalars(d: dict[str, Any]) -> dict[str, Any]:
     """Restrict scalar values to JSON-friendly primitive types so we
     don't accidentally pickle exotic objects into ctx for downstream
-    blocks to choke on."""
+    blocks to choke on.
+
+    NaN and ±Inf are rejected: standard JSON has no representation for
+    them, ``model_dump_json`` would emit ``NaN`` / ``Infinity`` (which
+    JSON.parse() refuses on the frontend), and the value is almost
+    certainly meaningless to downstream metrics anyway."""
     out: dict[str, Any] = {}
     for k, v in d.items():
         if not isinstance(k, str) or not k:
             continue
-        if isinstance(v, (int, float, str, bool)) or v is None:
+        if isinstance(v, bool) or isinstance(v, (int, str)) or v is None:
             out[k] = v
+        elif isinstance(v, float):
+            if math.isfinite(v):
+                out[k] = v
+            # Drop NaN/Inf silently — plugin author's responsibility.
     return out
 
 
@@ -246,14 +256,20 @@ def _scrub_dict(d: dict[str, Any]) -> dict[str, Any]:
 
 
 def _scrub_value(v: Any) -> Any:
-    if v is None or isinstance(v, (bool, int, float, str)):
+    if v is None or isinstance(v, bool) or isinstance(v, (int, str)):
         return v
+    if isinstance(v, float):
+        # Same rationale as _scrub_scalars: NaN/Inf break JSON.parse on
+        # the frontend, so coerce them to None instead.
+        return v if math.isfinite(v) else None
     if isinstance(v, dict):
         return _scrub_dict(v)
     if isinstance(v, (list, tuple)):
         return [_scrub_value(x) for x in v]
-    # Numpy scalar / Python decimal / etc — fall back to repr.
+    # Numpy scalar / Python decimal / etc — fall back to float, then
+    # repr. The finite check catches numpy.nan and numpy.inf as well.
     try:
-        return float(v)
+        f = float(v)
+        return f if math.isfinite(f) else None
     except (TypeError, ValueError):
         return str(v)

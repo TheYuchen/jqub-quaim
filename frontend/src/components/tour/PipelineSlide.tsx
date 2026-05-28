@@ -45,9 +45,8 @@ export function PipelineSlide() {
         <div className="panel-alt p-3">
           <div className="text-accent4 font-semibold mb-0.5">Offline by default</div>
           <span className="text-mute">
-            QuBound uses a 14-day cached calibration pickle; no IBM token
-            needed. Flip <span className="kbd">ALLOW_LIVE_IBM</span> to fetch
-            fresh history.
+            QuBound uses a shipped 14-day IBM Fez calibration cache —
+            no IBM account or token required to try the demo.
           </span>
         </div>
       </div>

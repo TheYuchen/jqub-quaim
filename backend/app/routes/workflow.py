@@ -56,12 +56,11 @@ def run_workflow(req: RunRequest, request: Request) -> RunResponse:
     # If caller requests live IBM but the server forbids it, refuse loudly
     # (better UX than silently swapping in a fake backend for the whole run).
     if req.use_live_ibm and not (settings.has_ibm_token and settings.allow_live_ibm):
+        # User-facing 403 — don't include the env var names. The UI
+        # already greys out the toggle in this state.
         raise HTTPException(
             status_code=403,
-            detail=(
-                "Live IBM execution is disabled on this server. "
-                "Set IBM_QUANTUM_TOKEN and ALLOW_LIVE_IBM=true to enable."
-            ),
+            detail="Live IBM execution is not enabled on this deployment.",
         )
 
     # Cache hit path: if the circuit + pipeline graph match something the

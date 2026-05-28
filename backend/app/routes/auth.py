@@ -46,15 +46,10 @@ async def login(request: Request) -> Response:
     URL with a state we stash in a short-lived signed cookie."""
     settings = get_settings()
     if not settings.oauth_enabled:
-        # In dev (no HF env vars) we surface a clear JSON error rather
-        # than redirecting into a 404.
+        # User-facing — keep the message generic. Operator docs cover
+        # the README hf_oauth recipe.
         return JSONResponse(
-            {
-                "detail": (
-                    "OAuth is not configured on this deployment. "
-                    "Set hf_oauth: true in README and redeploy on a Space."
-                )
-            },
+            {"detail": "Sign-in is not available on this deployment."},
             status_code=503,
         )
     state = auth_service.mint_state()
@@ -81,29 +76,33 @@ async def callback(
     """OAuth redirect target. Verify state, exchange code, set session
     cookie, redirect home. Errors are surfaced as a redirect to / with
     an ?auth_error= query so the frontend can show a banner."""
+    # Generic, user-facing message regardless of the underlying cause —
+    # we log the real exception/HF-error server-side and surface a
+    # short, neutral string in the URL bar where the user can read
+    # (and copy-paste into bug reports) without leaking upstream HF
+    # response bodies or internal endpoint paths.
+    GENERIC_ERROR = "sign-in+failed.+please+try+again."
+
     if error:
-        msg = error_description or error
-        return RedirectResponse(f"/?auth_error={msg}", status_code=302)
+        logger.info("OAuth provider returned error=%r description=%r", error, error_description)
+        return RedirectResponse(f"/?auth_error={GENERIC_ERROR}", status_code=302)
     if not code or not state:
-        return RedirectResponse(
-            "/?auth_error=missing+code+or+state", status_code=302
-        )
+        logger.info("OAuth callback missing code or state")
+        return RedirectResponse(f"/?auth_error={GENERIC_ERROR}", status_code=302)
     expected_state = auth_service.decode_state(
         request.cookies.get(auth_service.STATE_COOKIE)
     )
     if not expected_state or expected_state != state:
-        return RedirectResponse(
-            "/?auth_error=oauth+state+mismatch", status_code=302
-        )
+        logger.warning("OAuth state mismatch on callback")
+        return RedirectResponse(f"/?auth_error={GENERIC_ERROR}", status_code=302)
 
     try:
         user = await auth_service.exchange_code_for_user(
             code, _request_origin(request)
         )
     except auth_service.AuthError as exc:
-        return RedirectResponse(
-            f"/?auth_error={exc}", status_code=302
-        )
+        logger.info("OAuth exchange failed: %s", exc)
+        return RedirectResponse(f"/?auth_error={GENERIC_ERROR}", status_code=302)
 
     session_token = auth_service.encode_session(user)
     resp = RedirectResponse("/?logged_in=1", status_code=302)

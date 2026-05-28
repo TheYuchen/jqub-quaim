@@ -373,20 +373,15 @@ export function UploadPluginModal({
             <div className="text-[11px] text-mute">
               {session?.persistence_enabled ? (
                 <>
-                  Add a custom source/algorithm/metric/sink to{" "}
-                  <span className="text-ink">your account</span>. Persisted
-                  to your private HF Datasets repo — survives restarts and
-                  follows you across devices.
+                  Add a custom source/algorithm/metric/sink. Saved to
+                  your folder under{" "}
+                  <span className="font-mono">{session.user_data_repo}</span>{" "}
+                  — survives restarts and follows you across devices.
                 </>
               ) : (
                 <>
                   Add a custom source/algorithm/metric/sink to your
-                  catalog. Only you see it.{" "}
-                  {authStatus?.oauth_enabled && (
-                    <span className="text-mute/80">
-                      Sign in to keep plugins across restarts.
-                    </span>
-                  )}
+                  catalog. Only you see it.
                 </>
               )}
             </div>
@@ -403,6 +398,31 @@ export function UploadPluginModal({
         </div>
 
         <div className="p-4 space-y-3 overflow-y-auto flex-1 min-h-0">
+          {/* Guest-mode banner — only when the deployment has OAuth
+              wired up but the user hasn't signed in. We don't want to
+              show this on dev deployments where OAuth is off. */}
+          {!session && authStatus?.oauth_enabled && (
+            <div className="panel-alt border-accent/40 p-3 text-[11px] leading-relaxed">
+              <div className="flex items-start gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <div className="text-ink font-medium mb-0.5">Guest mode</div>
+                  <div className="text-mute">
+                    Plugins you upload here live only in this browser
+                    and disappear when the Space restarts (~24 h) or you
+                    clear browser data.{" "}
+                    <a
+                      href={api.authLoginUrl()}
+                      className="text-accent underline hover:no-underline"
+                    >
+                      Sign in with Hugging Face
+                    </a>{" "}
+                    to keep them across restarts and devices.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {examplesFirst ? (
             <>
               {examplesSection}
@@ -451,8 +471,8 @@ export function UploadPluginModal({
                   <span className="font-mono text-ink">
                     def run(inputs, params): ...
                   </span>
-                  ; the subprocess that runs it can take up to 10 min, uses
-                  ≤ 1 GB RAM, and never sees IBM secrets.
+                  ; runs in an isolated sandbox with a 10-minute
+                  wall-clock cap and a 1 GB memory cap.
                 </li>
               </ul>
               <p>

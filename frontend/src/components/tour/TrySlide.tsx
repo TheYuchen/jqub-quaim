@@ -10,6 +10,7 @@ import {
   Atom,
   CircleDot,
   Code2,
+  LogIn,
   Package,
   Play,
   Sparkles,
@@ -152,10 +153,19 @@ export function TrySlide({ onClose }: { onClose?: () => void } = {}) {
               — drop a .zip with{" "}
               <span className="font-mono text-ink">manifest.json</span> +{" "}
               <span className="font-mono text-ink">handler.py</span> next to
-              "Add blocks". Your block shows up in the catalog beside the
-              built-ins, visible only to your browser. See{" "}
+              "Add blocks". Visible only to you. See{" "}
               <span className="font-mono text-ink">PLUGIN_SDK.md</span> in the
               repo for the spec.
+            </span>
+          </div>
+          <div className="flex items-start gap-2 text-[12px]">
+            <LogIn className="w-3.5 h-3.5 mt-0.5 text-accent shrink-0" />
+            <span className="text-mute leading-relaxed">
+              <span className="text-ink font-medium">Sign in with Hugging Face</span>{" "}
+              (top-right) to keep your uploaded plugins across container
+              restarts and sync them to any device you sign in on.
+              Without signing in, plugins live only in this browser and
+              vanish if the Space restarts or you clear browser data.
             </span>
           </div>
         </div>

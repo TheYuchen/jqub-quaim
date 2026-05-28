@@ -272,8 +272,8 @@ def install_plugin_zip(
     import io
     try:
         zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
-    except zipfile.BadZipFile as exc:
-        raise PluginError(f"Not a valid zip file: {exc}") from None
+    except zipfile.BadZipFile:
+        raise PluginError("Not a valid zip file.") from None
 
     # Inspect entries before extracting. We refuse paths with .. or
     # leading /, refuse non-allowed extensions, refuse over-large files
@@ -335,8 +335,11 @@ def install_plugin_zip(
         raise PluginError("manifest.json is not valid UTF-8.") from None
     try:
         manifest_data = json.loads(manifest_raw)
-    except json.JSONDecodeError as exc:
-        raise PluginError(f"manifest.json is not valid JSON: {exc}") from None
+    except json.JSONDecodeError:
+        raise PluginError(
+            "manifest.json is not valid JSON. Check for missing commas, "
+            "trailing commas, or unquoted keys."
+        ) from None
     try:
         manifest = PluginManifest.model_validate(manifest_data)
     except ValidationError as exc:

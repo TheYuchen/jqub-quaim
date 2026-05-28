@@ -215,26 +215,34 @@ result in `scalars` — that always composes safely.
 
 ## Where plugins live
 
-Plugins are stored under `/tmp/quda_plugins/<your_user_id>/<kind>/`
-on the server. The `user_id` is a 32-char hex string your browser
-generates on first visit and keeps in `localStorage.quda.userId` —
-it's your namespace, no one else sees your plugins.
+Plugin storage depends on whether you're signed in:
 
-`/tmp/` is wiped when the HF Space container restarts (every ~24 h
-or so, or whenever the maintainers redeploy). You'll need to re-
-upload your plugins after a restart. The `.zip` you uploaded never
-left your local machine + the Space's container; copy it somewhere
-durable if you want to keep it.
+- **Guest (not signed in)**: your `user_id` is an anonymous 32-char
+  hex string the browser generates on first visit and keeps in
+  `localStorage.quda.userId`. Plugins live in the Space's ephemeral
+  scratch space and vanish when the container restarts (~24 h) or
+  you clear browser data.
+- **Signed in with Hugging Face**: your `user_id` is derived from
+  your HF username. Plugins are mirrored to a private folder on the
+  HF Datasets repo that backs the app. They survive container
+  restarts and follow you across devices — sign in on any device to
+  see the same set.
+
+In either case your namespace is isolated: other users can't see your
+plugins, and you can't see theirs.
+
+The `.zip` you uploaded stays on the server (plus the dataset repo if
+signed in); the original copy on your local machine is not retained
+beyond that. Keep a local copy if you want a durable backup.
 
 ## Safety
 
-Plugins are **per-browser** — your colleague won't see your blocks
-and vice versa. Plugins **can't read** secrets like the IBM token
-or other users' uploaded circuits. They **can crash** without
-taking down the server (subprocess isolation). They **can hog**
-CPU and memory up to the limits in the table above; HF Spaces has
-its own outer limits and may restart the container if a plugin is
-particularly abusive.
+Plugins **can't read** server secrets (HF token, IBM token, OAuth
+client secret) — the subprocess that runs them is started with a
+minimal environment. They **can crash** without taking down the
+server (subprocess isolation). They **can hog** CPU and memory up to
+the limits in the table above; HF Spaces has its own outer limits
+and may restart the container if a plugin is particularly abusive.
 
 There is no review process. The lab trusts itself here. If you
 deploy QuDA Studio publicly to thousands of users, the right next

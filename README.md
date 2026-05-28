@@ -23,16 +23,14 @@ configurable quantum pipelines.
 Drag-and-drop visual pipeline over research algorithms from the JQub lab —
 currently QuCAD, QuBound, CompressVQC, and Qshot, with more to come —
 applied to a quantum circuit of your choice (upload a `.qpy` or `.qasm`
-or pick a built-in sample). Each block in the graph becomes a stage of a
-FastAPI-side pipeline; run order is topologically sorted from the
+or pick a built-in sample). Each block in the graph becomes a stage of
+the pipeline; the run order is topologically sorted from the
 React-Flow edges.
 
 - **QuCAD**: ADMM-regularized, noise-aware VQC sparsification.
 - **QuBound**: LSTM over 14 days of real `ibm_fez` calibration data
   predicts today's error bound for your circuit. The calibration history
-  is bundled as a pickle, so the demo runs offline; no IBM token needed.
-  If an IBM Quantum Platform token is configured, it fetches fresh noise
-  history instead.
+  is bundled with the demo so it runs offline; no IBM account needed.
 - **CompressVQC**: QAOA-optimized lookup table for folding redundant
   parametric rotations on Heron-family hardware.
 - **Qshot**: noise-aware shot-count recommender. Matches your circuit
@@ -47,59 +45,36 @@ cache, so the demo returns instantly on first click. A cold QuBound run
 the shared HF CPU takes 1–3 min; QuCAD and CompressVQC are sub-second
 on small circuits.
 
-## User plugins
+## Custom blocks (plugins)
 
 Drop a `.zip` (manifest.json + handler.py) onto the **Upload** button
 next to "Add blocks" to add your own source / backend / algorithm /
-metric / sink block to the catalog. Plugins are per-browser (anonymous
-UUID in `localStorage`), run in an isolated subprocess with a 10-min
-wall-clock cap and 1 GB RAM cap, and never see `IBM_QUANTUM_TOKEN`.
-Each browser is capped at 5 active plugins.
+metric / sink block to the catalog. Each plugin runs in an isolated
+sandbox with a 10-minute wall-clock cap and a 1 GB memory cap.
+
+**Sign in with Hugging Face** (top-right of the app) and your uploaded
+plugins persist across container restarts and follow you to any device
+you sign in on. Without signing in, plugins live only in this browser
+and disappear when the Space restarts (~24 h) or you clear browser
+data. Each user is capped at 5 plugins; each plugin .zip is capped at
+1 MB.
 
 See [`PLUGIN_SDK.md`](./PLUGIN_SDK.md) for the manifest schema, the
 `run(inputs, params)` contract, per-family conventions, and the
 limits table. Worked examples live in `example_plugins/`.
 
-## Stack
+## Two mirrors
 
-- **Backend**: FastAPI + Qiskit 2.3 + qiskit-aer + qiskit-optimization +
-  PyTorch (CPU wheel) + torch-geometric + hdbscan. Serves the JSON API
-  under `/api/*` and the built React bundle under `/`.
-- **Frontend**: Vite + React 18 + TypeScript + Tailwind CSS + `@xyflow/react`
-  (React Flow v12) + Zustand.
-- **Deployment**: Single Docker image (two-stage build) on Hugging Face
-  Spaces.
+The app is served at:
 
-## Local development
+- https://qudastudio-app.hf.space
+- https://jqub21-quaim.hf.space
 
-```bash
-# 1. backend
-cd backend
-pip install -r requirements.txt
-pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 7860
+Both run the same code and share the same plugin backing store, so a
+signed-in user sees the same plugins on either URL. (Sessions are
+per-domain — you'll sign in on each mirror once.)
 
-# 2. frontend (in another shell)
-cd frontend
-npm install
-npm run dev                 # Vite dev on :5173 proxies /api to :7860
-```
+---
 
-## Environment variables
-
-| name | default | purpose |
-|---|---|---|
-| `IBM_QUANTUM_TOKEN` | _unset_ | enables live IBM noise fetches |
-| `ALLOW_LIVE_IBM` | `false` | gate for live calls (requires token) |
-| `CORS_ALLOW_ORIGINS` | `http://localhost:5173` | comma-separated list |
-| `LOG_LEVEL` | `INFO` | FastAPI log level |
-
-When neither env var is set the app silently falls back to the offline
-14-day calibration cache in `backend/cache/ibm_history/ibm_fez.pkl`.
-
-## Refreshing the offline noise cache
-
-```bash
-IBM_QUANTUM_TOKEN=... python scripts/fetch_ibm_history.py --backend ibm_fez --days 14
-```
-
+Operator setup notes live in [`OPERATIONS.md`](./OPERATIONS.md).
+Repository on GitHub: <https://github.com/TheYuchen/jqub-quaim>.

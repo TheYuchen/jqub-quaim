@@ -56,8 +56,10 @@ export function TopBar({
     chipLabel = "live ibm: unavailable";
     chipLabelShort = "ibm: n/a";
     chipClass = "!border-edge !text-mute opacity-70 cursor-not-allowed";
+    // End-user copy only — the operator-facing instructions about
+    // setting env vars live in the README, not in the UI tooltip.
     chipTitle =
-      "Server has no IBM Quantum Platform token configured, so QuBound is using the shipped 14-day calibration cache (real IBM Fez data, just not refreshed live). To enable live mode, set IBM_QUANTUM_TOKEN + ALLOW_LIVE_IBM=true in the HF Space secrets.";
+      "QuBound is using the shipped 14-day IBM Fez calibration cache (real hardware noise data, just not refreshed live). Live mode is not enabled on this deployment.";
   } else if (effectiveLive) {
     chipLabel = "live ibm: on";
     chipLabelShort = "ibm: on";

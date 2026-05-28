@@ -121,11 +121,15 @@ async def upload_plugin(
         manifest = plugin_service.install_plugin_zip(effective, blob)
     except plugin_service.PluginError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
-    except Exception as exc:
+    except Exception:
+        # Generic message to the user — the real traceback goes to
+        # server logs only. Without this, library exception strings
+        # (tempfile paths, encoding errors with leaky context) could
+        # surface in the upload modal.
         logger.exception("Plugin install failed unexpectedly")
         raise HTTPException(
             status_code=500,
-            detail=f"Unexpected error installing plugin: {exc}",
+            detail="Plugin install failed unexpectedly. Please try again.",
         ) from None
     return plugin_service.manifest_to_frontend(manifest)
 
