@@ -39,7 +39,11 @@ class SampleCircuit(BaseModel):
 
 # ---------- Workflow ----------
 
-NodeType = Literal[
+# Built-in block types. User-uploaded plugins extend this set at
+# runtime; the schema accepts arbitrary lowercase identifiers as a
+# string so plugin kinds (validated separately in plugin_service)
+# pass through here without us having to regen the Literal.
+BuiltinNodeType = Literal[
     "input_circuit",
     "ibm_backend",
     "fake_backend",
@@ -50,6 +54,9 @@ NodeType = Literal[
     "fidelity",
     "output",
 ]
+# Permissive alias so RunRequest.nodes[i].type accepts plugin kinds
+# too. Real validation happens in workflow_service when dispatching.
+NodeType = str
 
 
 class FlowNode(BaseModel):
@@ -73,6 +80,9 @@ class RunRequest(BaseModel):
     edges: list[FlowEdge]
     use_live_ibm: bool = False
     backend_name: str = "FakeFez"
+    # Anonymous browser-side UUID for per-user plugin lookup. None when
+    # the request uses only built-in blocks.
+    user_id: str | None = None
 
 
 

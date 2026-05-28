@@ -451,6 +451,130 @@ def _handle_output(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult
     return _make_step(node, "ok", started_at=t0, summary=summary)
 
 
+def _handle_plugin(
+    node: FlowNode,
+    ctx: dict,
+    _settings: Settings,
+    *,
+    user_id: str,
+) -> StepResult:
+    """Dispatch a user-uploaded plugin block.
+
+    Translates the in-process ``ctx`` (QuantumCircuit object, possible
+    Qiskit Backend object, scalar values) into the JSON-friendly
+    ``inputs`` shape the plugin subprocess expects, invokes
+    ``plugin_runner.run_plugin``, then translates the result back into
+    ctx mutations + a StepResult.
+    """
+    t0 = _now()
+    # Heavy / cross-module imports kept inside the handler so the
+    # plugin path doesn't run unless a plugin is actually used.
+    from app.services import plugin_service, plugin_runner
+
+    found = plugin_service.find_plugin(user_id, node.type)
+    if found is None:
+        return _make_step(
+            node, "error", started_at=t0,
+            message=(
+                f"No plugin {node.type!r} found for this session. "
+                "If you uploaded it on another device, re-upload it here."
+            ),
+        )
+    manifest, plugin_dir_path = found
+
+    # Build the inputs payload. Plugins of family=source legitimately
+    # have no upstream circuit; everything else gets the current ctx
+    # circuit serialized to QPY.
+    inputs: dict = {"scalars": {}, "backend_name": None}
+    if "circuit" in ctx:
+        inputs["circuit_qpy_bytes"] = _qpy_bytes_for_hash(ctx["circuit"])
+    if "backend" in ctx and ctx["backend"] is not None:
+        # The Qiskit FakeBackend objects have a `.name` attribute the
+        # plugin can use; live IBM backends also have one. We pass it
+        # as a string so plugins can decide how to re-create a model.
+        try:
+            inputs["backend_name"] = ctx["backend"].name
+        except AttributeError:
+            inputs["backend_name"] = None
+    # Pass any scalar values already in ctx so a metric/sink plugin
+    # can read them without re-deriving.
+    for k in ("fidelity", "qubound_value"):
+        if k in ctx and isinstance(ctx[k], (int, float)):
+            inputs["scalars"][k] = ctx[k]
+    # Allow plugin-set scalars from prior plugin steps too.
+    if "_plugin_scalars" in ctx and isinstance(ctx["_plugin_scalars"], dict):
+        for k, v in ctx["_plugin_scalars"].items():
+            inputs["scalars"].setdefault(k, v)
+
+    try:
+        result = plugin_runner.run_plugin(
+            handler_dir=plugin_dir_path,
+            inputs=inputs,
+            params=node.data or {},
+        )
+    except plugin_runner.PluginRunError as exc:
+        return _make_step(
+            node, "error", started_at=t0,
+            message=f"Plugin {node.type} failed: {exc}",
+        )
+    except Exception as exc:  # extra defence — should be rare
+        return _make_step(
+            node, "error", started_at=t0,
+            message=f"Plugin {node.type} crashed unexpectedly: {type(exc).__name__}: {exc}",
+        )
+
+    # ---- merge the plugin's outputs back into ctx ----
+    # 1. circuit replacement
+    if "circuit_qpy_bytes" in result:
+        try:
+            buf = io.BytesIO(result["circuit_qpy_bytes"])
+            new_qc = qpy.load(buf)
+            new_qc = new_qc[0] if isinstance(new_qc, list) else new_qc
+            ctx["circuit"] = new_qc
+        except Exception as exc:
+            return _make_step(
+                node, "error", started_at=t0,
+                message=f"Plugin {node.type} returned an invalid circuit QPY: {exc}",
+            )
+    # 2. backend selection (limited to known fake backends)
+    if "backend_name" in result:
+        bn = result["backend_name"]
+        try:
+            ctx["backend"] = _load_fake_backend(bn)
+        except Exception as exc:
+            return _make_step(
+                node, "error", started_at=t0,
+                message=(
+                    f"Plugin {node.type} requested backend {bn!r}, "
+                    f"which isn't supported: {exc}"
+                ),
+            )
+    # 3. scalar writes — fold into ctx by their stated key, and also
+    #    keep a separate _plugin_scalars dict so downstream plugins
+    #    can read them without confusing the built-in handlers.
+    scalars = result.get("scalars") or {}
+    if scalars:
+        plugin_scalars = ctx.setdefault("_plugin_scalars", {})
+        for k, v in scalars.items():
+            if not isinstance(v, (int, float, str, bool)) and v is not None:
+                continue
+            plugin_scalars[k] = v
+            # Built-in keys also overwrite the canonical ctx slot so
+            # the Output block picks them up.
+            if k in ("fidelity", "qubound_value"):
+                ctx[k] = v
+
+    summary = result.get("summary") or {}
+    # Include scalar writes in the summary too so users see them in
+    # the result card even if they didn't put them in summary.
+    if scalars:
+        summary = {**summary}
+        for k, v in scalars.items():
+            summary.setdefault(k, v)
+
+    return _make_step(node, "ok", started_at=t0, summary=summary)
+
+
 _HANDLERS: dict[str, Callable[[FlowNode, dict, Settings], StepResult]] = {
     "ibm_backend": _handle_ibm_backend,
     "fake_backend": _handle_fake_backend,
@@ -499,6 +623,7 @@ def run_pipeline(
     nodes: list[FlowNode],
     edges: list[FlowEdge],
     settings: Settings,
+    user_id: str | None = None,
 ) -> list[StepResult]:
     """Execute the user's pipeline. Returns a StepResult per visited node."""
     ctx: dict = {"circuit": circuit}
@@ -521,14 +646,25 @@ def run_pipeline(
             continue
 
         handler = _HANDLERS.get(node.type)
-        if handler is None:
-            steps.append(_make_step(node, "skipped", message=f"No handler for node type {node.type!r}"))
+        if handler is not None:
+            try:
+                steps.append(handler(node, ctx, settings))
+            except Exception as exc:
+                steps.append(_make_step(node, "error", message=f"{type(exc).__name__}: {exc}"))
+                break
             continue
-        try:
-            steps.append(handler(node, ctx, settings))
-        except Exception as exc:  # never let one bad node kill the whole run
-            steps.append(_make_step(node, "error", message=f"{type(exc).__name__}: {exc}"))
-            break
+
+        # Not a built-in — try a user plugin if we have a user_id.
+        if user_id:
+            steps.append(_handle_plugin(node, ctx, settings, user_id=user_id))
+            if steps[-1].status == "error":
+                break
+            continue
+
+        steps.append(_make_step(
+            node, "skipped",
+            message=f"No handler for node type {node.type!r}",
+        ))
 
     return steps
 
@@ -539,6 +675,7 @@ def run_pipeline_stream(
     nodes: list[FlowNode],
     edges: list[FlowEdge],
     settings: Settings,
+    user_id: str | None = None,
 ) -> Generator[StepResult, None, None]:
     """Generator version of run_pipeline: yields each StepResult as it
     completes, enabling Server-Sent Events in the route layer.
@@ -547,6 +684,13 @@ def run_pipeline_stream(
     prefixes resolve instantly. If the user changes only the last block
     and re-runs, all preceding steps are served from cache (~0 ms each)
     instead of re-executing (which can take minutes for QuBound/Qshot).
+
+    When ``user_id`` is provided, unknown node types are dispatched to
+    the per-user plugin registry (see services/plugin_service.py).
+    Plugin steps participate in the cache: the prefix hash includes
+    the plugin's kind + params, so re-running with the same plugin
+    settings hits the cache; modifying the plugin's params (or
+    re-uploading) busts only the suffix.
     """
     ctx: dict = {"circuit": circuit}
     ordered = topological_order(nodes, edges)
@@ -566,8 +710,6 @@ def run_pipeline_stream(
             ctx.update(cached_ctx)
             _step_cache.move_to_end(prefix_key)  # refresh LRU
             logger.debug("Step cache HIT for %s (%s)", node.type, prefix_key[:8])
-            # Return a copy with from_step_cache flag so the UI can
-            # show which steps were instant.
             yield cached_result.model_copy(update={"from_step_cache": True})
             continue
 
@@ -589,16 +731,32 @@ def run_pipeline_stream(
             continue
 
         handler = _HANDLERS.get(node.type)
-        if handler is None:
-            result = _make_step(node, "skipped", message=f"No handler for node type {node.type!r}")
-            _cache_put(prefix_key, result, ctx)
-            yield result
+        if handler is not None:
+            try:
+                result = handler(node, ctx, settings)
+                _cache_put(prefix_key, result, ctx)
+                yield result
+            except Exception as exc:
+                result = _make_step(node, "error", message=f"{type(exc).__name__}: {exc}")
+                yield result
+                break
             continue
-        try:
-            result = handler(node, ctx, settings)
-            _cache_put(prefix_key, result, ctx)
+
+        # Not a built-in — plugin dispatch path.
+        if user_id:
+            result = _handle_plugin(node, ctx, settings, user_id=user_id)
+            # Only cache successful plugin runs so a transient crash
+            # doesn't get pinned to the prefix.
+            if result.status == "ok":
+                _cache_put(prefix_key, result, ctx)
             yield result
-        except Exception as exc:
-            result = _make_step(node, "error", message=f"{type(exc).__name__}: {exc}")
-            yield result
-            break
+            if result.status == "error":
+                break
+            continue
+
+        result = _make_step(
+            node, "skipped",
+            message=f"No handler for node type {node.type!r}",
+        )
+        _cache_put(prefix_key, result, ctx)
+        yield result

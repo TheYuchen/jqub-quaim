@@ -10,8 +10,14 @@ from fastapi.responses import StreamingResponse
 from app.config import get_settings
 from app.schemas import RunRequest, RunResponse
 from app.services.circuit_service import CircuitNotFoundError, circuit_store
+from app.services.plugin_service import RESERVED_KINDS as BUILTIN_KINDS
 from app.services.run_cache import compute_cache_key, load_cached_response
 from app.services.workflow_service import run_pipeline, run_pipeline_stream
+
+
+def _uses_plugins(nodes) -> bool:
+    """True if any node has a non-built-in type (i.e. a user plugin)."""
+    return any(n.type not in BUILTIN_KINDS for n in nodes)
 
 router = APIRouter()
 
@@ -40,7 +46,10 @@ def run_workflow(req: RunRequest) -> RunResponse:
     # precompute script already ran, return the shipped response instantly
     # instead of spending 30-60s re-computing. Live IBM runs bypass the
     # cache because calibration drifts; every live run should hit hardware.
-    if not req.use_live_ibm:
+    # Plugin runs also bypass the precomputed cache — the cache was built
+    # against built-in handlers only and has no idea what the user's
+    # plugin will do.
+    if not req.use_live_ibm and not _uses_plugins(req.nodes):
         key = compute_cache_key(qc, req.nodes, req.edges, use_live_ibm=False)
         cached = load_cached_response(key, circuit_id=req.circuit_id)
         if cached is not None:
@@ -51,6 +60,7 @@ def run_workflow(req: RunRequest) -> RunResponse:
         nodes=req.nodes,
         edges=req.edges,
         settings=settings,
+        user_id=req.user_id,
     )
 
     ok = all(s.status != "error" for s in steps)
@@ -89,8 +99,9 @@ def run_workflow_stream(req: RunRequest):
     if req.use_live_ibm and not (settings.has_ibm_token and settings.allow_live_ibm):
         raise HTTPException(status_code=403, detail="Live IBM execution is disabled.")
 
-    # Cache hit → emit all steps at once and close.
-    if not req.use_live_ibm:
+    # Cache hit → emit all steps at once and close. Plugins bypass the
+    # precomputed cache (their behavior is user-specific).
+    if not req.use_live_ibm and not _uses_plugins(req.nodes):
         key = compute_cache_key(qc, req.nodes, req.edges, use_live_ibm=False)
         cached = load_cached_response(key, circuit_id=req.circuit_id)
         if cached is not None:
@@ -102,7 +113,8 @@ def run_workflow_stream(req: RunRequest):
     # Cache miss → stream steps one by one.
     def step_stream():
         for step in run_pipeline_stream(
-            circuit=qc, nodes=req.nodes, edges=req.edges, settings=settings,
+            circuit=qc, nodes=req.nodes, edges=req.edges,
+            settings=settings, user_id=req.user_id,
         ):
             yield f"data: {step.model_dump_json()}\n\n"
         yield "data: [DONE]\n\n"
