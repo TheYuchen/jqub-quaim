@@ -24,7 +24,6 @@ import {
   Link2,
   Loader2,
   Play,
-  Sliders,
   Trash2,
   Wand2,
   X,
@@ -51,7 +50,6 @@ import { PresetPicker } from "./PresetPicker";
 import { ShareButton } from "./ShareButton";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { MoreMenu } from "./MoreMenu";
-import { SweepDialog } from "./SweepDialog";
 
 /** One-shot feedback surfaced as a toast at the bottom of the canvas.
  *
@@ -139,7 +137,6 @@ export function FlowCanvas() {
   const pendingQuickStart = useApp((s) => s.pendingQuickStart);
   const clearQuickStart = useApp((s) => s.clearQuickStart);
   const [notice, setNotice] = useState<Notice>(null);
-  const [sweepOpen, setSweepOpen] = useState(false);
   // Non-danger toasts auto-fade; success is quick, warnings linger a bit
   // longer so the user has time to read every bullet. Runner errors stay
   // put until the next action (Run, Clear, preset change) clears them —
@@ -492,16 +489,6 @@ export function FlowCanvas() {
             <span className="hidden lg:inline">Export .py</span>
           </button>
           <button
-            onClick={() => setSweepOpen(true)}
-            disabled={nodes.length === 0 || !circuit}
-            className="btn hidden md:inline-flex disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Run the pipeline across a range of values for one parameter, then compare"
-            aria-label="Parameter sweep"
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Sweep</span>
-          </button>
-          <button
             onClick={clearGraph}
             className="btn hidden md:inline-flex"
             title="Clear the canvas"
@@ -519,11 +506,9 @@ export function FlowCanvas() {
             hasEdgesToReplace={edges.length > 0}
             canClear={nodes.length > 0 || edges.length > 0}
             canExport={nodes.length > 0}
-            canSweep={nodes.length > 0 && !!circuit}
             onAutoConnect={runAutoConnect}
             onShare={handleShareFromMenu}
             onExport={exportPython}
-            onSweep={() => setSweepOpen(true)}
             onClear={clearGraph}
           />
 
@@ -586,12 +571,6 @@ export function FlowCanvas() {
           <CanvasToast notice={notice} onDismiss={() => setNotice(null)} />
         )}
       </div>
-      <SweepDialog
-        open={sweepOpen}
-        onClose={() => setSweepOpen(false)}
-        nodes={nodes}
-        edges={edges}
-      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 // Tour slide 4: "you're ready" CTA with two tip columns + a feature
-// strip introducing the heavier workflow tools (Export .py, Sweep).
+// strip introducing the heavier workflow tools (Export .py).
 //
 // The "What to try first" items are clickable buttons that load the
 // matching preset + sample in one shot via the Zustand quickStart
@@ -11,7 +11,6 @@ import {
   CircleDot,
   Code2,
   Play,
-  Sliders,
   Sparkles,
 } from "lucide-react";
 import { useApp } from "../../lib/store";
@@ -135,24 +134,14 @@ export function TrySlide({ onClose }: { onClose?: () => void } = {}) {
         <div className="text-[10px] uppercase tracking-widest text-mute mb-2">
           Once you've got results
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[12px]">
-          <div className="flex items-start gap-2">
-            <Sliders className="w-3.5 h-3.5 mt-0.5 text-accent shrink-0" />
-            <span className="text-mute leading-relaxed">
-              <span className="text-ink font-medium">Sweep</span> — vary a
-              parameter across a range and compare results in one chart.
-              Upstream cache means N-value sweeps cost ~N × last-block
-              runtime, not N × full pipeline.
-            </span>
-          </div>
-          <div className="flex items-start gap-2">
-            <Code2 className="w-3.5 h-3.5 mt-0.5 text-accent shrink-0" />
-            <span className="text-mute leading-relaxed">
-              <span className="text-ink font-medium">Export .py</span> —
-              download the current pipeline as a runnable Python script for
-              your own Jupyter / slurm setup.
-            </span>
-          </div>
+        <div className="flex items-start gap-2 text-[12px]">
+          <Code2 className="w-3.5 h-3.5 mt-0.5 text-accent shrink-0" />
+          <span className="text-mute leading-relaxed">
+            <span className="text-ink font-medium">Export .py</span> —
+            download the current pipeline as a runnable Python script for
+            your own Jupyter / slurm setup. Tweak parameters and re-run
+            inside QuDA to compare a few values side by side.
+          </span>
         </div>
       </div>
 

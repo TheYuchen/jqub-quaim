@@ -94,25 +94,6 @@ export interface RunRequest {
   use_live_ibm?: boolean;
 }
 
-export interface SweepConfig {
-  node_id: string;
-  param_key: string;
-  values: (number | string)[];
-}
-
-export interface SweepRequest {
-  circuit_id: string;
-  nodes: FlowNodePayload[];
-  edges: FlowEdgePayload[];
-  use_live_ibm?: boolean;
-  sweep: SweepConfig;
-}
-
-export interface SweepRunResult {
-  param_value: number | string;
-  steps: StepResult[];
-  ok: boolean;
-}
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -229,56 +210,6 @@ export const api = {
         steps,
         final_metrics: finalMetrics,
       });
-    } catch (err) {
-      onError(err instanceof Error ? err : new Error(String(err)));
-    }
-  },
-
-  /**
-   * Parameter sweep streaming: yields one SweepRunResult per param
-   * value. Total runs = sweep.values.length.
-   */
-  sweepStream: async (
-    body: SweepRequest,
-    onRun: (run: SweepRunResult, idx: number) => void,
-    onDone: () => void,
-    onError: (err: Error) => void,
-  ) => {
-    try {
-      const res = await fetch(`${BASE}/workflow/sweep`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
-      }
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No response body");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let count = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6).trim();
-          if (payload === "[DONE]") continue;
-          try {
-            const run = JSON.parse(payload) as SweepRunResult;
-            onRun(run, count++);
-          } catch {
-            // ignore malformed
-          }
-        }
-      }
-      onDone();
     } catch (err) {
       onError(err instanceof Error ? err : new Error(String(err)));
     }

@@ -14,7 +14,6 @@ import {
   CircleDot,
   Clock,
   Code2,
-  Sliders,
   Sparkles,
 } from "lucide-react";
 import { StepBody } from "./results/cards";
@@ -107,8 +106,8 @@ function RunningHint() {
 }
 
 /** Subtle "what next" prompt shown at the bottom of the results pane
- *  after a successful run. Surfaces Sweep + Export .py since those
- *  are the natural follow-ups (compare across params, take it home). */
+ *  after a successful run. Surfaces Export .py as the natural follow-up
+ *  (take the pipeline home for iteration). */
 function NextStepsHint() {
   return (
     <div className="panel-alt p-3 text-[11px] leading-relaxed">
@@ -116,21 +115,13 @@ function NextStepsHint() {
         <Sparkles className="w-3 h-3 text-accent" />
         <span className="uppercase tracking-wider">Where to go from here</span>
       </div>
-      <div className="space-y-1.5 text-mute">
-        <div className="flex items-start gap-1.5">
-          <Sliders className="w-3 h-3 mt-0.5 text-accent shrink-0" />
-          <span>
-            <span className="text-ink">Sweep</span> a parameter across a
-            range to compare how it changes the result.
-          </span>
-        </div>
-        <div className="flex items-start gap-1.5">
-          <Code2 className="w-3 h-3 mt-0.5 text-accent shrink-0" />
-          <span>
-            <span className="text-ink">Export .py</span> to keep iterating
-            in your own Jupyter / slurm setup.
-          </span>
-        </div>
+      <div className="flex items-start gap-1.5 text-mute">
+        <Code2 className="w-3 h-3 mt-0.5 text-accent shrink-0" />
+        <span>
+          <span className="text-ink">Export .py</span> to keep iterating in
+          your own Jupyter / slurm setup, or tweak parameters and re-run
+          to compare.
+        </span>
       </div>
     </div>
   );
