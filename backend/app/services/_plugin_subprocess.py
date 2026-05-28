@@ -58,11 +58,24 @@ def main() -> int:
     handler_path = Path(sys.argv[1])
 
     # Read the whole stdin payload before doing anything else so the
-    # parent can close its end.
+    # parent can close its end. Hard cap at 50 MB so a runaway parent
+    # (shouldn't happen, but defence in depth) can't exhaust memory
+    # before the OS-level rlimit kicks in.
+    MAX_STDIN_BYTES = 50 * 1024 * 1024
     try:
-        raw = sys.stdin.read()
+        raw = sys.stdin.buffer.read(MAX_STDIN_BYTES + 1)
     except Exception as exc:
         _emit_error(f"reading stdin failed: {exc}")
+        return 1
+    if len(raw) > MAX_STDIN_BYTES:
+        _emit_error(
+            f"stdin payload exceeded {MAX_STDIN_BYTES} bytes; refusing to load."
+        )
+        return 1
+    try:
+        raw = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        _emit_error(f"stdin is not valid UTF-8: {exc}")
         return 1
     try:
         payload = json.loads(raw)

@@ -10,6 +10,7 @@ import {
   Atom,
   CircleDot,
   Code2,
+  Package,
   Play,
   Sparkles,
 } from "lucide-react";
@@ -134,14 +135,29 @@ export function TrySlide({ onClose }: { onClose?: () => void } = {}) {
         <div className="text-[10px] uppercase tracking-widest text-mute mb-2">
           Once you've got results
         </div>
-        <div className="flex items-start gap-2 text-[12px]">
-          <Code2 className="w-3.5 h-3.5 mt-0.5 text-accent shrink-0" />
-          <span className="text-mute leading-relaxed">
-            <span className="text-ink font-medium">Export .py</span> —
-            download the current pipeline as a runnable Python script for
-            your own Jupyter / slurm setup. Tweak parameters and re-run
-            inside QuDA to compare a few values side by side.
-          </span>
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 text-[12px]">
+            <Code2 className="w-3.5 h-3.5 mt-0.5 text-accent shrink-0" />
+            <span className="text-mute leading-relaxed">
+              <span className="text-ink font-medium">Export .py</span> —
+              download the current pipeline as a runnable Python script for
+              your own Jupyter / slurm setup. Tweak parameters and re-run
+              inside QuDA to compare a few values side by side.
+            </span>
+          </div>
+          <div className="flex items-start gap-2 text-[12px]">
+            <Package className="w-3.5 h-3.5 mt-0.5 text-accent2 shrink-0" />
+            <span className="text-mute leading-relaxed">
+              <span className="text-ink font-medium">Upload your own block</span>{" "}
+              — drop a .zip with{" "}
+              <span className="font-mono text-ink">manifest.json</span> +{" "}
+              <span className="font-mono text-ink">handler.py</span> next to
+              "Add blocks". Your block shows up in the catalog beside the
+              built-ins, visible only to your browser. See{" "}
+              <span className="font-mono text-ink">PLUGIN_SDK.md</span> in the
+              repo for the spec.
+            </span>
+          </div>
         </div>
       </div>
 

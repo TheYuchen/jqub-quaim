@@ -257,7 +257,18 @@ def install_plugin_zip(user_id: str, zip_bytes: bytes) -> PluginManifest:
         if m.is_dir():
             continue
         name = m.filename
-        if name.startswith("/") or ".." in Path(name).parts:
+        # Defence-in-depth: reject path-traversal in multiple flavours.
+        # On Linux the .. check below is sufficient, but we also reject
+        # backslash separators (Windows-style) and leading dots so a
+        # crafted zip can't end up writing to unexpected paths if this
+        # codebase is ever deployed on another OS.
+        if (
+            name.startswith("/")
+            or name.startswith("\\")
+            or "\\" in name
+            or ".." in Path(name).parts
+            or Path(name).is_absolute()
+        ):
             raise PluginError(f"Suspicious zip entry path: {name!r}.")
         # Reject extensions outside the allowlist.
         ext = Path(name).suffix.lower()

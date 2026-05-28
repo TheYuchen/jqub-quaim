@@ -85,7 +85,9 @@ def run_plugin(
     """
     handler_py = handler_dir / "handler.py"
     if not handler_py.exists():
-        raise PluginRunError(f"Plugin handler not found at {handler_py}.")
+        # Don't leak the full /tmp/quda_plugins/<user>/<kind>/ path —
+        # the user already knows their plugin kind, that's enough.
+        raise PluginRunError("Plugin handler.py is missing.")
 
     wrapper = Path(__file__).resolve().parent / "_plugin_subprocess.py"
     if not wrapper.exists():

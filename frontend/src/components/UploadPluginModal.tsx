@@ -103,9 +103,12 @@ export function UploadPluginModal({
       >
         <div className="px-4 py-3 border-b border-edge flex items-center justify-between">
           <div>
-            <div className="text-sm font-semibold text-ink">Upload plugin</div>
+            <div className="text-sm font-semibold text-ink">
+              Upload your own block
+            </div>
             <div className="text-[11px] text-mute">
-              Drop a .zip that contains manifest.json + handler.py.
+              Add a custom source/algorithm/metric/sink to your catalog. Only
+              you see it.
             </div>
           </div>
           <button

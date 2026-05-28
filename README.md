@@ -45,6 +45,19 @@ cache, so the demo returns instantly on first click. A cold QuBound run
 the shared HF CPU takes 1–3 min; QuCAD and CompressVQC are sub-second
 on small circuits.
 
+## User plugins
+
+Drop a `.zip` (manifest.json + handler.py) onto the **Upload** button
+next to "Add blocks" to add your own source / backend / algorithm /
+metric / sink block to the catalog. Plugins are per-browser (anonymous
+UUID in `localStorage`), run in an isolated subprocess with a 10-min
+wall-clock cap and 1 GB RAM cap, and never see `IBM_QUANTUM_TOKEN`.
+Each browser is capped at 5 active plugins.
+
+See [`PLUGIN_SDK.md`](./PLUGIN_SDK.md) for the manifest schema, the
+`run(inputs, params)` contract, per-family conventions, and the
+limits table. Worked examples live in `example_plugins/`.
+
 ## Stack
 
 - **Backend**: FastAPI + Qiskit 2.3 + qiskit-aer + qiskit-optimization +

@@ -208,14 +208,25 @@ export default function App() {
     // Fetch this browser's plugin manifests (anonymous user_id stored
     // in localStorage). Silent on failure — the user just won't see
     // their previously-uploaded plugins until they re-upload.
-    import("./lib/userId").then(({ getUserId }) => {
-      api
-        .listPlugins(getUserId())
-        .then(setPlugins)
-        .catch(() => {
-          /* ignore */
-        });
-    });
+    const refreshPlugins = () => {
+      import("./lib/userId").then(({ getUserId }) => {
+        api
+          .listPlugins(getUserId())
+          .then(setPlugins)
+          .catch(() => {
+            /* ignore */
+          });
+      });
+    };
+    refreshPlugins();
+    // Multi-tab sync: if the user uploads/deletes a plugin in another
+    // tab the storage event lets this tab pick the change up. We
+    // listen for any quda.* key to be safe.
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key || e.key.startsWith("quda.")) refreshPlugins();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [setHealth, setPlugins]);
 
   const leftWidth = leftCollapsed ? COLLAPSED_W : leftW;

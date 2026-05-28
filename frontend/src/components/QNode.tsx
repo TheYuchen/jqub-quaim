@@ -73,7 +73,45 @@ export function QNode({ id, data, selected }: NodeProps) {
   // state, not in node-data, because it's UI affordance only — we
   // don't want it serialised into share-links or auto-connect graphs.
   const [paramsOpen, setParamsOpen] = useState(false);
-  if (!spec) return null;
+  if (!spec) {
+    // Plugin was deleted (or never installed in this browser) while a
+    // node referencing its kind is still on the canvas — show a
+    // tombstone so the user knows what happened instead of an
+    // invisible-but-runnable block.
+    return (
+      <div className="node-card group relative border-danger/40 bg-danger/5">
+        <button
+          type="button"
+          aria-label="Delete this block"
+          title="Delete this orphaned block"
+          className="nodrag absolute -top-2 -right-2 w-5 h-5 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteElements({ nodes: [{ id }] });
+          }}
+        >
+          <X className="w-3 h-3" strokeWidth={2.5} />
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white bg-danger/60 shrink-0">
+            ?
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-ink text-sm truncate">
+              {d.kind}
+            </div>
+            <div className="text-[10px] text-danger uppercase tracking-wider">
+              plugin not installed
+            </div>
+          </div>
+        </div>
+        <div className="mt-1.5 text-[10px] text-mute leading-snug">
+          Re-upload this plugin to make the block work, or hover and
+          click × to remove it.
+        </div>
+      </div>
+    );
+  }
   const Icon = spec.icon;
 
   /** Patch this node's `data.params` and propagate to React Flow state. */

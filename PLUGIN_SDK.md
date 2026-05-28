@@ -190,6 +190,29 @@ treats plugins like built-in blocks: they participate in the per-
 node intermediate cache, the auto-connect family-order chain, and
 the SSE step-by-step result stream.
 
+### Things to watch when returning a new `circuit_qpy_bytes`
+
+A few downstream blocks have hard expectations about circuit shape;
+violating them surfaces as a confusing error several steps later.
+
+- **Qubit count** — QuBound and Qshot were trained on 5–8 qubit
+  circuits. Returning a circuit with a wildly different qubit count
+  works (they handle it gracefully), but the metric values may be
+  outside the model's confident range. Don't silently expand qubits
+  just to satisfy a downstream block.
+- **Classical bits** — keep at least the classical registers needed
+  for measurement; if you drop them, downstream `Output` will report
+  empty counts.
+- **Parameterized circuits** — CompressVQC assumes parametric RX/RY/RZ
+  rotations. If your block fully binds the parameters into static
+  numeric gates, CompressVQC will return zero compression.
+- **Custom gates** — avoid `qc.append` of user-defined `Gate`
+  subclasses unless you also include a decomposition; QPY may fail
+  to deserialize them on the other end.
+
+When in doubt, return the upstream circuit untouched plus your
+result in `scalars` — that always composes safely.
+
 ## Where plugins live
 
 Plugins are stored under `/tmp/quda_plugins/<your_user_id>/<kind>/`
