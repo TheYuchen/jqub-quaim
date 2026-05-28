@@ -1,0 +1,20 @@
+{
+  "kind": "prefix_x",
+  "label": "Prefix X",
+  "family": "algorithm",
+  "tagline": "prepend an X gate on a chosen qubit",
+  "description": "Adds an X gate at the beginning of the circuit on the target qubit. Doesn't change qubit count or anything else; useful for sanity-checking a downstream simulator's measurement statistics.",
+  "color": "#dc2626",
+  "author": "QuDA Studio SDK example",
+  "params": [
+    {
+      "key": "target_qubit",
+      "label": "Target qubit",
+      "type": "int",
+      "min": 0,
+      "max": 15,
+      "step": 1,
+      "hint": "Index of the qubit to apply X to before the rest of the circuit."
+    }
+  ]
+}

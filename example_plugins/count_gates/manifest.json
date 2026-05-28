@@ -1,0 +1,21 @@
+{
+  "kind": "count_gates",
+  "label": "Gate Counter",
+  "family": "metric",
+  "tagline": "tally gate types in the current circuit",
+  "description": "Reports the count of each gate type in the upstream circuit. Useful as a quick sanity check after a compression / sparsification block.",
+  "color": "#0ea5e9",
+  "author": "QuDA Studio SDK example",
+  "params": [
+    {
+      "key": "include_barriers",
+      "label": "Count barriers",
+      "type": "select",
+      "options": [
+        {"value": "yes", "label": "Include barrier gates"},
+        {"value": "no",  "label": "Skip barrier gates"}
+      ],
+      "hint": "Barriers don't affect computation but inflate the count."
+    }
+  ]
+}
