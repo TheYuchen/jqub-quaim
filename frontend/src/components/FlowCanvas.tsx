@@ -443,8 +443,12 @@ export function FlowCanvas() {
       // (qubits · depth · gates). Reads from the source node's step.
       const srcStep = stepByNodeId.get(edge.source);
       const shape = srcStep?.circuit_shape ?? null;
+      // Spelled out rather than `2q · d2 · 2g` — researchers and
+      // newcomers both read this without needing a legend. Slightly
+      // wider on canvas, but every edge gets the same width budget
+      // since labels are bg-colored.
       const label = shape
-        ? `${shape.num_qubits}q · d${shape.depth} · ${shape.size}g`
+        ? `${shape.num_qubits} qubits · depth ${shape.depth} · ${shape.size} ops`
         : undefined;
       let next = edge;
       if (label) {
@@ -735,7 +739,12 @@ export function FlowCanvas() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 overflow-x-auto">
+      {/* No overflow-x clip here: CSS spec forces overflow-y to auto
+          when overflow-x is auto, which would clip the dropdowns
+          (PresetPicker, MoreMenu) that anchor below this row. On
+          mobile the Run button drops out (md:flex) and the FAB
+          replaces it, so the remaining icon-only items fit easily. */}
+      <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4">
         {/* Status counter. Full form on ≥sm. On <sm we swap in an icon
             pair (Box = "blocks", Link2 = "links") so the compact counter
             is still self-explanatory — a bare "5·4" turned out to be
@@ -820,18 +829,22 @@ export function FlowCanvas() {
           <button
             onClick={runPipeline}
             disabled={running || !circuit}
-            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            // Hidden on mobile — the bottom-right Run FAB takes over
+            // there, and dropping this button frees the toolbar to
+            // fit the remaining icons without horizontal overflow
+            // (which used to clip the PresetPicker dropdown).
+            className="hidden md:flex btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={running ? "Running" : "Run pipeline"}
           >
             {running ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span className="hidden sm:inline">Running…</span>
+                <span>Running…</span>
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Run pipeline</span>
+                <span>Run pipeline</span>
               </>
             )}
           </button>
