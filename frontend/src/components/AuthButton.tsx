@@ -145,9 +145,12 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
         )}
       </button>
       {menuOpen && (
+        // Mobile (<sm): viewport-pinned so the dropdown stays visible
+        // even if the AuthButton is squeezed near the screen edge.
+        // Desktop (≥sm): anchored to the button.
         <div
           role="menu"
-          className="absolute right-0 mt-1 w-64 panel-alt shadow-lg z-50 text-xs"
+          className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 w-[min(16rem,calc(100vw-1.5rem))] panel-alt shadow-lg z-50 text-xs"
         >
           <div className="px-3 py-2 border-b border-edge">
             <div className="text-mute text-[10px] uppercase tracking-wider">

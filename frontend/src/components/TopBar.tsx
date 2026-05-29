@@ -55,7 +55,13 @@ export function TopBar({
   if (!serverCanGoLive) {
     chipLabel = "live ibm: unavailable";
     chipLabelShort = "ibm: n/a";
-    chipClass = "!border-edge !text-mute opacity-70 cursor-not-allowed";
+    // Use bg-canvas (not transparent) and dimmed text. Previously this
+    // used opacity-70 which made the whole chip 70% translucent, so
+    // any TopBar icons that flex-layout-squeezed against the chip
+    // showed THROUGH it on narrower viewports — confusing visual
+    // stacking. text-mute + bg-canvas gives the same "disabled" feel
+    // without alpha.
+    chipClass = "!border-edge !text-mute !bg-canvas cursor-not-allowed";
     // End-user copy only — the operator-facing instructions about
     // setting env vars live in the README, not in the UI tooltip.
     chipTitle =
@@ -86,7 +92,7 @@ export function TopBar({
       }}
       className="relative z-20 h-14 shrink-0 border-b border-edge sm:px-5 flex items-center justify-between gap-2 sm:gap-4 bg-canvas"
     >
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
         {mobile && onOpenLeftDrawer && (
           <button
             type="button"
@@ -138,7 +144,7 @@ export function TopBar({
           </button>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0">
+      <div className="flex items-center gap-1 sm:gap-2 text-xs shrink-0">
         {/* External-links group: JQub lab, papers, developer. Desktop
             shows icon+label; mobile collapses to icon-only to keep the
             header under ~390px. A subtle vertical divider (desktop only)

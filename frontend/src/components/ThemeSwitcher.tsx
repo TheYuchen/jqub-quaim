@@ -64,15 +64,14 @@ export function ThemeSwitcher() {
         <span className="hidden sm:inline">Theme</span>
       </button>
       {open && (
-        // On mobile (<md) the Theme button sits near the middle of the
-        // header, so a right-anchored 230px dropdown ends up straddling the
-        // palette strip and clips the longest tagline.
-        // Anchor right-0 on both sizes (button is right-of-center), but size
-        // the popover to viewport width minus a small margin on mobile so
-        // long taglines don't truncate.
+        // Mobile (<sm): pin to top-right of viewport so the popover never
+        // goes off-edge even when the Theme button has been squeezed off-
+        // screen by other TopBar items (which happens at certain widths
+        // when the header overflows).
+        // Desktop (≥sm): anchor right-0 to the button.
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-2 flex flex-col gap-1 w-[min(17rem,calc(100vw-1.5rem))]"
+          className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-40 p-2 flex flex-col gap-1 w-[min(17rem,calc(100vw-1.5rem))]"
         >
           {/* w- is viewport-aware: 17rem (272px) on wide screens, else
               capped at viewport minus 24px so it stays flush with the

@@ -140,9 +140,13 @@ export function MoreMenu({
         <MoreHorizontal className="w-4 h-4" />
       </button>
       {open && (
+        // Mobile (<sm): viewport-pinned (canvas toolbar can scroll
+        // horizontally on tiny screens, so an absolute-anchored menu
+        // could end up off-edge).
+        // Desktop (≥sm): anchored to the button.
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-1.5 flex flex-col gap-0.5 w-[min(18rem,calc(100vw-1.5rem))]"
+          className="fixed right-3 top-24 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-30 p-1.5 flex flex-col gap-0.5 w-[min(18rem,calc(100vw-1.5rem))]"
         >
           {items.map((it) => (
             <button
