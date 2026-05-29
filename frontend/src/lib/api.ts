@@ -58,6 +58,11 @@ export interface StepResult {
   /** True when this step was served from the per-node intermediate
    *  cache (pipeline prefix unchanged since last run). */
   from_step_cache?: boolean;
+  /** Rich visual outputs emitted by user plugins. Backend has already
+   *  validated + sanitised each entry (see plugin_runner._scrub_figures).
+   *  null/absent when the step is a built-in block or a plugin that
+   *  doesn't emit figures. */
+  figures?: Array<Record<string, unknown>> | null;
 }
 
 export interface RunResponse {

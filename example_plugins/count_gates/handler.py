@@ -1,8 +1,11 @@
 """Tiny metric-family plugin: tally gate types in the current circuit.
 
-Demonstrates the minimal handler contract: read the upstream circuit
-from inputs, compute something, return a dict with a `summary` and
-maybe `scalars`.
+Demonstrates:
+  * Reading the upstream circuit from inputs.
+  * Returning the basic ``summary`` + ``scalars`` for the KV table.
+  * Emitting a typed ``figures`` list — markdown narrative + a bar
+    chart — so the result card renders rich output instead of just a
+    flat dict.
 """
 
 from __future__ import annotations
@@ -25,12 +28,44 @@ def run(inputs: dict, params: dict) -> dict:
         ops.pop("barrier", None)
 
     total = sum(int(v) for v in ops.values())
+
+    # Sort bars by descending count for a more readable chart.
+    sorted_ops = sorted(ops.items(), key=lambda kv: kv[1], reverse=True)
+    bar_data = [{"label": name, "value": int(count)} for name, count in sorted_ops]
+
+    # Build a short markdown narrative summarising the result. Plugin
+    # authors get a place to write 1-2 sentences of "what this means".
+    narrative = (
+        f"The circuit has **{qc.num_qubits} qubits** at depth "
+        f"**{qc.depth()}**, with **{total} total gates** across "
+        f"**{len(ops)} distinct gate types**."
+    )
+
     return {
         "summary": {
             "num_qubits": qc.num_qubits,
             "depth": qc.depth(),
             "total_gates": total,
-            "by_gate": ops,
         },
         "scalars": {"total_gates": total},
+        "figures": [
+            {
+                "type": "markdown",
+                "title": "Analysis",
+                "content": narrative,
+            },
+            {
+                "type": "bar",
+                "title": "Gates by type",
+                "x_label": "Gate",
+                "y_label": "Count",
+                "data": bar_data,
+            },
+            {
+                "type": "table",
+                "title": "Raw counts",
+                "headers": ["gate", "count"],
+                "rows": [[name, int(count)] for name, count in sorted_ops],
+            },
+        ],
     }

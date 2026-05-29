@@ -101,11 +101,94 @@ def run(inputs: dict, params: dict) -> dict:
             JSON-friendly scalar values added to ctx. If you write
             "fidelity" or "qubound_value" they're also reflected in
             the Output block's summary.
+        "figures": list[dict]
+            Typed rich-output blocks rendered below the summary table
+            in the result card — see "Rich output (figures)" below.
         "error": str
             Surface a custom error message instead of finishing OK.
     """
     ...
 ```
+
+## Rich output (figures)
+
+Beyond the flat `summary` dict, plugins can emit a list of typed
+figures that render inline in the result card. Each entry is a small
+JSON object with a `type` field. The backend validates every figure
+and silently drops any that fail (oversize, malformed, unsafe markup);
+authors can check the Space's runtime logs for `Plugin figure: …`
+messages to debug rejections.
+
+Five types are supported today:
+
+```python
+"figures": [
+    # 1. Markdown narrative. Supports headings, bold/italic/code,
+    # ordered + unordered lists, fenced code blocks. Raw HTML is
+    # rejected (use markdown syntax for everything).
+    {
+        "type": "markdown",
+        "title": "Analysis",                       # optional, ≤ 120 chars
+        "content": "## Result\n\n**Bell state** has high fidelity.",
+    },
+
+    # 2. Table. Headers (≤ 12 cols) + rows (≤ 100 rows). Each cell
+    # must be a primitive (str / int / float / bool / None).
+    {
+        "type": "table",
+        "title": "Per-qubit",                      # optional
+        "headers": ["qubit", "fidelity"],
+        "rows": [[0, 0.99], [1, 0.97]],
+    },
+
+    # 3. Bar chart. Renders as an inline SVG with no JS dependency.
+    # Up to 50 bars; negative values clip to 0.
+    {
+        "type": "bar",
+        "title": "Gates by type",
+        "x_label": "Gate",                          # optional axis label
+        "y_label": "Count",
+        "data": [
+            {"label": "h", "value": 5},
+            {"label": "cx", "value": 3},
+        ],
+    },
+
+    # 4. Raw SVG. ≤ 256 KB; rejected if it contains <script>,
+    # javascript:, <foreignObject>, <iframe>, <object>, <embed>, or
+    # any on*= event-handler attribute. Use matplotlib's
+    # savefig(format="svg") output, then drop the prelude.
+    {
+        "type": "svg",
+        "title": "Distribution",
+        "content": "<svg xmlns='http://www.w3.org/2000/svg' "
+                   "viewBox='0 0 100 100'>… your shapes here …</svg>",
+    },
+
+    # 5. PNG image (base64-encoded). ≤ 1 MB decoded. Must have the
+    # PNG magic bytes — JPEGs / GIFs / other formats are rejected.
+    {
+        "type": "image_png_b64",
+        "title": "Heatmap",
+        "content": "iVBORw0KGgoAAAANSUhEUgA…",     # base64 string
+    },
+]
+```
+
+The whole list is capped at 10 figures; entries beyond that are
+silently dropped.
+
+### Recommended pattern
+
+If you have one or two scalar outputs, put them in `summary` /
+`scalars` so they show up in the KV table. Use `figures` to add the
+"why" or "how" — a short markdown explanation, a bar chart of an
+underlying distribution, a table of intermediate values. Don't
+duplicate the summary scalars in a figure; the card already shows
+them prominently.
+
+See `example_plugins/count_gates/handler.py` in the repo for a
+worked example combining markdown + bar chart + table.
 
 ## Minimum working example
 

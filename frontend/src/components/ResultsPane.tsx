@@ -20,6 +20,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { StepBody } from "./results/cards";
+import { PluginFigures } from "./PluginFigures";
 
 export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const run = useApp((s) => s.run);
@@ -193,16 +194,22 @@ function StepCard({ step }: { step: StepResult }) {
       {step.status === "ok" && step.summary && Object.keys(step.summary).length > 0 && (
         <StepBody step={step} />
       )}
+      {step.status === "ok" && step.figures && step.figures.length > 0 && (
+        <PluginFigures figures={step.figures} />
+      )}
       {step.status === "ok" &&
         isPlugin &&
-        (!step.summary || Object.keys(step.summary).length === 0) && (
+        (!step.summary || Object.keys(step.summary).length === 0) &&
+        (!step.figures || step.figures.length === 0) && (
           // Without this hint, a plugin author who forgot to return a
-          // summary dict sees a card with just the header — they can't
-          // tell "ran fine but quiet" apart from "broken plugin".
+          // summary dict OR any figures sees a card with just the
+          // header — they can't tell "ran fine but quiet" apart from
+          // "broken plugin".
           <div className="mt-2 text-[11px] text-mute italic leading-relaxed">
-            Plugin ran OK but returned no summary fields. Add a{" "}
+            Plugin ran OK but returned no summary or figures. Add a{" "}
             <span className="font-mono not-italic">"summary"</span> dict
-            to your handler's return value to display data here.
+            or a <span className="font-mono not-italic">"figures"</span>{" "}
+            list to your handler's return value to display data here.
           </div>
         )}
     </div>

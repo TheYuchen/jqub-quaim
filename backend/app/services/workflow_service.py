@@ -95,6 +95,7 @@ def _make_step(
     message: str | None = None,
     started_at: float | None = None,
     label: str | None = None,
+    figures: list[dict] | None = None,
 ) -> StepResult:
     t0 = started_at if started_at is not None else _now()
     return StepResult(
@@ -106,6 +107,7 @@ def _make_step(
         finished_at=_now(),
         summary=summary or {},
         message=message,
+        figures=figures,
     )
 
 
@@ -572,7 +574,11 @@ def _handle_plugin(
         for k, v in scalars.items():
             summary.setdefault(k, v)
 
-    return _make_step(node, "ok", started_at=t0, summary=summary)
+    # Plugin's typed rich-output figures (markdown / table / bar /
+    # svg / image_png_b64), already sanitised by plugin_runner.
+    figures = result.get("figures") or None
+
+    return _make_step(node, "ok", started_at=t0, summary=summary, figures=figures)
 
 
 _HANDLERS: dict[str, Callable[[FlowNode, dict, Settings], StepResult]] = {

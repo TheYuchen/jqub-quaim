@@ -30,6 +30,7 @@ import json
 import logging
 import math
 import os
+import re
 import resource
 import subprocess
 import sys
@@ -179,11 +180,16 @@ def run_plugin(
     #   - circuit_qpy_b64: optional base64 of new circuit bytes
     #   - backend_name: optional string (must be in known list)
     #   - scalars: optional dict of {key: float|int|str|bool}
+    #   - figures: list of typed visual outputs (markdown/table/bar/
+    #     svg/image), each validated + size-capped, see _scrub_figures.
     output: dict[str, Any] = {
         "summary": _scrub_dict(result.get("summary") or {}),
         "scalars": _scrub_scalars(result.get("scalars") or {}),
         "duration_s": duration,
     }
+    figures = _scrub_figures(result.get("figures"))
+    if figures:
+        output["figures"] = figures
     if "circuit_qpy_b64" in result:
         try:
             output["circuit_qpy_bytes"] = base64.b64decode(result["circuit_qpy_b64"])
@@ -273,3 +279,169 @@ def _scrub_value(v: Any) -> Any:
         return f if math.isfinite(f) else None
     except (TypeError, ValueError):
         return str(v)
+
+
+# ---- Figures validation -----------------------------------------------
+#
+# Plugins can return a `figures` list of typed visual outputs. Each
+# entry is a dict with a `type` field; per-type rules are below.
+# Anything that doesn't match — wrong shape, oversize, unsafe markup —
+# is dropped silently and the rest of the list still renders. We log
+# at INFO so plugin authors can debug via the Space logs.
+
+MAX_FIGURES = 10
+MAX_TITLE_CHARS = 120
+MAX_MARKDOWN_CHARS = 16 * 1024          # 16 KB of source markdown
+MAX_TABLE_ROWS = 100
+MAX_TABLE_COLS = 12
+MAX_BAR_BARS = 50
+MAX_SVG_CHARS = 256 * 1024              # 256 KB of source SVG
+MAX_PNG_BYTES = 1 * 1024 * 1024         # 1 MB decoded image
+_SVG_BAD_PATTERNS = (
+    "<script",
+    "javascript:",
+    "<foreignobject",
+    "<iframe",
+    "<object",
+    "<embed",
+)
+
+
+def _safe_str(s: Any, max_chars: int) -> str | None:
+    """Coerce to a stripped str within max_chars, or None if not stringy."""
+    if not isinstance(s, str):
+        return None
+    s2 = s.strip()
+    if not s2 or len(s2) > max_chars:
+        return None
+    return s2
+
+
+def _scrub_one_figure(fig: Any) -> dict[str, Any] | None:
+    """Validate + sanitise a single figure dict. Returns the cleaned
+    object or None if it fails any rule (silently dropped)."""
+    if not isinstance(fig, dict):
+        return None
+    ftype = fig.get("type")
+    if not isinstance(ftype, str):
+        return None
+
+    title = fig.get("title")
+    if title is not None:
+        title = _safe_str(title, MAX_TITLE_CHARS)
+
+    if ftype == "markdown":
+        content = _safe_str(fig.get("content"), MAX_MARKDOWN_CHARS)
+        if content is None:
+            return None
+        # Refuse anything that looks like an embedded HTML element —
+        # the frontend uses a tiny safe markdown renderer that ignores
+        # raw HTML anyway, but rejecting here gives the author a
+        # signal that <…> won't render.
+        if re.search(r"<\s*[a-zA-Z]", content):
+            logger.info("Plugin figure: markdown dropped (contains raw HTML)")
+            return None
+        return {"type": "markdown", "title": title, "content": content}
+
+    if ftype == "table":
+        headers = fig.get("headers")
+        rows = fig.get("rows")
+        if not isinstance(headers, list) or not isinstance(rows, list):
+            return None
+        if len(headers) > MAX_TABLE_COLS or len(rows) > MAX_TABLE_ROWS:
+            logger.info(
+                "Plugin figure: table dropped (cols=%d > %d or rows=%d > %d)",
+                len(headers), MAX_TABLE_COLS, len(rows), MAX_TABLE_ROWS,
+            )
+            return None
+        clean_headers = [str(h)[:50] for h in headers]
+        clean_rows = []
+        for r in rows:
+            if not isinstance(r, list):
+                return None
+            if len(r) != len(headers):
+                return None
+            cleaned = [_scrub_value(c) for c in r]
+            clean_rows.append(cleaned)
+        return {
+            "type": "table",
+            "title": title,
+            "headers": clean_headers,
+            "rows": clean_rows,
+        }
+
+    if ftype == "bar":
+        data = fig.get("data")
+        if not isinstance(data, list) or len(data) > MAX_BAR_BARS or not data:
+            return None
+        clean_bars = []
+        for item in data:
+            if not isinstance(item, dict):
+                return None
+            label = _safe_str(item.get("label"), 40)
+            raw_val = item.get("value")
+            if label is None:
+                return None
+            if not isinstance(raw_val, (int, float)) or isinstance(raw_val, bool):
+                return None
+            if not math.isfinite(float(raw_val)):
+                return None
+            clean_bars.append({"label": label, "value": float(raw_val)})
+        return {
+            "type": "bar",
+            "title": title,
+            "x_label": _safe_str(fig.get("x_label"), 40),
+            "y_label": _safe_str(fig.get("y_label"), 40),
+            "data": clean_bars,
+        }
+
+    if ftype == "svg":
+        content = _safe_str(fig.get("content"), MAX_SVG_CHARS)
+        if content is None:
+            return None
+        lowered = content.lower()
+        for bad in _SVG_BAD_PATTERNS:
+            if bad in lowered:
+                logger.info("Plugin figure: svg dropped (matched %r)", bad)
+                return None
+        # Reject inline event handlers like onclick="…"
+        if re.search(r"\son[a-z]+\s*=", lowered):
+            logger.info("Plugin figure: svg dropped (event handler attr)")
+            return None
+        return {"type": "svg", "title": title, "content": content}
+
+    if ftype == "image_png_b64":
+        content = fig.get("content")
+        if not isinstance(content, str) or not content:
+            return None
+        # Heuristic size cap on the encoded form (4 b64 chars = 3 raw).
+        if len(content) > int(MAX_PNG_BYTES * 4 / 3) + 4:
+            logger.info("Plugin figure: png dropped (oversize b64)")
+            return None
+        try:
+            raw = base64.b64decode(content, validate=True)
+        except Exception:
+            return None
+        if len(raw) > MAX_PNG_BYTES:
+            return None
+        # PNG magic: 89 50 4E 47 0D 0A 1A 0A
+        if raw[:8] != b"\x89PNG\r\n\x1a\n":
+            logger.info("Plugin figure: png dropped (wrong magic bytes)")
+            return None
+        return {"type": "image_png_b64", "title": title, "content": content}
+
+    return None  # unknown type
+
+
+def _scrub_figures(raw: Any) -> list[dict[str, Any]]:
+    """Top-level cleanup for a plugin's figures field. Drops the whole
+    list to [] if not a list; drops individual entries that fail
+    validation."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for fig in raw[:MAX_FIGURES]:
+        cleaned = _scrub_one_figure(fig)
+        if cleaned is not None:
+            out.append(cleaned)
+    return out

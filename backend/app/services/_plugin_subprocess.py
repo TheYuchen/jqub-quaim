@@ -127,7 +127,7 @@ def main() -> int:
 
     # If the plugin returned bytes for a circuit, base64 it for transport.
     out: dict[str, Any] = {}
-    for key in ("summary", "scalars", "backend_name", "error"):
+    for key in ("summary", "scalars", "backend_name", "error", "figures"):
         if key in result:
             out[key] = result[key]
     if "circuit_qpy_bytes" in result:

@@ -99,6 +99,12 @@ class StepResult(BaseModel):
     summary: dict[str, Any] = Field(default_factory=dict)
     message: str | None = None
     from_step_cache: bool = False
+    # Rich figures emitted by user plugins (validated + sanitised in
+    # plugin_runner._scrub_figures). Each figure is a typed dict —
+    # markdown / table / bar / svg / image — that the frontend's
+    # PluginFigures component renders inline below the step's summary
+    # table. None means "no figures" (the common case for built-ins).
+    figures: list[dict[str, Any]] | None = None
 
 
 class RunResponse(BaseModel):
