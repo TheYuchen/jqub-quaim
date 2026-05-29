@@ -61,7 +61,11 @@ export function UploadPluginModal({
   const autoCloseRef = useRef<number | null>(null);
 
   // Reset transient state every time the modal reopens, and cancel any
-  // pending auto-close from a previous open cycle.
+  // pending auto-close from a previous open cycle. Also remember the
+  // element that had focus when we opened so we can put focus back on
+  // close — without this, keyboard / screen-reader users land at the
+  // top of the document after closing.
+  const openerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (open) {
       setError(null);
@@ -69,6 +73,19 @@ export function UploadPluginModal({
       setBusy(false);
       setDragOver(false);
       setInstallingExample(null);
+      openerRef.current = (document.activeElement as HTMLElement) || null;
+    } else if (openerRef.current) {
+      // Defer one frame so React has flushed; otherwise we focus the
+      // element before the modal's portal unmounts and focus jumps.
+      const target = openerRef.current;
+      requestAnimationFrame(() => {
+        try {
+          target.focus();
+        } catch {
+          /* element may be gone */
+        }
+      });
+      openerRef.current = null;
     }
     return () => {
       if (autoCloseRef.current !== null) {

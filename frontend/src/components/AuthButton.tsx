@@ -21,6 +21,21 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
   const setPlugins = useApp((s) => s.setPlugins);
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  // When the dropdown closes (via Escape, click-outside, or explicit
+  // close), return focus to the trigger so keyboard users can keep
+  // navigating from where they were.
+  useEffect(() => {
+    if (!menuOpen && triggerRef.current && document.activeElement) {
+      // Only restore focus when something inside us had focus —
+      // otherwise we'd steal focus from elsewhere on a programmatic
+      // close.
+      if (wrapRef.current?.contains(document.activeElement)) {
+        triggerRef.current.focus();
+      }
+    }
+  }, [menuOpen]);
 
   // Click-outside + Escape close the dropdown.
   useEffect(() => {
@@ -99,6 +114,7 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
   return (
     <div className="relative" ref={wrapRef}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setMenuOpen((v) => !v)}
         className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-edge bg-surface/60 text-mute hover:text-ink hover:border-accent/40 text-xs"

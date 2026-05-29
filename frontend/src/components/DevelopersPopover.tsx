@@ -16,22 +16,27 @@ import { CircleUser, ExternalLink } from "lucide-react";
 
 interface Person {
   name: string;
-  /** Where the "open" click takes the user. */
+  /** Where the "open" click takes the user (primary link). */
   url: string;
   /** Domain/platform label shown as a right-aligned footer chip. */
   linkLabel: string;
+  /** Optional second link shown as a small chip alongside the first. */
+  secondaryUrl?: string;
+  secondaryLabel?: string;
 }
 
 const PEOPLE: Person[] = [
   {
-    name: "Jovin Antony Maria",
-    url: "https://www.linkedin.com/in/jovin-antony-maria-987262348/",
-    linkLabel: "LinkedIn",
-  },
-  {
     name: "Yuchen Yuan",
     url: "https://theyuchen.github.io/",
     linkLabel: "theyuchen.github.io",
+    secondaryUrl: "https://www.linkedin.com/in/yuchen-ethan-yuan-851130378/",
+    secondaryLabel: "LinkedIn",
+  },
+  {
+    name: "Jovin Antony Maria",
+    url: "https://www.linkedin.com/in/jovin-antony-maria-987262348/",
+    linkLabel: "LinkedIn",
   },
 ];
 
@@ -80,24 +85,42 @@ export function DevelopersPopover() {
           className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-40 p-2 flex flex-col gap-0.5 w-[min(20rem,calc(100vw-1.5rem))]"
         >
           {PEOPLE.map((p) => (
-            <a
+            <div
               key={p.name}
               role="menuitem"
-              href={p.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
               className="px-3 py-2 rounded-md hover:bg-surfaceAlt transition-colors border border-transparent hover:border-edge/60 flex items-center gap-3"
             >
               <CircleUser className="w-4 h-4 text-mute shrink-0" />
               <span className="flex-1 min-w-0 text-sm text-ink font-medium truncate">
                 {p.name}
               </span>
-              <span className="flex items-center gap-1 text-[10px] text-mute font-mono shrink-0">
-                {p.linkLabel}
-                <ExternalLink className="w-3 h-3" />
-              </span>
-            </a>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-1 text-[10px] text-mute hover:text-ink font-mono px-1.5 py-0.5 rounded border border-edge/40 hover:border-edge"
+                  title={`Open ${p.linkLabel} for ${p.name}`}
+                >
+                  {p.linkLabel}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+                {p.secondaryUrl && p.secondaryLabel && (
+                  <a
+                    href={p.secondaryUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-1 text-[10px] text-mute hover:text-ink font-mono px-1.5 py-0.5 rounded border border-edge/40 hover:border-edge"
+                    title={`Open ${p.secondaryLabel} for ${p.name}`}
+                  >
+                    {p.secondaryLabel}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            </div>
           ))}
         </div>
       )}

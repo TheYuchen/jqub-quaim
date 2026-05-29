@@ -347,11 +347,12 @@ function BarBlock({
   const barGap = 6;
   const minBarW = 14;
   const maxBarW = 36;
+  // Always give each bar at least minBarW px. When N is large the
+  // chart grows past the card width and the outer wrapper scrolls
+  // horizontally — that's better than shrinking labels to 5px.
   const width = Math.max(
     260,
-    padLeft +
-      padRight +
-      data.length * (Math.max(minBarW, maxBarW * (10 / data.length)) + barGap),
+    padLeft + padRight + data.length * (minBarW + barGap),
   );
 
   const positiveValues = data.map((d) => Math.max(0, d.value));
@@ -364,12 +365,28 @@ function BarBlock({
     ),
   );
 
+  // Screen-reader friendly summary of the chart. Without this, an
+  // assistive-tech user just hears "Bar chart" and can't interrogate
+  // the actual data. We keep it brief: count, max, top bar.
+  const top = data.reduce(
+    (acc, d) => (d.value > acc.value ? d : acc),
+    data[0],
+  );
+  const ariaLabel = `Bar chart of ${data.length} value${
+    data.length === 1 ? "" : "s"
+  }. Maximum: ${formatBarValue(top.value)} at "${top.label}".`;
+
   return (
+    <div className="overflow-x-auto">
     <svg
       viewBox={`0 0 ${width} ${chartH + padTop + padBottom}`}
-      className="w-full max-w-full h-auto"
+      // No w-full here: when width > container, the parent
+      // overflow-x-auto kicks in instead of squashing bars.
+      width={width}
+      height={chartH + padTop + padBottom}
+      style={{ maxWidth: "100%" }}
       role="img"
-      aria-label="Bar chart"
+      aria-label={ariaLabel}
     >
       {/* Y-axis label */}
       {yLabel && (
@@ -449,6 +466,7 @@ function BarBlock({
         </text>
       )}
     </svg>
+    </div>
   );
 }
 
@@ -462,17 +480,34 @@ function truncate(s: string, max: number): string {
 }
 
 // ----- Raw SVG ----------------------------------------------------------
-// The backend rejected anything containing <script>, javascript:,
-// <foreignObject>, event-handler attrs, etc. We render via
-// dangerouslySetInnerHTML — at this point the string is a safer
-// subset than typical user-supplied HTML.
+// The backend's _scrub_figures rejected anything containing <script>,
+// javascript: URLs, <foreignObject>, event-handler attrs, etc. As
+// defense-in-depth we still render inside a sandboxed iframe so a
+// stage-2 bypass (CSS-injection, future SVG attack vectors) can't
+// touch our DOM, cookies, or origin. The iframe has no allow-
+// scripts, no allow-same-origin — even if SVG content somehow runs
+// JS, it can't reach the parent page.
 
 function SvgBlock({ content }: { content: string }) {
+  // Wrap in minimal HTML so the iframe knows it's rendering SVG.
+  // body padding 0 + neutral background matches the rest of the card.
+  const srcdoc = useMemo(() => {
+    const css = `
+      html,body{margin:0;padding:0;background:transparent;color:inherit}
+      body{overflow:auto;max-width:100%}
+      svg{max-width:100%;height:auto;display:block}
+    `;
+    return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${content}</body></html>`;
+  }, [content]);
   return (
-    <div
-      className="plugin-svg overflow-x-auto"
-      // eslint-disable-next-line react/no-danger
-      dangerouslySetInnerHTML={{ __html: content }}
+    <iframe
+      sandbox=""
+      title="Plugin SVG figure"
+      srcDoc={srcdoc}
+      // Iframe content height is unknown until it renders; auto-size
+      // via a ResizeObserver would require same-origin, so we settle
+      // for a generous default that scrolls if needed.
+      className="w-full h-72 border-0"
     />
   );
 }

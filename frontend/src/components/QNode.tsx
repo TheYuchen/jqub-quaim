@@ -66,7 +66,7 @@ export function QNode({ id, data, selected }: NodeProps) {
           type="button"
           aria-label="Delete this block"
           title="Delete this orphaned block"
-          className="nodrag absolute -top-2 -right-2 w-5 h-5 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          className="nodrag absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-70 hover:opacity-100 focus:opacity-100 transition-opacity z-10"
           onClick={(e) => {
             e.stopPropagation();
             deleteElements({ nodes: [{ id }] });
@@ -117,7 +117,7 @@ export function QNode({ id, data, selected }: NodeProps) {
         type="button"
         aria-label="Delete this block"
         title="Delete this block"
-        className="nodrag absolute -top-2 -right-2 w-5 h-5 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="nodrag absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-70 hover:opacity-100 focus:opacity-100 transition-opacity z-10"
         onClick={(e) => {
           e.stopPropagation();
           deleteElements({ nodes: [{ id }] });

@@ -257,24 +257,48 @@ function PaletteTile({
    *  used for user-uploaded plugins. */
   onDelete?: () => void;
 }) {
+  const addBlocksToCanvas = useApp((s) => s.addBlocksToCanvas);
   const isPlugin = "isPlugin" in spec && spec.isPlugin;
   const Icon = spec.icon;
+
   function onDragStart(e: React.DragEvent) {
     e.dataTransfer.setData("application/reactflow", spec.kind);
     e.dataTransfer.effectAllowed = "move";
   }
+
+  // Tap (mobile) / click (mouse) / Enter+Space (keyboard) all funnel
+  // into the same "queue this kind for the canvas" path that the
+  // BlockPicker dropdown uses. Drag-and-drop continues to work for
+  // mouse users on top of this — they get both interactions.
+  function addToCanvas() {
+    addBlocksToCanvas([spec.kind]);
+  }
+
   return (
-    <div
+    <button
+      type="button"
       draggable
       onDragStart={onDragStart}
-      className={`group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border transition-colors text-center px-1.5 py-1.5 ${
+      onClick={addToCanvas}
+      // The button gives us Enter/Space → click for free; we override
+      // Space below so it doesn't also scroll the strip.
+      onKeyDown={(e) => {
+        if (e.key === " ") {
+          e.preventDefault();
+          addToCanvas();
+        }
+      }}
+      className={`group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border transition-colors text-center px-1.5 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
         isPlugin
           ? "border-edge bg-surface/60 hover:bg-surfaceAlt"
           : "border-edge/60 hover:border-edge hover:bg-surfaceAlt"
       }`}
       title={spec.description}
+      aria-label={`Add ${spec.label} block to canvas. ${spec.tagline}`}
     >
-      {/* Top-right corner badge: paper link, delete button, or nothing */}
+      {/* Top-right corner badge: paper link, delete button, or nothing.
+          These are interactive children; stopPropagation keeps the
+          parent button from also firing. */}
       {spec.paper && !isPlugin && (
         <a
           href={spec.paper.url}
@@ -283,7 +307,7 @@ function PaletteTile({
           draggable={false}
           onDragStart={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
-          className="absolute top-1 right-1 w-4 h-4 rounded-full bg-accent/20 border border-accent/70 text-accent hover:bg-accent/40 hover:border-accent hover:text-ink flex items-center justify-center shadow-sm transition-colors z-10"
+          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-accent/20 border border-accent/70 text-accent hover:bg-accent/40 hover:border-accent hover:text-ink flex items-center justify-center shadow-sm transition-colors z-10"
           title={`Paper: ${spec.paper.title} (${spec.paper.venue})`}
           aria-label={`Open paper: ${spec.paper.title}`}
         >
@@ -291,6 +315,10 @@ function PaletteTile({
         </a>
       )}
       {isPlugin && onDelete && (
+        // Always visible: previously hover-only, which left mobile +
+        // keyboard users with no way to find or activate the delete
+        // affordance. Slight opacity at rest keeps it from drawing too
+        // much focus when the user is browsing the catalogue.
         <button
           type="button"
           draggable={false}
@@ -299,23 +327,30 @@ function PaletteTile({
             e.stopPropagation();
             if (window.confirm(`Delete plugin "${spec.label}"?`)) onDelete();
           }}
-          className="absolute top-1 right-1 w-4 h-4 rounded-full border border-edge bg-surface text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          onKeyDown={(e) => {
+            // Don't bubble Enter/Space to the parent button when
+            // focused on the delete X.
+            if (e.key === "Enter" || e.key === " ") e.stopPropagation();
+          }}
+          className="absolute top-1 right-1 w-5 h-5 rounded-full border border-edge bg-surface text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-70 hover:opacity-100 focus:opacity-100 transition-opacity z-10"
           title={`Delete plugin ${spec.label}`}
           aria-label={`Delete plugin ${spec.label}`}
         >
-          <X className="w-2.5 h-2.5" strokeWidth={2.5} />
+          <X className="w-3 h-3" strokeWidth={2.5} />
         </button>
       )}
       {isPlugin ? (
         <span
           className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
           style={{ backgroundColor: (spec as PluginNodeSpec).pluginColor }}
+          aria-hidden
         >
           {(spec as PluginNodeSpec).initials}
         </span>
       ) : (
         <span
           className={`w-6 h-6 rounded-md border ${spec.accentRing} bg-surface flex items-center justify-center ${spec.accent}`}
+          aria-hidden
         >
           <Icon className="w-3 h-3" strokeWidth={2} />
         </span>
@@ -326,6 +361,6 @@ function PaletteTile({
       <span className="text-[9px] text-mute/80 leading-tight max-w-full line-clamp-2">
         {spec.tagline}
       </span>
-    </div>
+    </button>
   );
 }

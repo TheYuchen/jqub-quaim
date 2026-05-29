@@ -201,3 +201,24 @@
   color: rgb(var(--rf-edge-stroke)) !important;
   font-size: 10px !important;
 }
+
+/* ----- prefers-reduced-motion ----------------------------------------
+ * Honor the OS-level "reduce motion" setting. Without this rule the
+ * default React Flow `animated` edges loop a stroke-dash forever, and
+ * the various spinners / pulse loaders run regardless of user
+ * preference. We keep transitions essentially instant so the UI is
+ * still responsive but without continuous motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .react-flow__edge-path {
+    stroke-dasharray: none !important;
+    animation: none !important;
+  }
+}
