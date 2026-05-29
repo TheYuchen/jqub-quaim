@@ -30,7 +30,12 @@ import {
 } from "lucide-react";
 import { copyToClipboard } from "../lib/clipboard";
 import { generatePythonScript } from "../lib/exportPython";
-import { NODE_BY_KIND, resolveNodeSpec, type NodeKind } from "../lib/nodeCatalog";
+import {
+  NODE_BY_KIND,
+  resolveNodeSpec,
+  type NodeKind,
+  type PluginNodeSpec,
+} from "../lib/nodeCatalog";
 import {
   DEFAULT_PRESET_KEY,
   PRESET_BY_KEY,
@@ -399,6 +404,86 @@ export function FlowCanvas() {
     );
   }, [edges, dropTargetEdgeId]);
 
+  // ---- Touch drag bridge (mobile drag-to-insert) ---------------------
+  //
+  // HTML5 drag-and-drop doesn't fire on touch devices, so PaletteTile
+  // implements a parallel PointerEvent-based drag and publishes its
+  // state through the Zustand store. Here:
+  //   * touchDrag (non-null while a finger is dragging) drives the
+  //     floating preview chip and the edge-highlight target.
+  //   * pendingTouchDrop is set once on pointerup; we commit the
+  //     drop (splice into the closest edge, or land at the cursor).
+  const touchDrag = useApp((s) => s.touchDrag);
+  const pendingTouchDrop = useApp((s) => s.pendingTouchDrop);
+  const setPendingTouchDrop = useApp((s) => s.setPendingTouchDrop);
+
+  // While a touch drag is active, mirror the cursor position into
+  // dropTargetEdgeId so the same dashed-accent highlight that mouse
+  // drag uses also lights up for the touch user.
+  useEffect(() => {
+    if (!touchDrag) return;
+    const next = findClosestEdge(touchDrag.x, touchDrag.y);
+    setDropTargetEdgeId((prev) => (prev === next ? prev : next));
+  }, [touchDrag, findClosestEdge]);
+
+  // Commit the drop once the finger lifts. Same splice-vs-land logic
+  // as onDrop, just sourced from the store instead of a DragEvent.
+  useEffect(() => {
+    if (!pendingTouchDrop) return;
+    const { kind, x, y } = pendingTouchDrop;
+    setPendingTouchDrop(null);
+
+    const targetEdgeId = dropTargetEdgeId;
+    setDropTargetEdgeId(null);
+
+    const plugins = useApp.getState().plugins;
+    const spec = resolveNodeSpec(kind, plugins);
+    if (!spec) return;
+
+    // If the finger went up off-canvas (over the palette strip or a
+    // pane resizer), abort. wrapperRef bounds drive this check.
+    const rect = wrapperRef.current?.getBoundingClientRect();
+    if (!rect || x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      return;
+    }
+
+    const position = screenToFlowPosition({ x, y });
+    const id = `n${Date.now().toString(36)}`;
+    const node: RFNode = {
+      id,
+      type: "qnode",
+      position,
+      data: {
+        kind: kind as NodeKind,
+        params: { ...((spec.defaultData as Record<string, unknown>) ?? {}) },
+      },
+    };
+
+    if (targetEdgeId) {
+      const target = edges.find((edge) => edge.id === targetEdgeId);
+      if (target) {
+        setNodes((ns) => ns.concat(node));
+        setEdges((es) => {
+          const withoutOld = es.filter((edge) => edge.id !== targetEdgeId);
+          return withoutOld.concat(
+            { id: `e${id}-in`, source: target.source, target: id },
+            { id: `e${id}-out`, source: id, target: target.target },
+          );
+        });
+        return;
+      }
+    }
+    setNodes((ns) => ns.concat(node));
+  }, [
+    pendingTouchDrop,
+    dropTargetEdgeId,
+    edges,
+    screenToFlowPosition,
+    setNodes,
+    setEdges,
+    setPendingTouchDrop,
+  ]);
+
   // Monotonic counter so we can tell stale `loadSample` resolutions
   // (from a prior preset click) from the most recent one. Without this,
   // a user who quickly toggles between two presets that pull different
@@ -717,7 +802,57 @@ export function FlowCanvas() {
         {notice && (
           <CanvasToast notice={notice} onDismiss={() => setNotice(null)} />
         )}
+        {/* Floating preview while a finger drags a palette tile. fixed
+            positioning ignores the wrapper so it follows the finger
+            even off-canvas; pointer-events:none means the touch keeps
+            hitting whatever is underneath. */}
+        {touchDrag && (
+          <TouchDragPreview kind={touchDrag.kind} x={touchDrag.x} y={touchDrag.y} />
+        )}
       </div>
+    </div>
+  );
+}
+
+/** Floating chip following the finger during a touch drag. Shows the
+ *  block's family color + initials so the user sees what they're
+ *  carrying. */
+function TouchDragPreview({
+  kind,
+  x,
+  y,
+}: {
+  kind: NodeKind;
+  x: number;
+  y: number;
+}) {
+  const plugins = useApp((s) => s.plugins);
+  const spec = resolveNodeSpec(kind, plugins);
+  if (!spec) return null;
+  const isPlugin = "isPlugin" in spec && spec.isPlugin;
+  const Icon = spec.icon;
+  return (
+    <div
+      className="fixed z-50 pointer-events-none flex items-center gap-1.5 px-2 py-1 rounded-md border border-accent2 bg-surface shadow-lg text-[11px] font-medium text-ink"
+      style={{
+        left: x + 8,
+        top: y + 8,
+        // Slight rotation to look "held" and lifted.
+        transform: "rotate(-2deg)",
+      }}
+      aria-hidden
+    >
+      {isPlugin ? (
+        <span
+          className="w-5 h-5 rounded-sm flex items-center justify-center text-[9px] font-bold text-white"
+          style={{ backgroundColor: (spec as PluginNodeSpec).pluginColor }}
+        >
+          {(spec as PluginNodeSpec).initials}
+        </span>
+      ) : (
+        <Icon className={`w-3.5 h-3.5 ${spec.accent}`} />
+      )}
+      <span>{spec.label}</span>
     </div>
   );
 }

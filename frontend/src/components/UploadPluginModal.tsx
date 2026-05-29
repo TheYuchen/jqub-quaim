@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { bumpPluginsRev, getUserId } from "../lib/userId";
 import { useApp } from "../lib/store";
 import { FAMILY_HINTS } from "../lib/familyHints";
+import { useFocusTrap } from "../lib/focusTrap";
 import type { NodeSpec } from "../lib/nodeCatalog";
 
 type Example = {
@@ -59,6 +60,10 @@ export function UploadPluginModal({
   const [installingExample, setInstallingExample] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const autoCloseRef = useRef<number | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // While the modal is open, trap Tab inside it so keyboard users
+  // don't tab out into the obscured background controls.
+  useFocusTrap(open, dialogRef);
 
   // Reset transient state every time the modal reopens, and cancel any
   // pending auto-close from a previous open cycle. Also remember the
@@ -386,7 +391,9 @@ export function UploadPluginModal({
       onClick={() => !busy && onClose()}
     >
       <div
-        className="bg-surface border border-edge rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden"
+        ref={dialogRef}
+        tabIndex={-1}
+        className="bg-surface border border-edge rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-edge flex items-center justify-between">

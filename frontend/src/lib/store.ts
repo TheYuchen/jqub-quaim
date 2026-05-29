@@ -92,6 +92,34 @@ interface AppState {
   setPlugins: (p: PluginManifest[]) => void;
 
   /**
+   * Touch-drag bridge between NodePalette (where the touch starts)
+   * and FlowCanvas (which renders the floating preview, computes the
+   * edge under the finger, and ultimately commits the drop).
+   *
+   *   touchDrag       — non-null while a touch drag is active. The
+   *                     palette tile updates x/y on every pointermove.
+   *                     The canvas reads x/y to render a floating
+   *                     preview and to compute which edge to splice.
+   *   pendingTouchDrop — set once by the palette on pointerup. The
+   *                     canvas's useEffect commits the drop (splice
+   *                     into the closest edge OR add at the cursor
+   *                     position) and clears it.
+   *
+   * Why a separate "pending" signal instead of just one field: the
+   * preview state should disappear immediately on release, but the
+   * actual node creation needs the cursor's final coordinates AND
+   * needs to fire from FlowCanvas (which owns the React Flow nodes).
+   */
+  touchDrag: { kind: NodeKind; x: number; y: number } | null;
+  setTouchDrag: (
+    v: { kind: NodeKind; x: number; y: number } | null,
+  ) => void;
+  pendingTouchDrop: { kind: NodeKind; x: number; y: number } | null;
+  setPendingTouchDrop: (
+    v: { kind: NodeKind; x: number; y: number } | null,
+  ) => void;
+
+  /**
    * OAuth + persistence capability of this deployment. Probed once at
    * boot via /api/auth/status. When `oauth_enabled` is false (e.g.
    * local dev without HF_OAUTH metadata), the TopBar hides the Login
@@ -141,6 +169,10 @@ export const useApp = create<AppState>((set) => ({
     set((s) => ({ hintExpandLeftPane: s.hintExpandLeftPane + 1 })),
   plugins: [],
   setPlugins: (p) => set({ plugins: p }),
+  touchDrag: null,
+  setTouchDrag: (v) => set({ touchDrag: v }),
+  pendingTouchDrop: null,
+  setPendingTouchDrop: (v) => set({ pendingTouchDrop: v }),
   authStatus: null,
   setAuthStatus: (s) => set({ authStatus: s }),
   session: null,

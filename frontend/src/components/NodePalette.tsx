@@ -258,6 +258,8 @@ function PaletteTile({
   onDelete?: () => void;
 }) {
   const addBlocksToCanvas = useApp((s) => s.addBlocksToCanvas);
+  const setTouchDrag = useApp((s) => s.setTouchDrag);
+  const setPendingTouchDrop = useApp((s) => s.setPendingTouchDrop);
   const isPlugin = "isPlugin" in spec && spec.isPlugin;
   const Icon = spec.icon;
 
@@ -274,11 +276,90 @@ function PaletteTile({
     addBlocksToCanvas([spec.kind]);
   }
 
+  // ---- Touch drag (mobile) ------------------------------------------
+  //
+  // HTML5 drag-and-drop doesn't fire on touch; instead we implement a
+  // PointerEvent-based drag that mirrors the HTML5 behaviour for the
+  // canvas. Flow:
+  //   1. pointerdown (touch only) — remember the start coord. No drag
+  //      state yet; small movements still register as taps via the
+  //      button's onClick.
+  //   2. pointermove past TAP_THRESHOLD_PX — enter drag mode: take
+  //      pointer capture, set touchDrag in the store, suppress scroll.
+  //   3. pointermove while dragging — update touchDrag.x/y; FlowCanvas
+  //      watches this and renders the floating preview + edge target.
+  //   4. pointerup while dragging — set pendingTouchDrop with the
+  //      final coords; FlowCanvas commits the drop.
+  //   5. pointercancel / pointerup with no drag — clear state, let
+  //      onClick fire normally.
+  function onPointerDown(e: React.PointerEvent) {
+    if (e.pointerType !== "touch") return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const pointerId = e.pointerId;
+    const TAP_THRESHOLD_PX = 8;
+    let dragging = false;
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!dragging) {
+        if (Math.hypot(dx, dy) > TAP_THRESHOLD_PX) {
+          dragging = true;
+          try {
+            (e.target as Element).setPointerCapture?.(pointerId);
+          } catch {
+            /* element may have already lost pointer */
+          }
+        } else {
+          return;
+        }
+      }
+      setTouchDrag({ kind: spec.kind, x: ev.clientX, y: ev.clientY });
+      // preventDefault suppresses the palette strip's horizontal
+      // scroll once we've committed to dragging.
+      ev.preventDefault();
+    };
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      cleanup();
+      if (dragging) {
+        // Hand off the final position to FlowCanvas via the store.
+        setPendingTouchDrop({
+          kind: spec.kind,
+          x: ev.clientX,
+          y: ev.clientY,
+        });
+        setTouchDrag(null);
+      }
+      // Non-drag pointerup: tap; the button's onClick will fire.
+    };
+
+    const onCancel = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      cleanup();
+      setTouchDrag(null);
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+  }
+
   return (
     <button
       type="button"
       draggable
       onDragStart={onDragStart}
+      onPointerDown={onPointerDown}
       onClick={addToCanvas}
       // The button gives us Enter/Space → click for free; we override
       // Space below so it doesn't also scroll the strip.

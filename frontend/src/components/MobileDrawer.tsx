@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { useFocusTrap } from "../lib/focusTrap";
 
 /**
  * Mobile-only side drawer.
@@ -41,6 +42,11 @@ export function MobileDrawer({
     };
   }, [open, onClose]);
 
+  const panelRef = useRef<HTMLElement | null>(null);
+  // Trap Tab inside the drawer while it's open so keyboard users
+  // don't accidentally interact with the scrim-obscured background.
+  useFocusTrap(open, panelRef);
+
   const translate = open
     ? "translate-x-0"
     : side === "left"
@@ -60,10 +66,12 @@ export function MobileDrawer({
       />
       {/* Panel. */}
       <aside
+        ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`fixed top-0 bottom-0 z-50 w-[86vw] max-w-[420px] bg-surface border-edge flex flex-col min-h-0 transition-transform duration-200 ease-out shadow-2xl ${sideClass} ${translate}`}
+        className={`fixed top-0 bottom-0 z-50 w-[86vw] max-w-[420px] bg-surface border-edge flex flex-col min-h-0 transition-transform duration-200 ease-out shadow-2xl outline-none ${sideClass} ${translate}`}
       >
         <div className="h-12 shrink-0 border-b border-edge px-3 flex items-center justify-between">
           <div className="text-sm font-medium text-ink">{title}</div>
