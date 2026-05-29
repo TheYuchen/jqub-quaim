@@ -324,7 +324,14 @@ export default function App() {
   const rightWidth = rightCollapsed ? COLLAPSED_W : rightW;
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden">
+    // h-[100dvh] uses the dynamic viewport height — iOS Safari shrinks
+    // 100vh by the address bar, clipping ~80px of UI off the bottom.
+    // 100dvh tracks the actually-visible area. We keep w-screen since
+    // viewport WIDTH isn't dynamic.
+    <div
+      className="w-screen flex flex-col overflow-hidden"
+      style={{ height: "100dvh", minHeight: "100dvh" }}
+    >
       <TopBar
         onOpenTour={() => setTourOpen(true)}
         mobile={!isDesktop}

@@ -369,7 +369,7 @@ function PaletteTile({
           addToCanvas();
         }
       }}
-      className={`group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border transition-colors text-center px-1.5 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+      className={`qf-no-callout group relative shrink-0 cursor-grab active:cursor-grabbing flex flex-col items-center justify-center gap-0.5 w-[108px] h-[76px] rounded-md border transition-colors text-center px-1.5 py-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
         isPlugin
           ? "border-edge bg-surface/60 hover:bg-surfaceAlt"
           : "border-edge/60 hover:border-edge hover:bg-surfaceAlt"

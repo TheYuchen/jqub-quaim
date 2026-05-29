@@ -32,3 +32,17 @@ export function useMediaQuery(query: string): boolean {
 export function useIsDesktop(): boolean {
   return useMediaQuery("(min-width: 768px)");
 }
+
+/** True when the user has expressed an OS-level preference for
+ *  reduced motion. Reactive to live changes. */
+export function usePrefersReducedMotion(): boolean {
+  return useMediaQuery("(prefers-reduced-motion: reduce)");
+}
+
+/** True when the primary pointing device is "coarse" (touch). Used
+ *  to distinguish phones / tablets / touch laptops from mouse-only
+ *  desktops, independent of viewport width — a 1920px-wide touch
+ *  screen is still touch. */
+export function useIsTouchDevice(): boolean {
+  return useMediaQuery("(pointer: coarse)");
+}

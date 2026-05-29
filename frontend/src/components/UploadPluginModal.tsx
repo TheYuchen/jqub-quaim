@@ -393,7 +393,17 @@ export function UploadPluginModal({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className="bg-surface border border-edge rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden outline-none"
+        // max-h-[100dvh] tracks the dynamic viewport (iOS Safari shrinks
+        // 100vh by the address bar) so the modal never extends below the
+        // visible area. pb safe-area keeps the bottom from hiding under
+        // the iOS home indicator. landscape:items-start pins the modal
+        // to the top edge on landscape phones where centering would
+        // chop the header.
+        style={{
+          maxHeight: "calc(100dvh - 1rem)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
+        className="bg-surface border border-edge rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3 border-b border-edge flex items-center justify-between">

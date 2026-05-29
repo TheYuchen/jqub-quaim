@@ -45,6 +45,7 @@ import { autoConnect } from "../lib/autoConnect";
 import { useApp } from "../lib/store";
 import { api } from "../lib/api";
 import { getUserId } from "../lib/userId";
+import { usePrefersReducedMotion } from "../lib/useMediaQuery";
 import {
   buildSharePayload,
   buildShareUrl,
@@ -156,6 +157,9 @@ export function FlowCanvas() {
   }, [notice]);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
+  // OS-level reduce-motion preference — drives whether new edges
+  // get React Flow's animated stroke-dash loop.
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Watch the Zustand pendingBlockKinds queue: NodePalette pushes block
   // kinds here when the user checks tiles and clicks "Add to canvas" (or
@@ -240,6 +244,22 @@ export function FlowCanvas() {
       })
       .catch(() => {});
   }, [circuit, initial.hashPayload]);
+
+  // Re-fit the canvas to the visible viewport on orientation change.
+  // Without this, the React Flow internal viewBox is stale after a
+  // portrait → landscape rotation and the pipeline can sit
+  // half-off-screen until the user manually pans/zooms.
+  useEffect(() => {
+    const onChange = () => {
+      // Debounce one frame so the new viewport dimensions are
+      // computed before fitView measures.
+      requestAnimationFrame(() => {
+        fitView({ padding: 0.25, duration: 200 });
+      });
+    };
+    window.addEventListener("orientationchange", onChange);
+    return () => window.removeEventListener("orientationchange", onChange);
+  }, [fitView]);
 
   const onConnect: OnConnect = useCallback(
     (c: Connection) => setEdges((eds) => addEdge(c, eds)),
@@ -656,7 +676,7 @@ export function FlowCanvas() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4">
+      <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 overflow-x-auto">
         {/* Status counter. Full form on ≥sm. On <sm we swap in an icon
             pair (Box = "blocks", Link2 = "links") so the compact counter
             is still self-explanatory — a bare "5·4" turned out to be
@@ -760,7 +780,11 @@ export function FlowCanvas() {
       </div>
       <div
         ref={wrapperRef}
-        className="flex-1 relative"
+        // qf-canvas-wrapper applies touch-action: none so iOS Safari
+        // doesn't intercept two-finger pinches as page zoom before
+        // React Flow sees them — without this class, canvas
+        // pinch-zoom is broken on every iOS browser.
+        className="flex-1 relative qf-canvas-wrapper"
         onDragOver={onDragOver}
         onDrop={onDrop}
         onDragLeave={onDragLeave}
@@ -776,7 +800,7 @@ export function FlowCanvas() {
           fitViewOptions={{ padding: 0.25 }}
           minZoom={0.4}
           maxZoom={1.6}
-          defaultEdgeOptions={{ animated: true }}
+          defaultEdgeOptions={{ animated: !prefersReducedMotion }}
           proOptions={{ hideAttribution: false }}
         >
           <Background
@@ -786,9 +810,13 @@ export function FlowCanvas() {
             color="rgb(var(--color-edge))"
           />
           <Controls showInteractive={false} />
+          {/* MiniMap is noisy + unusable on a 360px screen — hide
+              when there's no room for it. The class targets React
+              Flow's internal MiniMap wrapper via the parent class. */}
           <MiniMap
             pannable
             zoomable
+            className="hidden md:block"
             nodeColor={(n) => {
               const kind = (n.data as QNodeData).kind;
               return colorForKind(kind);
@@ -809,6 +837,33 @@ export function FlowCanvas() {
         {touchDrag && (
           <TouchDragPreview kind={touchDrag.kind} x={touchDrag.x} y={touchDrag.y} />
         )}
+        {/* Mobile-only Run FAB. The Run button in the canvas toolbar
+            sits ~108px from the top — well outside thumb arc on tall
+            phones. This bottom-right FAB at sm:hidden is what mobile
+            users actually reach for. It respects safe-area-inset-bottom
+            so it stays clear of the iOS home indicator. */}
+        <button
+          type="button"
+          onClick={runPipeline}
+          disabled={running || !circuit}
+          className="md:hidden absolute right-4 z-20 flex items-center gap-2 px-4 py-3 rounded-full bg-accent text-canvas shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm active:scale-95 transition-transform"
+          style={{
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)",
+          }}
+          aria-label={running ? "Running" : "Run pipeline"}
+        >
+          {running ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Running…</span>
+            </>
+          ) : (
+            <>
+              <Play className="w-4 h-4" />
+              <span>Run</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
@@ -893,7 +948,14 @@ function CanvasToast({
     <div
       role={notice.tone === "danger" ? "alert" : "status"}
       aria-live={notice.tone === "danger" ? "assertive" : "polite"}
-      className={`absolute left-1/2 -translate-x-1/2 bottom-4 z-30 w-[min(36rem,calc(100%-2rem))] rounded-lg border ${palette.border} ${palette.bg} bg-surface/95 backdrop-blur-sm shadow-xl px-4 py-3 flex items-start gap-3`}
+      // Sit above the safe-area bottom (iOS home indicator) AND above
+      // the mobile Run FAB. The FAB is at ~3.5rem (1rem from safe-area +
+      // ~2.5rem button height); we leave that clearance so the toast
+      // doesn't overlap.
+      style={{
+        bottom: "calc(env(safe-area-inset-bottom, 0px) + 4.5rem)",
+      }}
+      className={`absolute left-1/2 -translate-x-1/2 z-30 w-[min(36rem,calc(100%-2rem))] rounded-lg border ${palette.border} ${palette.bg} bg-surface/95 backdrop-blur-sm shadow-xl px-4 py-3 flex items-start gap-3 md:!bottom-4`}
     >
       <div className="shrink-0 mt-0.5">{palette.icon}</div>
       <div className="flex-1 min-w-0 text-sm text-ink">

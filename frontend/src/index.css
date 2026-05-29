@@ -202,6 +202,40 @@
   font-size: 10px !important;
 }
 
+/* ----- Touch + viewport polish ---------------------------------------
+ *
+ * touch-action: none on the React Flow canvas wrapper hands all touch
+ * gestures (pan, pinch, two-finger drag) to React Flow's own handler.
+ * Without this, iOS Safari intercepts two-finger pinches as page zoom
+ * BEFORE React Flow ever sees the event, breaking canvas pinch-zoom.
+ *
+ * The inner React Flow elements re-enable touch as needed via their
+ * own handlers; this only affects the wrapper's default routing.
+ */
+.qf-canvas-wrapper {
+  touch-action: none;
+}
+
+/* iOS magnifier / "callout" suppression for elements that participate
+ * in our custom touch drag (palette tiles, draggable nodes). Without
+ * this, a long press on a tile triggers the system text magnifier
+ * and steals the gesture from our PointerEvent handler. */
+.qf-no-callout {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Slightly bigger zoom / fit / pan buttons on the React Flow Controls,
+ * matching the 44 CSS-px Material/iOS hit target on touch breakpoints.
+ * Desktop keeps the compact 26px sizing. */
+@media (pointer: coarse) {
+  .react-flow__controls-button {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
+
 /* ----- prefers-reduced-motion ----------------------------------------
  * Honor the OS-level "reduce motion" setting. Without this rule the
  * default React Flow `animated` edges loop a stroke-dash forever, and

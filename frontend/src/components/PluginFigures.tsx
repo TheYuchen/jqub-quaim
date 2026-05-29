@@ -499,15 +499,33 @@ function SvgBlock({ content }: { content: string }) {
     `;
     return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${content}</body></html>`;
   }, [content]);
+  // Try to extract an aspect ratio from the SVG's viewBox attribute so
+  // the iframe gets a sensible height proportional to its content.
+  // Without this, every plugin SVG got the same 288px box — short
+  // figures wasted space, tall ones clipped. The sandbox prevents
+  // postMessage so we can't auto-size from inside; this is the next
+  // best thing.
+  const aspect = useMemo(() => {
+    // viewBox is `min-x min-y width height` separated by whitespace
+    // OR commas. We don't care about min-x / min-y; capture the
+    // trailing pair as width + height.
+    const m = /viewBox\s*=\s*['"]\s*-?[\d.]+[\s,]+-?[\d.]+[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)\s*['"]/.exec(
+      content,
+    );
+    if (m) {
+      const w = parseFloat(m[1]);
+      const h = parseFloat(m[2]);
+      if (w > 0 && h > 0) return `${w} / ${h}`;
+    }
+    return "16 / 9";
+  }, [content]);
   return (
     <iframe
       sandbox=""
       title="Plugin SVG figure"
       srcDoc={srcdoc}
-      // Iframe content height is unknown until it renders; auto-size
-      // via a ResizeObserver would require same-origin, so we settle
-      // for a generous default that scrolls if needed.
-      className="w-full h-72 border-0"
+      style={{ aspectRatio: aspect, maxHeight: "70vh" }}
+      className="w-full border-0"
     />
   );
 }

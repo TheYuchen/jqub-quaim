@@ -77,7 +77,15 @@ export function TopBar({
   }
 
   return (
-    <header className="relative z-20 h-14 shrink-0 border-b border-edge px-3 sm:px-5 flex items-center justify-between gap-2 sm:gap-4 bg-canvas">
+    <header
+      // safe-area padding so the notch / Dynamic Island doesn't
+      // occlude the lab logo or auth chip on iPhones in landscape.
+      style={{
+        paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
+        paddingRight: "max(0.75rem, env(safe-area-inset-right))",
+      }}
+      className="relative z-20 h-14 shrink-0 border-b border-edge sm:px-5 flex items-center justify-between gap-2 sm:gap-4 bg-canvas"
+    >
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {mobile && onOpenLeftDrawer && (
           <button

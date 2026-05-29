@@ -1,0 +1,17 @@
+{
+  "name": "QuDA Studio",
+  "short_name": "QuDA",
+  "description": "Quantum Design Automation Studio — drag-and-drop pipelines over JQub-lab research algorithms.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0d12",
+  "theme_color": "#0b0d12",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

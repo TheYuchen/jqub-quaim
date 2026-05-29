@@ -27,18 +27,43 @@ export function MobileDrawer({
   title: string;
   children: ReactNode;
 }) {
-  // Esc to close + lock body scroll while open.
+  // Esc to close + lock body scroll while open. iOS Safari respects
+  // overflow:hidden on body but still allows rubber-band scrolling
+  // on the html element; pinning the body's position and restoring
+  // the scroll offset on close gives the only reliable lock that
+  // works across all browsers without bouncing the page.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
+    const scrollY = window.scrollY;
+    const prev = {
+      bodyPosition: document.body.style.position,
+      bodyTop: document.body.style.top,
+      bodyWidth: document.body.style.width,
+      bodyOverflow: document.body.style.overflow,
+      htmlOverflow: document.documentElement.style.overflow,
+      htmlOverscroll: document.documentElement.style.overscrollBehavior,
+    };
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    document.documentElement.style.overscrollBehavior = "contain";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
+      document.body.style.position = prev.bodyPosition;
+      document.body.style.top = prev.bodyTop;
+      document.body.style.width = prev.bodyWidth;
+      document.body.style.overflow = prev.bodyOverflow;
+      document.documentElement.style.overflow = prev.htmlOverflow;
+      document.documentElement.style.overscrollBehavior = prev.htmlOverscroll;
+      // Restore scroll position; without this the page jumps to top
+      // when the drawer closes.
+      window.scrollTo(0, scrollY);
     };
   }, [open, onClose]);
 
