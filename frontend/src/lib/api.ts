@@ -15,7 +15,10 @@ export interface HealthResponse {
 
 export interface BackendInfo {
   name: string;
-  kind: "fake" | "live";
+  /** Matches the backend's Pydantic Literal["fake", "ibm"]. Was
+   *  previously "fake" | "live" here, which silently never matched
+   *  any server payload — fixed to keep frontend filters honest. */
+  kind: "fake" | "ibm";
   num_qubits: number;
   description: string;
 }

@@ -17,23 +17,17 @@ from app.services.workflow_service import run_pipeline, run_pipeline_stream
 
 
 def _effective_user_id(request: Request, body_user_id: str | None) -> str | None:
-    """Same precedence as the plugin routes: session-derived hf_<username>
-    wins if the user is logged in; otherwise we take the body field
-    (the anon UUID from localStorage). Returning None is fine — the
-    workflow runner only consults user_id when it encounters a plugin
-    node, which only logged-in or anon users with uploaded plugins
-    would hit anyway.
-
-    Defence-in-depth: refuse body-supplied hf_* ids, matching the
-    plugin route's anon-squat guard."""
-    user = auth_service.decode_session(
-        request.cookies.get(auth_service.SESSION_COOKIE)
-    )
-    if user is not None:
-        return auth_service.hf_user_id(user.username)
-    if body_user_id and body_user_id.startswith("hf_"):
+    """Workflow's resolution is permissive — if there's no session and
+    no anon id, that's fine (most pipelines don't use plugins). The
+    shared helper handles the same anon-squat guard as the plugin
+    routes. We map ValueError → None here because workflow doesn't
+    400 on missing id; it just won't dispatch plugins."""
+    try:
+        return auth_service.resolve_effective_user_id(
+            request, body_user_id, required=False,
+        )
+    except ValueError:
         return None
-    return body_user_id
 
 
 def _uses_plugins(nodes) -> bool:

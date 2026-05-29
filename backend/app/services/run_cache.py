@@ -70,10 +70,18 @@ def _normalize_edge(e: FlowEdge | dict[str, Any]) -> dict[str, Any]:
     return {"source": e["source"], "target": e["target"]}
 
 
-def _qpy_bytes(qc: QuantumCircuit) -> bytes:
+def qpy_dump_bytes(qc: QuantumCircuit) -> bytes:
+    """Serialise a circuit to QPY bytes. Used both for prefix hashing
+    in the run cache and as the inputs payload for plugin
+    subprocesses — same wire format, one implementation."""
     buf = io.BytesIO()
     qpy.dump(qc, buf)
     return buf.getvalue()
+
+
+# Backward-compatible private alias for the older name (only one
+# call site, but keep both visible for one cycle).
+_qpy_bytes = qpy_dump_bytes
 
 
 def compute_cache_key(

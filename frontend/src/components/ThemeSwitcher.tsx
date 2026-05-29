@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Palette } from "lucide-react";
 import {
   THEMES,
@@ -7,6 +7,7 @@ import {
   storeTheme,
   type ThemeKey,
 } from "../lib/theme";
+import { useDismissOn } from "../lib/useDismissOn";
 
 /**
  * TopBar theme switcher.
@@ -30,24 +31,7 @@ export function ThemeSwitcher() {
     storeTheme(theme);
   }, [theme]);
 
-  // Close the menu on outside-click / Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
 
   return (
     <div ref={rootRef} className="relative">

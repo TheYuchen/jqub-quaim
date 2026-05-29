@@ -54,6 +54,11 @@ STATE_COOKIE = "quda_oauth_state"
 # Sessions valid for 8 hours, matching the HF token expiration we set
 # in README frontmatter (hf_oauth_expiration_minutes: 480).
 SESSION_MAX_AGE_SECONDS = 8 * 3600
+# OAuth state + verifier cookie is short-lived: it has to survive the
+# round-trip through HF's authorize → callback flow but no longer.
+STATE_MAX_AGE_SECONDS = 600  # 10 minutes
+# Outbound HTTP timeout when talking to HF's /oauth/{token,userinfo}.
+HF_OAUTH_TIMEOUT_SECONDS = 15.0
 
 # Authorization URL endpoint paths off the openid_provider_url.
 _AUTHORIZE_PATH = "/oauth/authorize"
@@ -217,7 +222,7 @@ def decode_state(token: str | None) -> tuple[str | None, str | None]:
     if not token:
         return None, None
     try:
-        payload = _serializer().loads(token, max_age=600)  # 10 min
+        payload = _serializer().loads(token, max_age=STATE_MAX_AGE_SECONDS)
     except (SignatureExpired, BadSignature):
         return None, None
     if not isinstance(payload, dict):
@@ -243,7 +248,7 @@ async def exchange_code_for_user(
     if not settings.oauth_enabled:
         raise AuthError("OAuth not configured.")
     redirect_uri = _redirect_uri(request_origin)
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=HF_OAUTH_TIMEOUT_SECONDS) as client:
         try:
             token_resp = await client.post(
                 f"{settings.openid_provider_url}{_TOKEN_PATH}",
@@ -320,4 +325,55 @@ def hf_user_id(username: str) -> str:
 
 
 def is_hf_user_id(user_id: str) -> bool:
+    """True if this user_id corresponds to an authenticated HF user
+    (server-derived from a valid session) rather than an anonymous
+    browser UUID. Used to gate features that require persistence."""
     return user_id.startswith("hf_")
+
+
+def resolve_effective_user_id(
+    request: Any,
+    query_user_id: str | None,
+    *,
+    required: bool,
+) -> str | None:
+    """Single source of truth for figuring out which user_id namespace
+    a request operates on.
+
+    Precedence:
+      1. Session-derived ``hf_<username>`` from a valid session cookie.
+         Always wins so a logged-in user can't spoof someone else's
+         namespace by passing a different ``user_id`` query parameter.
+      2. ``query_user_id`` (the client-supplied anon UUID). Refused if
+         it begins with ``hf_`` — that prefix is reserved for
+         authenticated users, and accepting it would let an unauth'd
+         client squat on a real HF user's namespace and poison their
+         plugin list on next login.
+
+    Behaviour when there is no session and no valid query id:
+      * ``required=True``  → raise ``ValueError(reason)`` so the caller
+        can return a 400 with that exact reason.
+      * ``required=False`` → return ``None`` so the caller can decide
+        (e.g. workflow_service treats this as "no plugin lookup").
+    """
+    # Late import — auth_service is imported all over the place; the
+    # session decode bits live below this in the file already.
+    cookie = request.cookies.get(SESSION_COOKIE)
+    user = decode_session(cookie)
+    if user is not None:
+        return hf_user_id(user.username)
+    if not query_user_id:
+        if required:
+            raise ValueError(
+                "No session cookie and no user_id query parameter."
+            )
+        return None
+    if query_user_id.startswith("hf_"):
+        if required:
+            raise ValueError(
+                "The hf_ user_id prefix is reserved for authenticated "
+                "sessions. Sign in with Hugging Face or use a "
+                "non-prefixed id."
+            )
+        return None
+    return query_user_id

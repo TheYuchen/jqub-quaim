@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ChevronDown, Layers } from "lucide-react";
 import { PIPELINE_PRESETS } from "../lib/presets";
+import { useDismissOn } from "../lib/useDismissOn";
 
 /**
  * "Load preset" button that opens a small popover listing the named
@@ -11,21 +12,7 @@ export function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
 
   return (
     <div ref={rootRef} className="relative">

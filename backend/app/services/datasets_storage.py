@@ -130,9 +130,12 @@ _last_hydrate_at: dict[str, float] = {}
 
 
 def _is_authenticated_user(user_id: str) -> bool:
-    """Anon users (anon_*) get no persistence. Logged-in users
-    (hf_*) get the full dataset sync."""
-    return user_id.startswith("hf_")
+    """Anon users get no persistence. Authenticated users (hf_*) get
+    the full dataset sync. Delegates to auth_service so the prefix
+    check stays in one place."""
+    from app.services.auth_service import is_hf_user_id
+
+    return is_hf_user_id(user_id)
 
 
 def _hf_api():

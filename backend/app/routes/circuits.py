@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 
@@ -15,6 +17,8 @@ from app.services.circuit_service import (
     parse_uploaded,
     summarize,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,8 +61,17 @@ async def upload_circuit(file: UploadFile = File(...)) -> CircuitInfo:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
     try:
         qc = parse_uploaded(file.filename or "upload", data)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Could not parse circuit: {exc}") from exc
+    except Exception:
+        # Log the real Qiskit exception so an operator can diagnose
+        # bad uploads; surface a generic user-facing message.
+        logger.exception("Failed to parse uploaded circuit %r", file.filename)
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Could not parse this circuit. Check that the file is a "
+                "valid Qiskit .qpy or OpenQASM .qasm/.qasm2/.qasm3."
+            ),
+        ) from None
     circuit_id = circuit_store.put(qc)
     return summarize(qc, circuit_id)
 

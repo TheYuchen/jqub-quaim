@@ -51,10 +51,10 @@ _STEP_CACHE_MAX = 200
 _step_cache: OrderedDict[str, tuple[StepResult, dict]] = OrderedDict()
 
 
-def _qpy_bytes_for_hash(qc: QuantumCircuit) -> bytes:
-    buf = io.BytesIO()
-    qpy.dump(qc, buf)
-    return buf.getvalue()
+# Re-export under the old name so other call sites in this module
+# don't have to change. The canonical implementation lives in
+# run_cache so cache-hash + plugin-payload use identical bytes.
+from app.services.run_cache import qpy_dump_bytes as _qpy_bytes_for_hash  # noqa: E402
 
 
 def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode]) -> str:
@@ -668,8 +668,21 @@ def run_pipeline(
         if handler is not None:
             try:
                 steps.append(handler(node, ctx, settings))
-            except Exception as exc:
-                steps.append(_make_step(node, "error", message=f"{type(exc).__name__}: {exc}"))
+            except Exception:
+                # Log the real traceback server-side; the user-facing
+                # message stays generic so library exception text
+                # (file paths, stack fragments) doesn't leak.
+                logger.exception(
+                    "Built-in handler %s crashed for node %s",
+                    node.type, node.id,
+                )
+                steps.append(_make_step(
+                    node, "error",
+                    message=(
+                        f"The {node.type} block hit an unexpected error. "
+                        "See the run log for details."
+                    ),
+                ))
                 break
             continue
 
@@ -766,8 +779,20 @@ def run_pipeline_stream(
                 result = handler(node, ctx, settings)
                 _cache_put(prefix_key, result, ctx)
                 yield result
-            except Exception as exc:
-                result = _make_step(node, "error", message=f"{type(exc).__name__}: {exc}")
+            except Exception:
+                # Same policy as run_pipeline above: log traceback,
+                # surface generic message to the user.
+                logger.exception(
+                    "Built-in handler %s crashed (stream) for node %s",
+                    node.type, node.id,
+                )
+                result = _make_step(
+                    node, "error",
+                    message=(
+                        f"The {node.type} block hit an unexpected error. "
+                        "See the run log for details."
+                    ),
+                )
                 yield result
                 break
             continue

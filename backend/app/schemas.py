@@ -39,23 +39,10 @@ class SampleCircuit(BaseModel):
 
 # ---------- Workflow ----------
 
-# Built-in block types. User-uploaded plugins extend this set at
-# runtime; the schema accepts arbitrary lowercase identifiers as a
-# string so plugin kinds (validated separately in plugin_service)
-# pass through here without us having to regen the Literal.
-BuiltinNodeType = Literal[
-    "input_circuit",
-    "ibm_backend",
-    "fake_backend",
-    "qucad",
-    "qubound",
-    "compvqc",
-    "qshot",
-    "fidelity",
-    "output",
-]
 # Permissive alias so RunRequest.nodes[i].type accepts plugin kinds
-# too. Real validation happens in workflow_service when dispatching.
+# too. The canonical built-in set lives in
+# plugin_service.RESERVED_KINDS; real validation happens in
+# workflow_service when dispatching a node to its handler.
 NodeType = str
 
 

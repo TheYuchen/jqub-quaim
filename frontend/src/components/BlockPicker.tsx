@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Plus, Search, X } from "lucide-react";
 import {
   NODE_CATALOG,
@@ -8,6 +8,7 @@ import {
   type PluginNodeSpec,
 } from "../lib/nodeCatalog";
 import { useApp } from "../lib/store";
+import { useDismissOn } from "../lib/useDismissOn";
 
 /**
  * Dropdown multi-select block picker.
@@ -50,23 +51,7 @@ export function BlockPicker({
   const searchRef = useRef<HTMLInputElement>(null);
   const addBlocksToCanvas = useApp((s) => s.addBlocksToCanvas);
 
-  // Outside-click + Escape to close.
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node))
-        setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
 
   // Reset to defaults + focus search on open.
   useEffect(() => {

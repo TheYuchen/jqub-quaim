@@ -63,7 +63,7 @@ async def login(request: Request) -> Response:
     resp.set_cookie(
         auth_service.STATE_COOKIE,
         state_token,
-        max_age=600,
+        max_age=auth_service.STATE_MAX_AGE_SECONDS,
         httponly=True,
         samesite="lax",
         secure=_is_https(request),

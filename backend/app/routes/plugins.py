@@ -42,41 +42,23 @@ _SAFE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,30}$")
 
 
 def _effective_user_id(request: Request, query_user_id: str | None) -> str:
-    """Resolve which namespace this request operates on.
-
-    Precedence:
-      1. Session-derived ``hf_<username>`` (cookie present + valid).
-         The server always wins — a logged-in user can't spoof someone
-         else's namespace by passing a different ``user_id`` query.
-      2. The client-supplied anon UUID for non-logged-in browsers. We
-         REFUSE any query value starting with ``hf_`` because that
-         prefix is reserved for authenticated users; without this
-         check an anonymous client could squat on a real HF username's
-         namespace, polluting their plugin list on next login.
-    """
-    user = auth_service.decode_session(
-        request.cookies.get(auth_service.SESSION_COOKIE)
-    )
-    if user is not None:
-        return auth_service.hf_user_id(user.username)
-    if not query_user_id:
-        raise HTTPException(
-            status_code=400,
-            detail="No session cookie and no user_id query parameter.",
-        )
-    if query_user_id.startswith("hf_"):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "The hf_ user_id prefix is reserved for authenticated "
-                "sessions. Sign in with Hugging Face or use a non-prefixed id."
-            ),
-        )
+    """Resolve the user namespace for this plugin request and validate
+    the result. See :func:`auth_service.resolve_effective_user_id` for
+    the precedence rules; here we just translate ValueError → 400 and
+    apply the plugin_service.validate_user_id format check on top."""
     try:
-        plugin_service.validate_user_id(query_user_id)
+        resolved = auth_service.resolve_effective_user_id(
+            request, query_user_id, required=True,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    # mypy/runtime: required=True guarantees non-None on success.
+    assert resolved is not None
+    try:
+        plugin_service.validate_user_id(resolved)
     except plugin_service.PluginError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
-    return query_user_id
+    return resolved
 
 
 @router.get("/plugins")

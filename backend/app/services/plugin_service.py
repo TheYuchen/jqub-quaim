@@ -409,9 +409,9 @@ def hydrate_from_dataset_if_needed(user_id: str) -> int:
     /tmp. Idempotent + cheap when there's nothing to hydrate.
 
     Anon users always no-op (no persistent backing store)."""
-    from app.services import datasets_storage
+    from app.services import auth_service, datasets_storage
 
-    if not user_id.startswith("hf_"):
+    if not auth_service.is_hf_user_id(user_id):
         return 0
     user_dir = user_plugin_dir(user_id)
     return datasets_storage.hydrate_into_tmp(

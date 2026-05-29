@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Cloud, LogIn, LogOut, User } from "lucide-react";
 import { api } from "../lib/api";
 import { useApp } from "../lib/store";
 import { bumpPluginsRev, bumpSessionRev } from "../lib/userId";
+import { useDismissOn } from "../lib/useDismissOn";
 
 /**
  * Compact user-state control in the TopBar:
@@ -37,27 +38,7 @@ export function AuthButton({ mobile = false }: { mobile?: boolean } = {}) {
     }
   }, [menuOpen]);
 
-  // Click-outside + Escape close the dropdown.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onClick = (e: MouseEvent) => {
-      if (
-        wrapRef.current &&
-        !wrapRef.current.contains(e.target as Node)
-      ) {
-        setMenuOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
+  useDismissOn(menuOpen, wrapRef, useCallback(() => setMenuOpen(false), []));
 
   // While we haven't probed /api/auth/status yet, reserve the slot
   // with an invisible placeholder so the TopBar's right cluster

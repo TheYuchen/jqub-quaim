@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { BookOpen, Check, Copy } from "lucide-react";
 import { NODE_CATALOG } from "../lib/nodeCatalog";
 import { copyToClipboard } from "../lib/clipboard";
+import { useDismissOn } from "../lib/useDismissOn";
 
 /**
  * Popover listing the algorithm papers. Data is pulled from nodeCatalog
@@ -20,23 +21,7 @@ export function PapersPopover() {
     ...(n.paper as NonNullable<(typeof n)["paper"]>),
   }));
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
 
   // Copy a BibTeX entry to the clipboard and briefly flash a "copied" tick.
   // `copyToClipboard` handles the navigator.clipboard → textarea fallback.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Code2,
   Link as LinkIcon,
@@ -6,6 +6,7 @@ import {
   Trash2,
   Wand2,
 } from "lucide-react";
+import { useDismissOn } from "../lib/useDismissOn";
 
 /**
  * Mobile-only overflow menu for the canvas toolbar.
@@ -48,22 +49,7 @@ export function MoreMenu({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Outside-click / Escape handlers.
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as globalThis.Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
 
   // Responsive guard: if the viewport grows past the `md` breakpoint
   // while the menu is open, the wrapper becomes `display:none` but the
