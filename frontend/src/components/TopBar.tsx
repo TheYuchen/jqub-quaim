@@ -48,25 +48,14 @@ export function TopBar({
     !!health?.live_ibm_allowed && !!health?.ibm_token_configured;
   const effectiveLive = serverCanGoLive && useLiveIbm;
 
+  // The "unavailable" branch is gone — we hide the chip entirely when
+  // the server can't go live. Only on / off-using-cache states need
+  // copy now.
   let chipLabel: string;
   let chipLabelShort: string;
   let chipClass: string;
   let chipTitle: string;
-  if (!serverCanGoLive) {
-    chipLabel = "live ibm: unavailable";
-    chipLabelShort = "ibm: n/a";
-    // Use bg-canvas (not transparent) and dimmed text. Previously this
-    // used opacity-70 which made the whole chip 70% translucent, so
-    // any TopBar icons that flex-layout-squeezed against the chip
-    // showed THROUGH it on narrower viewports — confusing visual
-    // stacking. text-mute + bg-canvas gives the same "disabled" feel
-    // without alpha.
-    chipClass = "!border-edge !text-mute !bg-canvas cursor-not-allowed";
-    // End-user copy only — the operator-facing instructions about
-    // setting env vars live in the README, not in the UI tooltip.
-    chipTitle =
-      "QuBound is using the shipped 14-day IBM Fez calibration cache (real hardware noise data, just not refreshed live). Live mode is not enabled on this deployment.";
-  } else if (effectiveLive) {
+  if (effectiveLive) {
     chipLabel = "live ibm: on";
     chipLabelShort = "ibm: on";
     chipClass =
@@ -119,8 +108,10 @@ export function TopBar({
             runtime state (library versions + whether the live-IBM path is
             hot) and belong next to the title, not mixed in with the
             external-link / theme controls on the right. The version chip
-            is hidden on mobile to save room; the IBM chip stays since it
-            is interactive. */}
+            is hidden on mobile to save room. The live-IBM toggle is
+            ONLY shown when the server actually supports live mode (token
+            + ALLOW_LIVE_IBM); without it the chip would just say
+            "ibm: n/a" forever, which adds noise without value. */}
         <div className="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0 ml-1 sm:ml-2">
           {!mobile && (
             <span className="chip">
@@ -130,18 +121,17 @@ export function TopBar({
                 : "loading…"}
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => {
-              if (serverCanGoLive) setUseLiveIbm(!useLiveIbm);
-            }}
-            disabled={!serverCanGoLive}
-            aria-pressed={effectiveLive}
-            className={`chip transition-colors gap-1 ${chipClass}`}
-          >
-            <span>{mobile ? chipLabelShort : chipLabel}</span>
-            <TipIcon hint={chipTitle} size={10} position="below" />
-          </button>
+          {serverCanGoLive && (
+            <button
+              type="button"
+              onClick={() => setUseLiveIbm(!useLiveIbm)}
+              aria-pressed={effectiveLive}
+              className={`chip transition-colors gap-1 ${chipClass}`}
+            >
+              <span>{mobile ? chipLabelShort : chipLabel}</span>
+              <TipIcon hint={chipTitle} size={10} position="below" />
+            </button>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-1 sm:gap-2 text-xs shrink-0">
