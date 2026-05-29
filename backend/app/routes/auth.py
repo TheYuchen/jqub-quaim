@@ -53,8 +53,12 @@ async def login(request: Request) -> Response:
             status_code=503,
         )
     state = auth_service.mint_state()
-    state_token = auth_service.encode_state(state)
-    target = auth_service.build_authorize_url(state, _request_origin(request))
+    code_verifier = auth_service.mint_code_verifier()
+    code_challenge = auth_service.code_challenge_for(code_verifier)
+    state_token = auth_service.encode_state(state, code_verifier)
+    target = auth_service.build_authorize_url(
+        state, code_challenge, _request_origin(request),
+    )
     resp = RedirectResponse(target, status_code=302)
     resp.set_cookie(
         auth_service.STATE_COOKIE,
@@ -89,16 +93,16 @@ async def callback(
     if not code or not state:
         logger.info("OAuth callback missing code or state")
         return RedirectResponse(f"/?auth_error={GENERIC_ERROR}", status_code=302)
-    expected_state = auth_service.decode_state(
+    expected_state, code_verifier = auth_service.decode_state(
         request.cookies.get(auth_service.STATE_COOKIE)
     )
-    if not expected_state or expected_state != state:
-        logger.warning("OAuth state mismatch on callback")
+    if not expected_state or not code_verifier or expected_state != state:
+        logger.warning("OAuth state mismatch or missing PKCE verifier on callback")
         return RedirectResponse(f"/?auth_error={GENERIC_ERROR}", status_code=302)
 
     try:
         user = await auth_service.exchange_code_for_user(
-            code, _request_origin(request)
+            code, code_verifier, _request_origin(request),
         )
     except auth_service.AuthError as exc:
         logger.info("OAuth exchange failed: %s", exc)

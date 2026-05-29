@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import io
 import logging
+import random
 import threading
 import time
 import zipfile
@@ -54,6 +55,61 @@ from pathlib import Path
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+# HF Hub returns 412 Precondition Failed on a concurrent commit race
+# (two write_file calls land on the same parent revision). The Hub's
+# own client side has a 1-shot rebase retry, but it doesn't cover all
+# races we've seen with two HF Spaces pushing to the same dataset.
+# Three attempts with jittered backoff covers the realistic worst case.
+_COMMIT_MAX_ATTEMPTS = 3
+_COMMIT_BACKOFF_BASE_S = 0.4
+
+
+def _is_412(exc: BaseException) -> bool:
+    """True if an exception from huggingface_hub is a 412 Precondition
+    Failed (concurrent commit conflict). We avoid importing the
+    HfHubHTTPError class at module top so a stale huggingface_hub
+    doesn't break import; instead we sniff `response.status_code`."""
+    resp = getattr(exc, "response", None)
+    status = getattr(resp, "status_code", None)
+    if status == 412:
+        return True
+    # Fallback: some hub versions wrap the message
+    return "412" in str(exc) and "Precondition" in str(exc)
+
+
+def _retry_on_commit_conflict(label: str, fn):
+    """Run fn() up to _COMMIT_MAX_ATTEMPTS times, retrying only on
+    412 conflicts. Any other exception bubbles immediately. Returns
+    fn()'s return value on success, None on final failure.
+
+    Why None on failure rather than raise: the call sites all handle
+    "mirror failed, plugin still works locally" as a soft failure;
+    we keep that contract."""
+    for attempt in range(1, _COMMIT_MAX_ATTEMPTS + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            if not _is_412(exc):
+                # Not a conflict — bubble up so the caller's `except
+                # Exception` records and swallows it as before.
+                raise
+            if attempt >= _COMMIT_MAX_ATTEMPTS:
+                logger.warning(
+                    "Dataset commit %s lost after %d 412 conflicts; "
+                    "giving up. Plugin still on disk.",
+                    label, attempt,
+                )
+                return None
+            delay = _COMMIT_BACKOFF_BASE_S * (2 ** (attempt - 1))
+            delay *= 1 + random.random() * 0.5  # jitter
+            logger.info(
+                "Dataset commit %s conflict (412) on attempt %d; "
+                "retrying in %.2fs", label, attempt, delay,
+            )
+            time.sleep(delay)
+    return None
 
 
 # Per-process hydration lock map. Keyed on user_id; each user's
@@ -119,13 +175,18 @@ def push_plugin(user_id: str, kind: str, zip_bytes: bytes) -> bool:
     if api is None:
         return False
     try:
-        api.upload_file(
-            path_or_fileobj=zip_bytes,
-            path_in_repo=_path_in_repo(user_id, kind),
-            repo_id=_repo_id(),
-            repo_type="dataset",
-            commit_message=f"upload {user_id}/{kind}",
+        result = _retry_on_commit_conflict(
+            f"upload {user_id}/{kind}",
+            lambda: api.upload_file(
+                path_or_fileobj=zip_bytes,
+                path_in_repo=_path_in_repo(user_id, kind),
+                repo_id=_repo_id(),
+                repo_type="dataset",
+                commit_message=f"upload {user_id}/{kind}",
+            ),
         )
+        if result is None:
+            return False
         logger.info("Mirrored plugin %s/%s to dataset", user_id, kind)
         return True
     except Exception:
@@ -144,12 +205,17 @@ def remove_plugin(user_id: str, kind: str) -> bool:
     if api is None:
         return False
     try:
-        api.delete_file(
-            path_in_repo=_path_in_repo(user_id, kind),
-            repo_id=_repo_id(),
-            repo_type="dataset",
-            commit_message=f"delete {user_id}/{kind}",
+        result = _retry_on_commit_conflict(
+            f"delete {user_id}/{kind}",
+            lambda: api.delete_file(
+                path_in_repo=_path_in_repo(user_id, kind),
+                repo_id=_repo_id(),
+                repo_type="dataset",
+                commit_message=f"delete {user_id}/{kind}",
+            ),
         )
+        if result is None:
+            return False
         logger.info("Removed plugin %s/%s from dataset", user_id, kind)
         return True
     except Exception:

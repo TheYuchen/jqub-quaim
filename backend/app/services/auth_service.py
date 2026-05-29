@@ -32,6 +32,8 @@ Threats considered:
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import logging
 import re
 import secrets
@@ -148,8 +150,18 @@ def _redirect_uri(request_origin: str | None) -> str:
     return "https://qudastudio-app.hf.space/api/auth/callback"
 
 
-def build_authorize_url(state: str, request_origin: str | None) -> str:
-    """Build the URL we redirect the browser to for HF login."""
+def build_authorize_url(
+    state: str, code_challenge: str, request_origin: str | None,
+) -> str:
+    """Build the URL we redirect the browser to for HF login.
+
+    Includes PKCE (RFC 7636) parameters: ``code_challenge`` is the
+    SHA-256 hash of a random verifier we keep in a server-side signed
+    cookie. The verifier travels back to HF on the token exchange,
+    proving the callback is happening in the same browser that started
+    the login. This binds the OAuth flow to the user agent even if an
+    attacker can otherwise plant cookies (e.g. via HTTPS-stripping
+    intermediary)."""
     settings = get_settings()
     if not settings.oauth_enabled:
         raise AuthError(
@@ -163,6 +175,8 @@ def build_authorize_url(state: str, request_origin: str | None) -> str:
             "response_type": "code",
             "scope": "openid profile",
             "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         }
     )
     return f"{settings.openid_provider_url}{_AUTHORIZE_PATH}?{params}"
@@ -174,29 +188,53 @@ def mint_state() -> str:
     return secrets.token_urlsafe(24)
 
 
-def encode_state(state: str) -> str:
-    return _serializer().dumps({"state": state})
+def mint_code_verifier() -> str:
+    """PKCE code_verifier — 43-128 chars of unreserved characters per
+    RFC 7636. We use 64 random bytes urlsafe-encoded (~86 chars)."""
+    return secrets.token_urlsafe(64)
 
 
-def decode_state(token: str | None) -> str | None:
+def code_challenge_for(verifier: str) -> str:
+    """PKCE code_challenge = base64url(sha256(verifier)) without
+    padding (RFC 7636 §4.2)."""
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def encode_state(state: str, code_verifier: str) -> str:
+    """Sign and pack the per-login secrets into one cookie value.
+    Bundling state + verifier in a single cookie means a forged state
+    cookie is useless without the verifier — they have to be valid
+    together."""
+    return _serializer().dumps(
+        {"state": state, "code_verifier": code_verifier}
+    )
+
+
+def decode_state(token: str | None) -> tuple[str | None, str | None]:
+    """Returns (state, code_verifier) or (None, None) on invalid/
+    expired cookie."""
     if not token:
-        return None
+        return None, None
     try:
         payload = _serializer().loads(token, max_age=600)  # 10 min
     except (SignatureExpired, BadSignature):
-        return None
-    if isinstance(payload, dict):
-        st = payload.get("state")
-        if isinstance(st, str):
-            return st
-    return None
+        return None, None
+    if not isinstance(payload, dict):
+        return None, None
+    st = payload.get("state")
+    cv = payload.get("code_verifier")
+    if isinstance(st, str) and isinstance(cv, str):
+        return st, cv
+    return None, None
 
 
 async def exchange_code_for_user(
-    code: str, request_origin: str | None
+    code: str, code_verifier: str, request_origin: str | None,
 ) -> SessionUser:
-    """POST the code to HF /oauth/token, then GET /userinfo with the
-    resulting access_token. Returns a normalized SessionUser.
+    """POST the code + PKCE verifier to HF /oauth/token, then GET
+    /userinfo with the resulting access_token. Returns a normalized
+    SessionUser.
 
     Raises AuthError with a user-facing string on any failure so the
     route can return a 400 with the original message.
@@ -213,6 +251,8 @@ async def exchange_code_for_user(
                     "grant_type": "authorization_code",
                     "code": code,
                     "redirect_uri": redirect_uri,
+                    # PKCE: prove we're the browser that started login
+                    "code_verifier": code_verifier,
                 },
                 auth=(settings.oauth_client_id or "", settings.oauth_client_secret or ""),
                 headers={"Accept": "application/json"},
