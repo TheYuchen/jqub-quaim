@@ -96,6 +96,7 @@ def _make_step(
     started_at: float | None = None,
     label: str | None = None,
     figures: list[dict] | None = None,
+    circuit_shape: dict | None = None,
 ) -> StepResult:
     t0 = started_at if started_at is not None else _now()
     return StepResult(
@@ -108,7 +109,20 @@ def _make_step(
         summary=summary or {},
         message=message,
         figures=figures,
+        circuit_shape=circuit_shape,  # type: ignore[arg-type]
     )
+
+
+def _shape_of(qc: "QuantumCircuit") -> dict:
+    """Extract the small (qubits, depth, size, num_parameters) shape
+    tuple from a QuantumCircuit, JSON-ready for the StepResult. Used
+    by the run-loop to attach a per-step snapshot for edge labels."""
+    return {
+        "num_qubits": qc.num_qubits,
+        "depth": qc.depth(),
+        "size": qc.size(),
+        "num_parameters": qc.num_parameters,
+    }
 
 
 def _default_label(node_type: str) -> str:
@@ -660,6 +674,7 @@ def run_pipeline(
                         "depth": circuit.depth(),
                         "num_parameters": circuit.num_parameters,
                     },
+                    circuit_shape=_shape_of(circuit),
                 )
             )
             continue
@@ -667,7 +682,15 @@ def run_pipeline(
         handler = _HANDLERS.get(node.type)
         if handler is not None:
             try:
-                steps.append(handler(node, ctx, settings))
+                step = handler(node, ctx, settings)
+                # Snapshot the circuit's current shape onto the step.
+                # Handlers don't bother setting this themselves —
+                # they just mutate ctx, and we read it here.
+                if step.status == "ok" and "circuit" in ctx:
+                    step = step.model_copy(
+                        update={"circuit_shape": _shape_of(ctx["circuit"])},
+                    )
+                steps.append(step)
             except Exception:
                 # Log the real traceback server-side; the user-facing
                 # message stays generic so library exception text
@@ -688,8 +711,13 @@ def run_pipeline(
 
         # Not a built-in — try a user plugin if we have a user_id.
         if user_id:
-            steps.append(_handle_plugin(node, ctx, settings, user_id=user_id))
-            if steps[-1].status == "error":
+            step = _handle_plugin(node, ctx, settings, user_id=user_id)
+            if step.status == "ok" and "circuit" in ctx:
+                step = step.model_copy(
+                    update={"circuit_shape": _shape_of(ctx["circuit"])},
+                )
+            steps.append(step)
+            if step.status == "error":
                 break
             continue
 
@@ -768,6 +796,7 @@ def run_pipeline_stream(
                     "depth": circuit.depth(),
                     "num_parameters": circuit.num_parameters,
                 },
+                circuit_shape=_shape_of(circuit),
             )
             _cache_put(prefix_key, result, ctx)
             yield result
@@ -777,6 +806,10 @@ def run_pipeline_stream(
         if handler is not None:
             try:
                 result = handler(node, ctx, settings)
+                if result.status == "ok" and "circuit" in ctx:
+                    result = result.model_copy(
+                        update={"circuit_shape": _shape_of(ctx["circuit"])},
+                    )
                 _cache_put(prefix_key, result, ctx)
                 yield result
             except Exception:
@@ -800,6 +833,10 @@ def run_pipeline_stream(
         # Not a built-in — plugin dispatch path.
         if user_id:
             result = _handle_plugin(node, ctx, settings, user_id=user_id)
+            if result.status == "ok" and "circuit" in ctx:
+                result = result.model_copy(
+                    update={"circuit_shape": _shape_of(ctx["circuit"])},
+                )
             # Only cache successful plugin runs so a transient crash
             # doesn't get pinned to the prefix.
             if result.status == "ok":

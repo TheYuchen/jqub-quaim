@@ -46,6 +46,7 @@ import { useApp } from "../lib/store";
 import { api } from "../lib/api";
 import { getUserId } from "../lib/userId";
 import { usePrefersReducedMotion } from "../lib/useMediaQuery";
+import { runPreflight, type PreflightFinding } from "../lib/preflightChecks";
 import {
   buildSharePayload,
   buildShareUrl,
@@ -137,6 +138,10 @@ export function FlowCanvas() {
   const sampleKey = useApp((s) => s.sampleKey);
   const setRun = useApp((s) => s.setRun);
   const running = useApp((s) => s.running);
+  // Subscribe to the latest run so edge labels can pull per-step
+  // circuit shape (see styledEdges memo below). Cheap re-render
+  // when the user clicks Run.
+  const run = useApp((s) => s.run);
   const setRunning = useApp((s) => s.setRunning);
   const useLiveIbm = useApp((s) => s.useLiveIbm);
   const pendingBlockKinds = useApp((s) => s.pendingBlockKinds);
@@ -406,23 +411,77 @@ export function FlowCanvas() {
 
   /** Style override for the targeted edge — animated dashed accent so
    *  it's visually obvious you're about to splice into it. */
+  // Build a node_id → StepResult lookup so we can quickly answer
+  // "what came out of this node's source?" when attaching edge
+  // labels. Cheap to recompute; the run only changes after a run.
+  const stepByNodeId = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof run>["steps"][number]>();
+    if (run) for (const s of run.steps) map.set(s.node_id, s);
+    return map;
+  }, [run]);
+
+  // Pre-flight lint pass: rerun whenever the graph or the loaded
+  // circuit changes. Cheap (O(nodes+edges)) and surfaces the findings
+  // as a soft banner above the canvas.
+  const preflightPlugins = useApp((s) => s.plugins);
+  const preflight: PreflightFinding[] = useMemo(
+    () =>
+      runPreflight({
+        nodes: nodes.map((n) => ({ ...n, data: { kind: n.data.kind } })),
+        edges,
+        circuit,
+        plugins: preflightPlugins,
+      }),
+    [nodes, edges, circuit, preflightPlugins],
+  );
+
   const styledEdges = useMemo(() => {
-    if (!dropTargetEdgeId) return edges;
-    return edges.map((edge) =>
-      edge.id === dropTargetEdgeId
-        ? {
-            ...edge,
-            style: {
-              ...(edge.style ?? {}),
-              stroke: "rgb(var(--color-accent2))",
-              strokeWidth: 3,
-              strokeDasharray: "8 4",
-            },
-            animated: true,
-          }
-        : edge,
-    );
-  }, [edges, dropTargetEdgeId]);
+    return edges.map((edge) => {
+      const isTarget = edge.id === dropTargetEdgeId;
+      // Data-flow label: when a successful run exists, each edge
+      // shows the shape of what's flowing from source to target
+      // (qubits · depth · gates). Reads from the source node's step.
+      const srcStep = stepByNodeId.get(edge.source);
+      const shape = srcStep?.circuit_shape ?? null;
+      const label = shape
+        ? `${shape.num_qubits}q · d${shape.depth} · ${shape.size}g`
+        : undefined;
+      let next = edge;
+      if (label) {
+        next = {
+          ...next,
+          label,
+          labelBgPadding: [4, 2] as [number, number],
+          labelBgBorderRadius: 4,
+          labelStyle: {
+            fill: "rgb(var(--color-ink))",
+            fontSize: 9,
+            fontFamily: "monospace",
+            fontWeight: 500,
+          },
+          labelBgStyle: {
+            fill: "rgb(var(--color-surface))",
+            stroke: "rgb(var(--color-edge))",
+            strokeWidth: 0.5,
+            fillOpacity: 0.95,
+          },
+        };
+      }
+      if (isTarget) {
+        next = {
+          ...next,
+          style: {
+            ...(next.style ?? {}),
+            stroke: "rgb(var(--color-accent2))",
+            strokeWidth: 3,
+            strokeDasharray: "8 4",
+          },
+          animated: true,
+        };
+      }
+      return next;
+    });
+  }, [edges, dropTargetEdgeId, stepByNodeId]);
 
   // ---- Touch drag bridge (mobile drag-to-insert) ---------------------
   //
@@ -778,6 +837,7 @@ export function FlowCanvas() {
           </button>
         </div>
       </div>
+      {preflight.length > 0 && <PreflightBanner findings={preflight} />}
       <div
         ref={wrapperRef}
         // qf-canvas-wrapper applies touch-action: none so iOS Safari
@@ -872,6 +932,55 @@ export function FlowCanvas() {
 /** Floating chip following the finger during a touch drag. Shows the
  *  block's family color + initials so the user sees what they're
  *  carrying. */
+/** Soft banner above the canvas summarising pre-flight findings.
+ *  Renders as a collapsed-by-default single line "N issues" chip;
+ *  expands on click into a per-finding list. The Run button stays
+ *  enabled (we don't block on warnings); errors get a danger-tone
+ *  treatment but still don't disable Run since the user might want
+ *  to try anyway. */
+function PreflightBanner({ findings }: { findings: PreflightFinding[] }) {
+  const [open, setOpen] = useState(false);
+  const errors = findings.filter((f) => f.severity === "error");
+  const warns = findings.filter((f) => f.severity === "warn");
+  const dominantTone = errors.length > 0 ? "danger" : "warn";
+  const toneClass =
+    dominantTone === "danger"
+      ? "border-danger/40 text-danger bg-danger/5"
+      : "border-warn/40 text-warn bg-warn/5";
+  const headline = errors.length
+    ? `${errors.length} issue${errors.length === 1 ? "" : "s"} likely to break the run`
+    : `${warns.length} pipeline note${warns.length === 1 ? "" : "s"}`;
+  return (
+    <div className={`shrink-0 border-b ${toneClass}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px]"
+      >
+        <AlertTriangle className="w-3.5 h-3.5" />
+        <span className="font-medium">{headline}</span>
+        <span className="text-mute/80">— click to {open ? "hide" : "see details"}</span>
+      </button>
+      {open && (
+        <ul className="px-3 pb-2 space-y-1 text-[11px]">
+          {findings.map((f, i) => (
+            <li key={i} className="flex items-start gap-1.5">
+              <span
+                className={`mt-0.5 inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
+                  f.severity === "error" ? "bg-danger" : "bg-warn"
+                }`}
+                aria-hidden
+              />
+              <span>{f.message}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function TouchDragPreview({
   kind,
   x,

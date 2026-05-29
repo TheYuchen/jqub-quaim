@@ -74,6 +74,19 @@ class RunRequest(BaseModel):
 
 
 
+class CircuitShape(BaseModel):
+    """Post-step circuit shape, attached to each StepResult so the
+    frontend can render data-flow labels on the edges leaving this
+    node (e.g. "5q · d8 · 17 gates"). None means "this step didn't
+    touch the circuit" (most metric / sink blocks) and the frontend
+    falls back to the upstream shape."""
+
+    num_qubits: int
+    depth: int
+    size: int  # total gate count
+    num_parameters: int
+
+
 class StepResult(BaseModel):
     """One stage of the pipeline's output (rendered as a panel in the UI)."""
 
@@ -92,6 +105,12 @@ class StepResult(BaseModel):
     # PluginFigures component renders inline below the step's summary
     # table. None means "no figures" (the common case for built-ins).
     figures: list[dict[str, Any]] | None = None
+    # Snapshot of the circuit's shape AFTER this step ran. Used by
+    # the canvas to render data-flow labels on outgoing edges. None
+    # for steps that ran in a context with no circuit (e.g. a source
+    # plugin executed with no upstream) or that errored before the
+    # circuit was computable.
+    circuit_shape: CircuitShape | None = None
 
 
 class RunResponse(BaseModel):

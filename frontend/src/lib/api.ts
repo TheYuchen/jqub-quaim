@@ -49,6 +49,17 @@ export interface CircuitInfo {
 
 export type StepStatus = "ok" | "skipped" | "error";
 
+/** Post-step circuit shape, attached by the backend after each
+ *  successful step. Drives the data-flow labels rendered on edges
+ *  leaving this node. Null when the step ran without a circuit in
+ *  context (e.g. a source plugin) or errored before computing one. */
+export interface CircuitShape {
+  num_qubits: number;
+  depth: number;
+  size: number;
+  num_parameters: number;
+}
+
 export interface StepResult {
   node_id: string;
   node_type: string;
@@ -66,6 +77,8 @@ export interface StepResult {
    *  null/absent when the step is a built-in block or a plugin that
    *  doesn't emit figures. */
   figures?: Array<Record<string, unknown>> | null;
+  /** Shape of the circuit AFTER this step ran. */
+  circuit_shape?: CircuitShape | null;
 }
 
 export interface RunResponse {

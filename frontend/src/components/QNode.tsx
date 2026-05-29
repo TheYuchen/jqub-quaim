@@ -17,6 +17,7 @@ import { NodeParamEditor } from "./NodeParamEditor";
 import { TipIcon } from "./TipIcon";
 import { useApp } from "../lib/store";
 import { FAMILY_HINTS } from "../lib/familyHints";
+import { durationTone, headlineFor } from "../lib/headlineMetric";
 
 export interface QNodeData extends Record<string, unknown> {
   kind: NodeKind;
@@ -46,6 +47,15 @@ export function QNode({ id, data, selected }: NodeProps) {
   const circuit = useApp((s) => s.circuit);
   const sampleKey = useApp((s) => s.sampleKey);
   const plugins = useApp((s) => s.plugins);
+  // After-run state: subscribe to the latest run so each node can
+  // surface its own headline metric + duration badge. Cheap because
+  // run only changes once per Run click.
+  const run = useApp((s) => s.run);
+  const step = run?.steps.find((s) => s.node_id === id);
+  const stepDurationS =
+    step && step.status === "ok"
+      ? step.finished_at - step.started_at
+      : null;
   // Spec resolution — built-in OR user plugin. Hook order requires
   // this stay above any early return.
   const spec = resolveNodeSpec(d.kind, plugins);
@@ -273,12 +283,103 @@ export function QNode({ id, data, selected }: NodeProps) {
           </div>
         )
       )}
+      {step && step.status === "ok" && (
+        <RunResultStrip
+          kind={d.kind}
+          step={step}
+          durationS={stepDurationS}
+        />
+      )}
+      {step && step.status === "error" && (
+        <div className="mt-2 pt-2 border-t border-danger/30 text-[10px] text-danger flex items-start gap-1">
+          <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+          <span className="truncate" title={step.message ?? ""}>
+            {step.message ?? "Failed"}
+          </span>
+        </div>
+      )}
       {hasInput && (
         <Handle type="target" position={Position.Left} isConnectable={true} />
       )}
       {hasOutput && (
         <Handle type="source" position={Position.Right} isConnectable={true} />
       )}
+    </div>
+  );
+}
+
+/** After-run strip at the bottom of the node tile: headline metric +
+ *  duration chip + cache indicator. None of these are interactive,
+ *  but they make the canvas itself a glanceable dashboard once a run
+ *  has happened. */
+function RunResultStrip({
+  kind,
+  step,
+  durationS,
+}: {
+  kind: NodeKind;
+  step: import("../lib/api").StepResult;
+  durationS: number | null;
+}) {
+  const headline = headlineFor(kind, step);
+  const tone = durationS !== null ? durationTone(durationS) : null;
+  const durBadgeClass = {
+    fast: "border-edge/60 text-mute/80",
+    medium: "border-accent/40 text-accent/90",
+    slow: "border-warn/50 text-warn",
+    "very-slow": "border-danger/50 text-danger",
+  }[tone ?? "fast"];
+  const durFormatted =
+    durationS === null
+      ? ""
+      : durationS < 1
+        ? `${Math.round(durationS * 1000)}ms`
+        : `${durationS.toFixed(durationS < 10 ? 2 : 1)}s`;
+  return (
+    <div className="mt-2 pt-1.5 border-t border-edge/40 flex items-baseline justify-between gap-2">
+      {headline ? (
+        <div className="min-w-0 flex-1">
+          <div className="text-[9px] uppercase tracking-wider text-mute/70 truncate">
+            {headline.label}
+          </div>
+          <div
+            className={`text-[12px] font-mono font-semibold leading-tight truncate ${
+              headline.tone ?? "text-ink"
+            }`}
+            title={`${headline.label}: ${headline.value}`}
+          >
+            {headline.value}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 text-[10px] text-ok/80">✓ ran</div>
+      )}
+      <div className="flex items-center gap-1 shrink-0">
+        {step.from_step_cache && (
+          <span
+            className="text-[9px] px-1 py-0.5 rounded border border-accent/30 text-accent"
+            title="Served from per-node cache (pipeline prefix unchanged)"
+          >
+            cached
+          </span>
+        )}
+        {durationS !== null && (
+          <span
+            className={`text-[9px] px-1 py-0.5 rounded border font-mono ${durBadgeClass}`}
+            title={
+              tone === "very-slow"
+                ? "Took over 1 minute — likely the pipeline's bottleneck"
+                : tone === "slow"
+                  ? "Took over 10 seconds"
+                  : tone === "medium"
+                    ? "Took 1-10 seconds"
+                    : "Sub-second"
+            }
+          >
+            {durFormatted}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
