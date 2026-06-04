@@ -113,7 +113,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     icon: Server,
     accent: "text-accent",
     accentRing: "border-accent/40",
-    defaultData: { backend_name: "FakeFez" },
+    defaultData: { backend_name: "FakeFez", shots: 1024 },
     defaultCount: 1,
     // Backend handler in workflow_service supports three Heron-family
     // fakes (FakeFez / FakeMarrakesh / FakeTorino). Adding more requires
@@ -130,6 +130,15 @@ export const NODE_CATALOG: NodeSpec[] = [
         ],
         hint: "Each option is a simulated copy of a real IBM chip. The choice mainly affects which gate-error rates and qubit connectivity the noise model uses.",
       },
+      {
+        key: "shots",
+        label: "Shots",
+        type: "int",
+        min: 1,
+        max: 65536,
+        step: 1,
+        hint: "Number of times the circuit is run and measured. Picked up from ctx by downstream blocks that actually sample (e.g. Fidelity in `sampled` mode). 1024 is the Qiskit default; bigger means lower shot noise but proportionally slower runs.",
+      },
     ],
   },
   {
@@ -141,7 +150,18 @@ export const NODE_CATALOG: NodeSpec[] = [
     icon: Cpu,
     accent: "text-warn",
     accentRing: "border-warn/40",
-    defaultData: { backend_name: "ibm_fez" },
+    defaultData: { backend_name: "ibm_fez", shots: 1024 },
+    params: [
+      {
+        key: "shots",
+        label: "Shots",
+        type: "int",
+        min: 1,
+        max: 65536,
+        step: 1,
+        hint: "Measurement count used by downstream sampling blocks. Same units as Noisy simulator's shots; live mode falls back to Noisy simulator on this deployment.",
+      },
+    ],
   },
   {
     kind: "qucad",
@@ -208,11 +228,23 @@ export const NODE_CATALOG: NodeSpec[] = [
     label: "QuBound",
     family: "algorithm",
     tagline: "predict today's error bound",
-    description: "LSTM over 14 days of calibration history; predicts today's error bound.",
+    description: "LSTM over 14 days of calibration history; predicts today's error bound. Set a threshold to get a pass/fail decision.",
     icon: LineChart,
     accent: "text-accent3",
     accentRing: "border-accent3/50",
-    defaultData: { cache_backend: "ibm_fez" },
+    defaultData: { cache_backend: "ibm_fez", threshold: 0 },
+    params: [
+      {
+        key: "threshold",
+        label: "Acceptance threshold",
+        type: "number",
+        min: 0,
+        max: 1,
+        step: 0.01,
+        displayPrecision: 3,
+        hint: "Acceptable upper bound on predicted error. 0 disables the pass/fail decision and shows the predicted bound only. Typical values: 0.05 (strict) to 0.20 (lenient).",
+      },
+    ],
     paper: {
       url: "https://arxiv.org/abs/2507.17043",
       title:
@@ -300,11 +332,34 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "fidelity",
     label: "Fidelity",
     family: "metric",
-    tagline: "statevector vs noisy",
-    description: "Quick statevector-vs-noisy fidelity estimate (bound-parameter circuits only).",
+    tagline: "noiseless vs sampled",
+    description: "Estimates the |0…0⟩-state fidelity. Two methods: noiseless statevector (fast, ignores backend noise) or sampled shots from the noisy backend (uses backend's shots, has shot noise).",
     icon: Gauge,
     accent: "text-ok",
     accentRing: "border-ok/40",
+    defaultData: { method: "statevector", unbound_param_policy: "bind_zero" },
+    params: [
+      {
+        key: "method",
+        label: "Method",
+        type: "select",
+        options: [
+          { value: "statevector", label: "Statevector (noiseless)" },
+          { value: "sampled", label: "Sampled from noisy backend" },
+        ],
+        hint: "Statevector gives the noiseless probability of the |0…0⟩ outcome. Sampled actually runs the (bound) circuit on the upstream backend with N shots and observes the count fraction — this is what real hardware would give and uses the backend's noise model.",
+      },
+      {
+        key: "unbound_param_policy",
+        label: "Unbound parameters",
+        type: "select",
+        options: [
+          { value: "bind_zero", label: "Bind to zero (default)" },
+          { value: "error", label: "Refuse with error" },
+        ],
+        hint: "Parametric circuits (e.g. ry_chain_6q) have unbound parameters. `bind_zero` substitutes zero so a number comes out; `error` refuses and asks you to bind upstream so the result reflects your actual intent.",
+      },
+    ],
   },
   {
     kind: "output",

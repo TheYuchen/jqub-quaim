@@ -153,11 +153,20 @@ def _load_fake_backend(name: str):
 # ---------- Per-node handlers ----------
 
 def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
+    """Local noisy simulator using a Qiskit Aer fake backend. Exposes
+    a user-configurable ``shots`` count so downstream blocks that
+    actually run measurements (e.g. Fidelity in `sampled` mode) can
+    pick it up from ctx without each having its own shots param."""
     t0 = _now()
     name = node.data.get("backend_name", "FakeFez")
+    # Clamp shots to a sensible range to avoid DOS via "shots=10**9".
+    shots_raw = node.data.get("shots", 1024)
+    shots = int(shots_raw) if isinstance(shots_raw, (int, float)) else 1024
+    shots = max(1, min(shots, 65536))
     backend = _load_fake_backend(name)
     ctx["backend"] = backend
     ctx["backend_is_live"] = False
+    ctx["shots"] = shots
     return _make_step(
         node,
         "ok",
@@ -165,23 +174,28 @@ def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> Step
         summary={
             "backend_name": name,
             "num_qubits": backend.configuration().n_qubits,
+            "shots": shots,
         },
     )
 
 
 def _handle_ibm_backend(node: FlowNode, ctx: dict, settings: Settings) -> StepResult:
     t0 = _now()
+    shots_raw = node.data.get("shots", 1024)
+    shots = int(shots_raw) if isinstance(shots_raw, (int, float)) else 1024
+    shots = max(1, min(shots, 65536))
     if not settings.has_ibm_token or not settings.allow_live_ibm:
         # Silently downgrade to fake so the rest of the pipeline still runs.
         fallback = _load_fake_backend(node.data.get("fallback_backend", "FakeFez"))
         ctx["backend"] = fallback
         ctx["backend_is_live"] = False
+        ctx["shots"] = shots
         return _make_step(
             node,
             "skipped",
             started_at=t0,
             message="Live IBM call disabled; falling back to FakeFez.",
-            summary={"fallback": "FakeFez"},
+            summary={"fallback": "FakeFez", "shots": shots},
         )
     from qiskit_ibm_runtime import QiskitRuntimeService
 
@@ -194,11 +208,12 @@ def _handle_ibm_backend(node: FlowNode, ctx: dict, settings: Settings) -> StepRe
     backend = service.backend(name)
     ctx["backend"] = backend
     ctx["backend_is_live"] = True
+    ctx["shots"] = shots
     return _make_step(
         node,
         "ok",
         started_at=t0,
-        summary={"backend_name": name, "live": True},
+        summary={"backend_name": name, "live": True, "shots": shots},
     )
 
 
@@ -260,6 +275,26 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
     if qc.num_parameters > 0:
         qc = qc.assign_parameters([0.0] * qc.num_parameters)
 
+    # Optional acceptance threshold for the predicted bound. Defaults
+    # are absent ("none" means the user didn't set one, so no
+    # pass/fail decision is rendered — just the predicted number).
+    threshold_raw = node.data.get("threshold")
+    threshold = float(threshold_raw) if isinstance(threshold_raw, (int, float)) and threshold_raw > 0 else None
+
+    def _build_summary(bound_value: float, source: str, extra: dict | None = None) -> dict:
+        out: dict = {
+            "predicted_error_bound": float(bound_value),
+            "source": source,
+        }
+        if threshold is not None:
+            passes = float(bound_value) <= threshold
+            out["threshold"] = threshold
+            out["passes_threshold"] = bool(passes)
+            out["margin"] = float(threshold - bound_value)  # >0 = headroom, <0 = over
+        if extra:
+            out.update(extra)
+        return out
+
     # Prefer live IBM history when we have a token and it's enabled.
     if settings.has_ibm_token and settings.allow_live_ibm:
         reference = backend or _load_fake_backend("FakeFez")
@@ -269,7 +304,7 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
             node,
             "ok",
             started_at=t0,
-            summary={"predicted_error_bound": float(bound), "source": "live_ibm"},
+            summary=_build_summary(bound, "live_ibm"),
         )
 
     # Offline path — use cached 14-day pickle shipped with the repo.
@@ -294,13 +329,14 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
         node,
         "ok",
         started_at=t0,
-        summary={
-            "predicted_error_bound": float(bound),
-            "source": "cached_ibm_history",
-            "cached_backend": meta["backend_name"],
-            "history_window": f"{meta['first_date']} → {meta['last_date']}",
-            "num_days": meta["num_days"],
-        },
+        summary=_build_summary(
+            bound, "cached_ibm_history",
+            {
+                "cached_backend": meta["backend_name"],
+                "history_window": f"{meta['first_date']} → {meta['last_date']}",
+                "num_days": meta["num_days"],
+            },
+        ),
     )
 
 
@@ -433,12 +469,59 @@ def _handle_qshot(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
 
 
 def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
-    t0 = _now()
-    from qlib.qiskit_utils import simpleFidelityEstimator
+    """Fidelity estimator. Two methods:
 
-    fid = simpleFidelityEstimator(ctx["circuit"])
+      * ``statevector`` (default) — noiseless ⟨0…0|U|0…0⟩.
+      * ``sampled``               — bind params, run on the noisy
+                                    backend with N shots, observe
+                                    the |0…0⟩ count fraction.
+
+    The choice is made by the ``method`` param on the node. The
+    ``unbound_param_policy`` param controls whether unbound circuit
+    parameters get silently bound to zero (default, matches QuBound's
+    convention) or refused with an actionable error.
+    """
+    t0 = _now()
+    from qlib.qiskit_utils import (
+        UnboundParametersError,
+        sampledFidelityEstimator,
+        simpleFidelityEstimator,
+    )
+
+    method = node.data.get("method", "statevector")
+    unbound_policy = node.data.get("unbound_param_policy", "bind_zero")
+
+    try:
+        if method == "sampled":
+            backend = ctx.get("backend")
+            shots = int(ctx.get("shots", 1024))
+            fid, meta = sampledFidelityEstimator(
+                ctx["circuit"], backend, shots,
+                unbound_param_policy=unbound_policy,
+            )
+        else:
+            fid, meta = simpleFidelityEstimator(
+                ctx["circuit"], unbound_param_policy=unbound_policy,
+            )
+    except UnboundParametersError as exc:
+        # User-actionable: tell them exactly which lever to flip.
+        return _make_step(node, "error", started_at=t0, message=str(exc))
+    except Exception:
+        # Unknown failure — log traceback server-side, generic to user.
+        logger.exception("Fidelity handler crashed for node %s", node.id)
+        return _make_step(
+            node, "error", started_at=t0,
+            message=(
+                "Fidelity estimation failed. The most common cause is a "
+                "circuit shape the estimator doesn't support (e.g. classical "
+                "registers attached). Check the server run log for the "
+                "underlying error."
+            ),
+        )
+
     ctx["fidelity"] = float(fid)
-    return _make_step(node, "ok", started_at=t0, summary={"fidelity": float(fid)})
+    summary: dict = {"fidelity": float(fid), **meta}
+    return _make_step(node, "ok", started_at=t0, summary=summary)
 
 
 def _handle_output(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:

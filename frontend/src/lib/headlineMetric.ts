@@ -75,10 +75,19 @@ export function headlineFor(
     }
     case "qubound": {
       const eb = asNumber(s.predicted_error_bound ?? s.qubound_value);
-      if (eb !== null) {
-        return { label: "Error bound", value: `≤ ${fmt(eb)}`, tone: "text-accent" };
+      if (eb === null) return null;
+      // When the user set a threshold, render pass/fail. Otherwise
+      // just show the predicted number.
+      const passes = s.passes_threshold;
+      const threshold = asNumber(s.threshold);
+      if (typeof passes === "boolean" && threshold !== null) {
+        return {
+          label: passes ? "Below threshold" : "Above threshold",
+          value: `${fmt(eb)} / ${fmt(threshold)}`,
+          tone: passes ? "text-ok" : "text-danger",
+        };
       }
-      return null;
+      return { label: "Error bound", value: `≤ ${fmt(eb)}`, tone: "text-accent" };
     }
     case "compvqc": {
       const folded = asNumber(s.rotations_folded ?? s.compressed);
@@ -101,14 +110,21 @@ export function headlineFor(
     }
     case "fidelity": {
       const f = asNumber(s.fidelity);
-      if (f !== null) {
-        return {
-          label: "Fidelity",
-          value: fmt(f),
-          tone: f >= 0.9 ? "text-ok" : f >= 0.7 ? "text-warn" : "text-danger",
-        };
-      }
-      return null;
+      if (f === null) return null;
+      // Tag the headline with the method so the reader knows whether
+      // this is noiseless (statevector) or backend-noise (sampled).
+      const method = typeof s.method === "string" ? s.method : null;
+      const label =
+        method === "sampled"
+          ? "Fidelity (sampled)"
+          : method === "statevector"
+            ? "Fidelity (noiseless)"
+            : "Fidelity";
+      return {
+        label,
+        value: fmt(f),
+        tone: f >= 0.9 ? "text-ok" : f >= 0.7 ? "text-warn" : "text-danger",
+      };
     }
     case "output": {
       const f = asNumber(s.fidelity);
