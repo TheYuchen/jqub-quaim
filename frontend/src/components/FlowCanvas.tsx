@@ -427,7 +427,16 @@ export function FlowCanvas() {
   const preflight: PreflightFinding[] = useMemo(
     () =>
       runPreflight({
-        nodes: nodes.map((n) => ({ ...n, data: { kind: n.data.kind } })),
+        // Pass kind + params (params are the only data fields the
+        // preflight rules actually read). Stripping the rest keeps
+        // the memo key small so unrelated UI churn doesn't re-fire.
+        nodes: nodes.map((n) => ({
+          ...n,
+          data: {
+            kind: n.data.kind,
+            params: n.data.params,
+          },
+        })),
         edges,
         circuit,
         plugins: preflightPlugins,

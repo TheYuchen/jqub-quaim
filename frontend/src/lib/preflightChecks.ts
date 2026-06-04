@@ -29,7 +29,13 @@ export type PreflightFinding = {
   node_id?: string;
 };
 
-export type GraphNode = Node<{ kind: NodeKind | string }>;
+export type GraphNode = Node<{
+  kind: NodeKind | string;
+  /** Param values flat from the canvas node (the same shape stored
+   *  under data.params on a React Flow node). Used by rules that
+   *  branch on user choices (e.g. Fidelity method = sampled). */
+  params?: Record<string, unknown>;
+}>;
 
 /** Build a lookup of each node's incoming edges. */
 function incomingMap(edges: Edge[]): Map<string, string[]> {
@@ -140,6 +146,31 @@ export function runPreflight(input: PreflightInput): PreflightFinding[] {
           message: "QuCAD has no backend upstream; it will use the default FakeFez.",
           node_id: n.id,
         });
+      }
+    }
+
+    // 3b. Fidelity in `sampled` mode needs a backend upstream because
+    //     that's where the noise model + shots come from. Without one
+    //     the sampled estimator falls back to noiseless AerSimulator
+    //     and the result is effectively the same as `statevector` mode
+    //     but slower — which defeats the user's choice.
+    if (kind === "fidelity") {
+      const method = n.data.params?.method;
+      if (method === "sampled") {
+        const backend = findUpstream(
+          n.id, incoming, (pid) => familyOf(pid) === "backend",
+        );
+        if (!backend) {
+          findings.push({
+            severity: "warn",
+            message:
+              "Fidelity is in `sampled` mode but has no Backend block " +
+              "upstream. It will fall back to a noiseless simulator — " +
+              "switch to `statevector` mode or add a backend to take " +
+              "advantage of sampled mode.",
+            node_id: n.id,
+          });
+        }
       }
     }
 

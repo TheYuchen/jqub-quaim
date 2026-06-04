@@ -127,16 +127,19 @@ export function generatePythonScript(
 
       case "fake_backend": {
         const name = String(b.params.backend_name ?? "FakeFez");
+        const shots = Number(b.params.shots ?? 1024);
         lines.push(`# Step ${stepNum}: Noisy simulator (${name})`);
         lines.push(`from qiskit.providers.fake_provider import ${name}V2`);
         lines.push(`backend = ${name}V2()`);
         lines.push(`noise_model = NoiseModel.from_backend(backend)`);
+        lines.push(`shots = ${shots}  # user-set measurement count`);
         lines.push(``);
         break;
       }
 
       case "ibm_backend": {
         const name = String(b.params.backend_name ?? "ibm_fez");
+        const shots = Number(b.params.shots ?? 1024);
         lines.push(`# Step ${stepNum}: IBM live backend (${name})`);
         lines.push(`# Requires: pip install qiskit-ibm-runtime`);
         lines.push(`# from qiskit_ibm_runtime import QiskitRuntimeService`);
@@ -148,6 +151,7 @@ export function generatePythonScript(
         lines.push(`from qiskit.providers.fake_provider import FakeFezV2`);
         lines.push(`backend = FakeFezV2()`);
         lines.push(`noise_model = NoiseModel.from_backend(backend)`);
+        lines.push(`shots = ${shots}`);
         lines.push(``);
         break;
       }
@@ -177,6 +181,10 @@ export function generatePythonScript(
 
       case "qubound": {
         const cacheBackend = String(b.params.cache_backend ?? "ibm_fez");
+        const thresholdRaw = Number(b.params.threshold ?? 0);
+        // 0 / negative disables pass/fail, matching the backend's
+        // _build_summary contract.
+        const threshold = thresholdRaw > 0 ? thresholdRaw : null;
         lines.push(`# Step ${stepNum}: QuBound — LSTM error-bound prediction`);
         lines.push(`from qlib.qbound import call_QuBound_from_cache`);
         lines.push(`from pathlib import Path`);
@@ -191,6 +199,14 @@ export function generatePythonScript(
         lines.push(`    qc_eval, cache_path, reference_backend=backend if 'backend' in dir() else None,`);
         lines.push(`)`);
         lines.push(`print(f"QuBound predicted error bound: {bound:.6f}")`);
+        if (threshold !== null) {
+          lines.push(`threshold = ${threshold}`);
+          lines.push(`passes = bound <= threshold`);
+          lines.push(`margin = threshold - bound`);
+          lines.push(
+            `print(f"  threshold {threshold}: {'PASS' if passes else 'FAIL'} (margin {margin:+.4f})")`,
+          );
+        }
         lines.push(``);
         break;
       }
@@ -242,11 +258,45 @@ export function generatePythonScript(
       }
 
       case "fidelity": {
+        const method = String(b.params.method ?? "statevector");
+        const policy = String(b.params.unbound_param_policy ?? "bind_zero");
         lines.push(`# Step ${stepNum}: Fidelity estimate`);
-        lines.push(`from qlib.qiskit_utils import simpleFidelityEstimator`);
-        lines.push(``);
-        lines.push(`fidelity = simpleFidelityEstimator(qc)`);
-        lines.push(`print(f"Fidelity (statevector vs noisy): {fidelity:.6f}")`);
+        if (method === "sampled") {
+          lines.push(
+            `from qlib.qiskit_utils import sampledFidelityEstimator`,
+          );
+          lines.push(``);
+          lines.push(
+            `fidelity, meta = sampledFidelityEstimator(`,
+          );
+          lines.push(`    qc,`);
+          lines.push(
+            `    backend if 'backend' in dir() else None,`,
+          );
+          lines.push(
+            `    shots=shots if 'shots' in dir() else 1024,`,
+          );
+          lines.push(`    unbound_param_policy="${policy}",`);
+          lines.push(`)`);
+          lines.push(
+            `print(f"Fidelity (sampled, shots={meta['shots']}): {fidelity:.6f}")`,
+          );
+        } else {
+          lines.push(
+            `from qlib.qiskit_utils import simpleFidelityEstimator`,
+          );
+          lines.push(``);
+          lines.push(
+            `fidelity, meta = simpleFidelityEstimator(`,
+          );
+          lines.push(
+            `    qc, unbound_param_policy="${policy}",`,
+          );
+          lines.push(`)`);
+          lines.push(
+            `print(f"Fidelity (noiseless statevector): {fidelity:.6f}")`,
+          );
+        }
         lines.push(``);
         break;
       }
