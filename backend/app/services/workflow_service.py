@@ -125,6 +125,27 @@ def _shape_of(qc: "QuantumCircuit") -> dict:
     }
 
 
+def _format_exception_for_user(exc: BaseException) -> str:
+    """Build a one-line exception summary safe to show users.
+
+    Includes the exception class and the first line of ``str(exc)``,
+    truncated. We deliberately drop the traceback (it can contain
+    server-side file paths) and strip anything that looks like an
+    absolute path so a stray FileNotFoundError doesn't leak the
+    container layout. The result is suitable for placing inside a
+    user-visible StepResult.message.
+    """
+    cls = exc.__class__.__name__
+    raw = str(exc).strip()
+    first_line = raw.splitlines()[0] if raw else ""
+    # Strip absolute /paths/... that frequently appear in qiskit /
+    # numpy errors, replace with <path>.
+    import re
+    sanitised = re.sub(r"(?:/[\w.-]+)+\.\w+", "<path>", first_line)
+    sanitised = sanitised[:240].rstrip() + ("…" if len(sanitised) > 240 else "")
+    return f"{cls}: {sanitised}" if sanitised else cls
+
+
 def _default_label(node_type: str) -> str:
     return {
         "input_circuit": "Input circuit",
@@ -369,6 +390,34 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
             summary={"lut_size": 0},
         )
     qp = quadraticProgram_luttoqp(qc, lut)
+    # Scale guard. CompressVQC solves the QUBO via QAOA on a state-
+    # vector simulator. QAOA needs one qubit per binary variable, so
+    # the statevector grows as 2^(num_vars). Anything past ~25 vars
+    # exhausts memory ("Maximum allowed dimension exceeded" from
+    # numpy). Skip cleanly with an actionable message rather than
+    # crashing 30 s into the run.
+    n_vars = qp.get_num_vars()
+    COMPVQC_MAX_VARS = 22  # 2^22 ≈ 4M complex = 64 MB
+    if n_vars > COMPVQC_MAX_VARS:
+        return _make_step(
+            node,
+            "skipped",
+            started_at=t0,
+            message=(
+                f"CompressVQC would build a {n_vars}-binary-variable QUBO "
+                f"({qc.num_parameters} rotations × {n_vars // max(1, qc.num_parameters)} "
+                f"theta candidates), and the underlying QAOA solver runs on a "
+                f"state-vector simulator capped near {COMPVQC_MAX_VARS} qubits. "
+                f"Try a circuit with fewer parameterised rotations (e.g. fewer "
+                f"reps in EfficientSU2 / a smaller HEA), or split the circuit "
+                f"and compress per-block."
+            ),
+            summary={
+                "lut_size": len(lut),
+                "num_qp_vars": n_vars,
+                "qaoa_max_vars": COMPVQC_MAX_VARS,
+            },
+        )
     result = admmOptimizedCompVQC(qp)
     compressed = resultsCompressVQC(result, qc)
 
@@ -780,19 +829,22 @@ def run_pipeline(
                         update={"circuit_shape": _shape_of(ctx["circuit"])},
                     )
                 steps.append(step)
-            except Exception:
-                # Log the real traceback server-side; the user-facing
-                # message stays generic so library exception text
-                # (file paths, stack fragments) doesn't leak.
+            except Exception as exc:
+                # Log the full traceback server-side; surface the
+                # exception class + first line of str(exc) to the
+                # user so they can self-diagnose without server log
+                # access (a Space deployment has no log surface for
+                # end users). We deliberately keep it to one line —
+                # full tracebacks may contain file paths.
                 logger.exception(
                     "Built-in handler %s crashed for node %s",
                     node.type, node.id,
                 )
+                detail = _format_exception_for_user(exc)
                 steps.append(_make_step(
                     node, "error",
                     message=(
-                        f"The {node.type} block hit an unexpected error. "
-                        "See the run log for details."
+                        f"The {node.type} block hit an unexpected error: {detail}"
                     ),
                 ))
                 break
@@ -935,18 +987,18 @@ def run_pipeline_stream(
                 if not cache_disabled_for_tail:
                     _cache_put(prefix_key, result, ctx)
                 yield result
-            except Exception:
-                # Same policy as run_pipeline above: log traceback,
-                # surface generic message to the user.
+            except Exception as exc:
+                # Same policy as run_pipeline above: log traceback +
+                # surface the exception class + first line of message.
                 logger.exception(
                     "Built-in handler %s crashed (stream) for node %s",
                     node.type, node.id,
                 )
+                detail = _format_exception_for_user(exc)
                 result = _make_step(
                     node, "error",
                     message=(
-                        f"The {node.type} block hit an unexpected error. "
-                        "See the run log for details."
+                        f"The {node.type} block hit an unexpected error: {detail}"
                     ),
                 )
                 yield result
