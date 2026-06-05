@@ -71,7 +71,7 @@ export function generatePythonScript(
   // Header
   lines.push(`"""`);
   lines.push(`Pipeline exported from QuDA Studio`);
-  lines.push(`https://qudastudio-app.hf.space/`);
+  lines.push(`https://jqub21-quaim.hf.space/`);
   lines.push(`"""`);
   lines.push(``);
 
