@@ -874,18 +874,27 @@ def run_pipeline_stream(
         prefix_key = _prefix_hash(circuit_qpy, nodes_so_far)
 
         # ---- cache hit: return saved result + restore ctx ----
+        # A cached entry that is itself nondeterministic must NEVER
+        # be served — it'd be the same scientific bug we're fixing.
+        # This guards against (a) legacy entries from before this
+        # fix, and (b) any future handler that retroactively flips
+        # nondeterministic on. We evict and re-execute.
         if not cache_disabled_for_tail and prefix_key in _step_cache:
             cached_result, cached_ctx = _step_cache[prefix_key]
-            ctx.update(cached_ctx)
-            _step_cache.move_to_end(prefix_key)  # refresh LRU
-            logger.debug("Step cache HIT for %s (%s)", node.type, prefix_key[:8])
-            # If a cached step was itself nondeterministic (e.g. an
-            # OLD cache entry from before this fix), trip the flag
-            # so downstream prefixes don't get served stale either.
             if cached_result.nondeterministic:
+                logger.debug(
+                    "Step cache EVICT (nondet legacy) %s (%s)",
+                    node.type, prefix_key[:8],
+                )
+                del _step_cache[prefix_key]
                 cache_disabled_for_tail = True
-            yield cached_result.model_copy(update={"from_step_cache": True})
-            continue
+                # Fall through to the miss path.
+            else:
+                ctx.update(cached_ctx)
+                _step_cache.move_to_end(prefix_key)  # refresh LRU
+                logger.debug("Step cache HIT for %s (%s)", node.type, prefix_key[:8])
+                yield cached_result.model_copy(update={"from_step_cache": True})
+                continue
 
         # ---- cache miss: execute the step ----
         logger.debug("Step cache MISS for %s (%s)", node.type, prefix_key[:8])
@@ -914,15 +923,17 @@ def run_pipeline_stream(
                     result = result.model_copy(
                         update={"circuit_shape": _shape_of(ctx["circuit"])},
                     )
-                if not cache_disabled_for_tail:
-                    _cache_put(prefix_key, result, ctx)
                 # A nondeterministic step (e.g. sampled fidelity) trips
-                # the sticky flag so this run AND any downstream step
-                # in the same call no longer write to the cache, and
-                # future runs of the same prefix won't lookup-hit
-                # downstream entries that depend on stale ctx.
+                # the sticky flag so this step itself AND any
+                # downstream step in the same run no longer write to
+                # the cache, AND future runs of the same prefix won't
+                # lookup-hit a stale draw. Crucially the flag is set
+                # BEFORE _cache_put so the nondeterministic step's
+                # own result is also not written.
                 if result.nondeterministic:
                     cache_disabled_for_tail = True
+                if not cache_disabled_for_tail:
+                    _cache_put(prefix_key, result, ctx)
                 yield result
             except Exception:
                 # Same policy as run_pipeline above: log traceback,
@@ -949,14 +960,15 @@ def run_pipeline_stream(
                 result = result.model_copy(
                     update={"circuit_shape": _shape_of(ctx["circuit"])},
                 )
-            # Only cache successful plugin runs so a transient crash
-            # doesn't get pinned to the prefix. Also respect the
-            # nondeterministic-tail flag (a plugin downstream of
-            # sampled fidelity shouldn't cache its derived output).
-            if result.status == "ok" and not cache_disabled_for_tail:
-                _cache_put(prefix_key, result, ctx)
+            # Flag first so a plugin marking itself nondeterministic
+            # is treated like sampled fidelity: its own result isn't
+            # cached, and nothing downstream is.
             if result.nondeterministic:
                 cache_disabled_for_tail = True
+            # Only cache successful plugin runs so a transient crash
+            # doesn't get pinned to the prefix, and respect the flag.
+            if result.status == "ok" and not cache_disabled_for_tail:
+                _cache_put(prefix_key, result, ctx)
             yield result
             if result.status == "error":
                 break
