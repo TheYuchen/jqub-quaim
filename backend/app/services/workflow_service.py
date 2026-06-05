@@ -293,8 +293,15 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
     backend = ctx.get("backend")
 
     # Bind any free parameters with zeros so Aer can simulate them.
+    # Also defensively copy so downstream steps see the same circuit
+    # we received — qbound's internals attach measurements while
+    # building training labels, and if we didn't deep-copy that
+    # mutation would leak into ctx['circuit'] and break Qshot /
+    # Fidelity / Output for the rest of the pipeline.
     if qc.num_parameters > 0:
         qc = qc.assign_parameters([0.0] * qc.num_parameters)
+    else:
+        qc = qc.copy()
 
     # Optional acceptance threshold for the predicted bound. Defaults
     # are absent ("none" means the user didn't set one, so no

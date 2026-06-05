@@ -121,8 +121,13 @@ def get_labels_fromNoise(
     per day, suitable as LSTM supervision."""
     logger.info("Computing error labels from circuit noiseless vs. noisy runs")
 
-    # Mutation by design: attaches measurements so the Aer shots mean
-    # something. Caller doesn't reuse ``qc`` after this point.
+    # Defensive copy: previous version called ``qc.measure_all()`` on
+    # the caller's circuit, which silently appended a classical
+    # register to whatever they passed in. That broke long pipelines
+    # where the same QuantumCircuit object then flowed into Qshot /
+    # statevector fidelity / Output, which interpret the extra reg as
+    # a counts-string delimiter and crash.
+    qc = qc.copy()
     qc.measure_all()
     qc = transpile(qc, backend, optimization_level=3)
 
