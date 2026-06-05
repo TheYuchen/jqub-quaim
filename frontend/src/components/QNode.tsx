@@ -14,6 +14,7 @@ import {
   type PluginNodeSpec,
 } from "../lib/nodeCatalog";
 import { NodeParamEditor } from "./NodeParamEditor";
+import { RunStatusChips } from "./RunStatusChips";
 import { TipIcon } from "./TipIcon";
 import { useApp } from "../lib/store";
 import { FAMILY_HINTS } from "../lib/familyHints";
@@ -355,22 +356,7 @@ function RunResultStrip({
         <div className="flex-1 text-[10px] text-ok/80">✓ ran</div>
       )}
       <div className="flex items-center gap-1 shrink-0">
-        {step.from_step_cache && (
-          <span
-            className="text-[9px] px-1 py-0.5 rounded border border-accent/30 text-accent"
-            title="Served from per-node cache (pipeline prefix unchanged)"
-          >
-            cached
-          </span>
-        )}
-        {step.nondeterministic && !step.from_step_cache && (
-          <span
-            className="text-[9px] px-1 py-0.5 rounded border border-warn/30 text-warn"
-            title="Result is intentionally fresh each run (e.g. sampled shots). The per-node cache is bypassed for this step and every downstream step."
-          >
-            live
-          </span>
-        )}
+        <RunStatusChips step={step} variant="tile" />
         {durationS !== null && (
           <span
             className={`text-[9px] px-1 py-0.5 rounded border font-mono ${durBadgeClass}`}

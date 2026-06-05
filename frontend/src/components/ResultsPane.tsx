@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { StepBody } from "./results/cards";
 import { PluginFigures } from "./PluginFigures";
+import { RunStatusChips } from "./RunStatusChips";
 
 export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const run = useApp((s) => s.run);
@@ -175,19 +176,7 @@ function StepCard({ step }: { step: StepResult }) {
             <span className={`chip ${statusClass}`}>
               {statusIcon} {step.status}
             </span>
-            {step.from_step_cache && (
-              <span className="chip !border-accent/30 !text-accent text-[9px]">
-                cached
-              </span>
-            )}
-            {step.nondeterministic && !step.from_step_cache && (
-              <span
-                className="chip !border-warn/30 !text-warn text-[9px]"
-                title="Fresh each run — the per-node cache is bypassed for this step and everything downstream."
-              >
-                live
-              </span>
-            )}
+            <RunStatusChips step={step} variant="card" />
           </div>
           <div className="text-[11px] text-mute">
             {dur.toFixed(2)}s · node <span className="font-mono">{step.node_id}</span>

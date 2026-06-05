@@ -29,6 +29,7 @@ from qiskit import QuantumCircuit, qpy, transpile
 
 from app.config import Settings, ibm_history_cache_path
 from app.schemas import FlowEdge, FlowNode, StepResult
+from app.services.run_cache import qpy_dump_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -85,11 +86,6 @@ _STEP_CACHE_MAX = 200
 _step_cache: OrderedDict[str, tuple[StepResult, dict]] = OrderedDict()
 
 
-# Re-export under the old name so other call sites in this module
-# don't have to change. The canonical implementation lives in
-# run_cache so cache-hash + plugin-payload use identical bytes.
-from app.services.run_cache import qpy_dump_bytes as _qpy_bytes_for_hash  # noqa: E402
-
 
 def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode]) -> str:
     """Hash the pipeline prefix up to and including the last node in
@@ -142,27 +138,27 @@ def _cache_put(
     key: str,
     result: StepResult,
     ctx: dict,
-    prefix_types: set[str] | None = None,
+    prefix_types: set[str],
 ) -> None:
-    # Deep-copy QuantumCircuit objects so that downstream handlers that
-    # mutate in-place (we audited the built-ins and they all defensively
-    # copy now, but a future plugin author may not) can't silently
-    # corrupt the cached snapshot. Other ctx values (backend, floats)
-    # are either immutable or cheap to share by reference.
-    snapshot = {}
-    for k, v in ctx.items():
-        if isinstance(v, QuantumCircuit):
-            snapshot[k] = v.copy()
-        else:
-            snapshot[k] = v
+    """Store ``result`` + a snapshot of ``ctx`` under ``key``.
+
+    QuantumCircuit objects in ctx are deep-copied so that downstream
+    handlers that mutate in-place (built-ins all defensively copy
+    now, but a future plugin author may not) can't silently corrupt
+    the cached snapshot. Other ctx values (backend, floats, lists of
+    primitives) are either immutable or cheap to share by reference.
+
+    ``prefix_types`` is the set of node types covered by this prefix,
+    used by :func:`invalidate_step_cache_for_node_type` to surgically
+    evict on plugin reinstall.
+    """
+    snapshot = {
+        k: v.copy() if isinstance(v, QuantumCircuit) else v
+        for k, v in ctx.items()
+    }
     _step_cache[key] = (result, snapshot)
     _step_cache.move_to_end(key)
-    # Track which node types this prefix covers so plugin reinstalls
-    # can surgically invalidate only the affected entries. None means
-    # 'caller didn't supply' — the entry is still cached but won't be
-    # invalidated by node-type lookup.
-    if prefix_types is not None:
-        _step_cache_node_types[key] = set(prefix_types)
+    _step_cache_node_types[key] = set(prefix_types)
     while len(_step_cache) > _STEP_CACHE_MAX:
         old_key, _ = _step_cache.popitem(last=False)
         _step_cache_node_types.pop(old_key, None)
@@ -260,6 +256,30 @@ def _load_fake_backend(name: str):
     }.get(name, FakeFez)()
 
 
+# ---------- Per-handler shared helpers ----------
+
+# Allowed shot count range. 1 shot is degenerate but legitimate (single
+# sample); 65536 is the largest power-of-two that Aer happily runs
+# without OOM on free HF tier. Outside the range we clamp silently —
+# the user's intent (more / fewer shots) is honoured to the extent we
+# can serve it.
+_MIN_SHOTS, _MAX_SHOTS = 1, 65536
+
+
+def _clamp_shots(node: FlowNode, default: int = 1024) -> int:
+    """Read ``shots`` off a node payload and clamp to the safe range."""
+    raw = node.data.get("shots", default)
+    shots = int(raw) if isinstance(raw, (int, float)) else default
+    return max(_MIN_SHOTS, min(shots, _MAX_SHOTS))
+
+
+def _set_backend_ctx(ctx: dict, backend, *, is_live: bool, shots: int) -> None:
+    """Standard shape for what backend-emitting handlers write to ctx."""
+    ctx["backend"] = backend
+    ctx["backend_is_live"] = is_live
+    ctx["shots"] = shots
+
+
 # ---------- Per-node handlers ----------
 
 def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
@@ -270,9 +290,8 @@ def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> Step
     t0 = _now()
     name_raw = node.data.get("backend_name", "FakeFez")
     # Refuse empty / unknown names with a clear message instead of
-    # silently picking FakeFez — users typo backend names and got
-    # confused that their "FakeBollywood" run mysteriously matched
-    # FakeFez results.
+    # silently picking FakeFez. Typos like "FakeBollywood" used to
+    # match FakeFez results and confuse users about why.
     if not isinstance(name_raw, str) or not name_raw:
         return _make_step(
             node, "error", started_at=t0,
@@ -289,21 +308,13 @@ def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> Step
                 f"Choose one of: {', '.join(_FAKE_BACKENDS_AVAILABLE)}."
             ),
         )
-    name = name_raw
-    # Clamp shots to a sensible range to avoid DOS via "shots=10**9".
-    shots_raw = node.data.get("shots", 1024)
-    shots = int(shots_raw) if isinstance(shots_raw, (int, float)) else 1024
-    shots = max(1, min(shots, 65536))
-    backend = _load_fake_backend(name)
-    ctx["backend"] = backend
-    ctx["backend_is_live"] = False
-    ctx["shots"] = shots
+    shots = _clamp_shots(node)
+    backend = _load_fake_backend(name_raw)
+    _set_backend_ctx(ctx, backend, is_live=False, shots=shots)
     return _make_step(
-        node,
-        "ok",
-        started_at=t0,
+        node, "ok", started_at=t0,
         summary={
-            "backend_name": name,
+            "backend_name": name_raw,
             "num_qubits": backend.configuration().n_qubits,
             "shots": shots,
         },
@@ -312,22 +323,19 @@ def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> Step
 
 def _handle_ibm_backend(node: FlowNode, ctx: dict, settings: Settings) -> StepResult:
     t0 = _now()
-    shots_raw = node.data.get("shots", 1024)
-    shots = int(shots_raw) if isinstance(shots_raw, (int, float)) else 1024
-    shots = max(1, min(shots, 65536))
+    shots = _clamp_shots(node)
+
+    # Live IBM disabled on this deployment: silently downgrade so the
+    # rest of the pipeline still runs against the named fallback fake.
     if not settings.has_ibm_token or not settings.allow_live_ibm:
-        # Silently downgrade to fake so the rest of the pipeline still runs.
         fallback = _load_fake_backend(node.data.get("fallback_backend", "FakeFez"))
-        ctx["backend"] = fallback
-        ctx["backend_is_live"] = False
-        ctx["shots"] = shots
+        _set_backend_ctx(ctx, fallback, is_live=False, shots=shots)
         return _make_step(
-            node,
-            "skipped",
-            started_at=t0,
+            node, "skipped", started_at=t0,
             message="Live IBM call disabled; falling back to FakeFez.",
             summary={"fallback": "FakeFez", "shots": shots},
         )
+
     # Validate the requested backend name up front. IBM's set of live
     # backends is dynamic (depends on the user's plan and IBM's current
     # roster), so we can't enumerate them like the fake backends. The
@@ -364,13 +372,9 @@ def _handle_ibm_backend(node: FlowNode, ctx: dict, settings: Settings) -> StepRe
                 f"{_format_exception_for_user(exc)}"
             ),
         )
-    ctx["backend"] = backend
-    ctx["backend_is_live"] = True
-    ctx["shots"] = shots
+    _set_backend_ctx(ctx, backend, is_live=True, shots=shots)
     return _make_step(
-        node,
-        "ok",
-        started_at=t0,
+        node, "ok", started_at=t0,
         summary={"backend_name": name, "live": True, "shots": shots},
     )
 
@@ -812,7 +816,7 @@ def _handle_plugin(
     # circuit serialized to QPY.
     inputs: dict = {"scalars": {}, "backend_name": None}
     if "circuit" in ctx:
-        inputs["circuit_qpy_bytes"] = _qpy_bytes_for_hash(ctx["circuit"])
+        inputs["circuit_qpy_bytes"] = qpy_dump_bytes(ctx["circuit"])
     if "backend" in ctx and ctx["backend"] is not None:
         # The Qiskit FakeBackend objects have a `.name` attribute the
         # plugin can use; live IBM backends also have one. We pass it
@@ -946,6 +950,168 @@ def topological_order(nodes: list[FlowNode], edges: list[FlowEdge]) -> list[Flow
 
 # ---------- Public entry ----------
 
+def _dispatch_one_node(
+    node: FlowNode,
+    ctx: dict,
+    circuit: QuantumCircuit,
+    settings: Settings,
+    user_id: str | None,
+) -> StepResult:
+    """Compute the StepResult for a single node, with no caching.
+
+    This is the only place that knows how to map a ``node.type`` to an
+    executor — built-in handlers, the user-plugin dispatcher, or the
+    'no handler found' skip. Exceptions from built-in handlers are
+    caught and surfaced through ``_format_exception_for_user``;
+    handlers that fail by *returning* status='error' (the common path
+    for input-validation failures) flow through unmodified.
+    """
+    if node.type == "input_circuit":
+        return _make_step(
+            node, "ok",
+            summary={
+                "num_qubits": circuit.num_qubits,
+                "depth": circuit.depth(),
+                "num_parameters": circuit.num_parameters,
+            },
+            circuit_shape=_shape_of(circuit),
+        )
+
+    handler = _HANDLERS.get(node.type)
+    if handler is not None:
+        try:
+            return handler(node, ctx, settings)
+        except Exception as exc:
+            logger.exception(
+                "Built-in handler %s crashed for node %s", node.type, node.id,
+            )
+            return _make_step(
+                node, "error",
+                message=(
+                    f"The {node.type} block hit an unexpected error: "
+                    f"{_format_exception_for_user(exc)}"
+                ),
+            )
+
+    # Not a built-in — try the user-plugin path if we have a user.
+    if user_id:
+        return _handle_plugin(node, ctx, settings, user_id=user_id)
+
+    return _make_step(
+        node, "skipped",
+        message=f"No handler for node type {node.type!r}",
+    )
+
+
+def _hydrate_user_plugins_if_needed(nodes: list[FlowNode], user_id: str | None) -> None:
+    """Make sure the user's plugins are on disk before dispatch.
+
+    On a freshly-restarted HF Space (or the mirror Space) an
+    authenticated user's plugins live only in HF Datasets until the
+    first reference, so a pipeline that uses them would otherwise hit
+    'plugin not found'. Cheap when nothing to hydrate. Failure is
+    logged but non-fatal — dispatch continues and the missing plugin
+    surfaces as a regular step error.
+    """
+    if not user_id:
+        return
+    has_user_plugin = any(
+        n.type not in _HANDLERS and n.type != "input_circuit" for n in nodes
+    )
+    if not has_user_plugin:
+        return
+    from app.services import plugin_service  # local: avoid import cycle
+    try:
+        plugin_service.hydrate_from_dataset_if_needed(user_id)
+    except Exception:
+        logger.exception("Plugin hydration failed for %s (continuing)", user_id)
+
+
+def _execute_pipeline(
+    *,
+    circuit: QuantumCircuit,
+    nodes: list[FlowNode],
+    edges: list[FlowEdge],
+    settings: Settings,
+    user_id: str | None,
+) -> Generator[StepResult, None, None]:
+    """Single execution loop for a pipeline graph.
+
+    Both :func:`run_pipeline` (eager list) and
+    :func:`run_pipeline_stream` (SSE generator) delegate here. This
+    function:
+
+      * dispatches each node via :func:`_dispatch_one_node`,
+      * stamps the post-step ``circuit_shape`` onto successful results
+        (handlers don't bother — they just mutate ctx),
+      * participates in the in-memory prefix cache,
+      * obeys the sticky 'cache disabled' rule that the first
+        :attr:`StepResult.nondeterministic` step trips for the rest of
+        the run — both this step and every downstream step bypass
+        cache lookup AND put, because caching a single shot draw and
+        replaying it (or restoring a stale ctx that depended on one)
+        is a silent scientific bug,
+      * stops on ``status == 'error'`` so downstream steps don't run
+        on inconsistent ctx,
+      * caches only ``ok`` / ``skipped`` results — error results are
+        often transient and shouldn't pin the prefix.
+    """
+    ctx: dict = {"circuit": circuit}
+    ordered = topological_order(nodes, edges)
+    _hydrate_user_plugins_if_needed(nodes, user_id)
+
+    circuit_qpy = qpy_dump_bytes(circuit)  # expensive; reuse across prefixes
+    nodes_so_far: list[FlowNode] = []
+    cache_disabled = False
+
+    for node in ordered:
+        nodes_so_far.append(node)
+        prefix_key = _prefix_hash(circuit_qpy, nodes_so_far)
+        prefix_types = {n.type for n in nodes_so_far}
+
+        # Cache hit path. A nondeterministic cached entry MUST NEVER
+        # be served (legacy entries from before this rule existed are
+        # actively evicted so they can't haunt future runs).
+        if not cache_disabled and prefix_key in _step_cache:
+            cached_result, cached_ctx = _step_cache[prefix_key]
+            if cached_result.nondeterministic:
+                del _step_cache[prefix_key]
+                _step_cache_node_types.pop(prefix_key, None)
+                cache_disabled = True
+                # Fall through to re-execute.
+            else:
+                ctx.update(cached_ctx)
+                _step_cache.move_to_end(prefix_key)  # LRU refresh
+                yield cached_result.model_copy(update={"from_step_cache": True})
+                continue
+
+        # Cache miss: actually run the node.
+        result = _dispatch_one_node(node, ctx, circuit, settings, user_id)
+
+        # Stamp the post-step circuit shape onto successful results so
+        # the canvas can draw data-flow labels on outgoing edges.
+        if result.status == "ok" and "circuit" in ctx:
+            result = result.model_copy(
+                update={"circuit_shape": _shape_of(ctx["circuit"])},
+            )
+
+        # Disable cache forward of the first nondeterministic step.
+        # Set the flag BEFORE _cache_put so this step itself isn't
+        # written — otherwise a single shot draw would get cached.
+        if result.nondeterministic:
+            cache_disabled = True
+        if not cache_disabled and result.status in ("ok", "skipped"):
+            _cache_put(prefix_key, result, ctx, prefix_types)
+
+        yield result
+
+        # Error stops the chain — downstream steps would silently run
+        # on the previous handler's stale ctx and report misleading
+        # numbers. (skipped does NOT stop; ctx is still valid.)
+        if result.status == "error":
+            break
+
+
 def run_pipeline(
     *,
     circuit: QuantumCircuit,
@@ -954,100 +1120,11 @@ def run_pipeline(
     settings: Settings,
     user_id: str | None = None,
 ) -> list[StepResult]:
-    """Execute the user's pipeline. Returns a StepResult per visited node."""
-    ctx: dict = {"circuit": circuit}
-    steps: list[StepResult] = []
-
-    # If any node in the graph is a plugin and we know the user, make
-    # sure their plugins are hydrated from the HF Datasets backing
-    # store before dispatching. Without this, an authenticated user
-    # running a pipeline on a freshly-restarted Space (or on the OTHER
-    # Space mirroring the same dataset) would see "plugin not found"
-    # even though it's safely in their dataset.
-    if user_id and any(n.type not in _HANDLERS and n.type != "input_circuit" for n in nodes):
-        from app.services import plugin_service
-        try:
-            plugin_service.hydrate_from_dataset_if_needed(user_id)
-        except Exception:
-            logger.exception("Pre-run plugin hydration failed for %s (continuing)", user_id)
-
-    ordered = topological_order(nodes, edges)
-    for node in ordered:
-        if node.type == "input_circuit":
-            steps.append(
-                _make_step(
-                    node,
-                    "ok",
-                    summary={
-                        "num_qubits": circuit.num_qubits,
-                        "depth": circuit.depth(),
-                        "num_parameters": circuit.num_parameters,
-                    },
-                    circuit_shape=_shape_of(circuit),
-                )
-            )
-            continue
-
-        handler = _HANDLERS.get(node.type)
-        if handler is not None:
-            try:
-                step = handler(node, ctx, settings)
-                # Snapshot the circuit's current shape onto the step.
-                # Handlers don't bother setting this themselves —
-                # they just mutate ctx, and we read it here.
-                if step.status == "ok" and "circuit" in ctx:
-                    step = step.model_copy(
-                        update={"circuit_shape": _shape_of(ctx["circuit"])},
-                    )
-                steps.append(step)
-                # A handler that returned status="error" (e.g. QuCAD
-                # raised "needs a backend upstream") must stop the
-                # chain — downstream steps would otherwise execute on
-                # whatever ctx['circuit'] the upstream handed in,
-                # silently producing misleading results. status="skipped"
-                # is fine to continue past (the user is told the block
-                # didn't run, and ctx remains valid).
-                if step.status == "error":
-                    break
-            except Exception as exc:
-                # Log the full traceback server-side; surface the
-                # exception class + first line of str(exc) to the
-                # user so they can self-diagnose without server log
-                # access (a Space deployment has no log surface for
-                # end users). We deliberately keep it to one line —
-                # full tracebacks may contain file paths.
-                logger.exception(
-                    "Built-in handler %s crashed for node %s",
-                    node.type, node.id,
-                )
-                detail = _format_exception_for_user(exc)
-                steps.append(_make_step(
-                    node, "error",
-                    message=(
-                        f"The {node.type} block hit an unexpected error: {detail}"
-                    ),
-                ))
-                break
-            continue
-
-        # Not a built-in — try a user plugin if we have a user_id.
-        if user_id:
-            step = _handle_plugin(node, ctx, settings, user_id=user_id)
-            if step.status == "ok" and "circuit" in ctx:
-                step = step.model_copy(
-                    update={"circuit_shape": _shape_of(ctx["circuit"])},
-                )
-            steps.append(step)
-            if step.status == "error":
-                break
-            continue
-
-        steps.append(_make_step(
-            node, "skipped",
-            message=f"No handler for node type {node.type!r}",
-        ))
-
-    return steps
+    """Eager wrapper: run the pipeline and collect StepResults."""
+    return list(_execute_pipeline(
+        circuit=circuit, nodes=nodes, edges=edges,
+        settings=settings, user_id=user_id,
+    ))
 
 
 def run_pipeline_stream(
@@ -1058,164 +1135,9 @@ def run_pipeline_stream(
     settings: Settings,
     user_id: str | None = None,
 ) -> Generator[StepResult, None, None]:
-    """Generator version of run_pipeline: yields each StepResult as it
-    completes, enabling Server-Sent Events in the route layer.
-
-    Uses an in-memory per-node prefix cache so that unchanged pipeline
-    prefixes resolve instantly. If the user changes only the last block
-    and re-runs, all preceding steps are served from cache (~0 ms each)
-    instead of re-executing (which can take minutes for QuBound/Qshot).
-
-    When ``user_id`` is provided, unknown node types are dispatched to
-    the per-user plugin registry (see services/plugin_service.py).
-    Plugin steps participate in the cache: the prefix hash includes
-    the plugin's kind + params, so re-running with the same plugin
-    settings hits the cache; modifying the plugin's params (or
-    re-uploading) busts only the suffix.
-    """
-    ctx: dict = {"circuit": circuit}
-    ordered = topological_order(nodes, edges)
-
-    # Same hydration as run_pipeline — without this, a logged-in user
-    # running a pipeline on a freshly-restarted Space or on the OTHER
-    # mirror Space would see "plugin not found" even though it sits
-    # in their HF Datasets backing store.
-    if user_id and any(n.type not in _HANDLERS and n.type != "input_circuit" for n in nodes):
-        from app.services import plugin_service
-        try:
-            plugin_service.hydrate_from_dataset_if_needed(user_id)
-        except Exception:
-            logger.exception("Pre-stream plugin hydration failed for %s (continuing)", user_id)
-
-    # Compute the circuit's QPY hash once (expensive) — reused for
-    # every prefix hash in this run.
-    circuit_qpy = _qpy_bytes_for_hash(circuit)
-    nodes_so_far: list[FlowNode] = []
-    # Sticky flag: once a step emits nondeterministic=True (e.g.
-    # sampled fidelity), the in-memory prefix cache must stop
-    # participating for the rest of the run. Reasons:
-    #   * THIS step's result is fresh-each-run by design; caching it
-    #     would freeze a single shot draw and replay it.
-    #   * EVERY downstream step's prefix hash would match a previous
-    #     run's, but the ctx it depends on (e.g. ctx['fidelity']) is
-    #     stale, so a lookup hit would restore a contradictory state.
-    cache_disabled_for_tail = False
-
-    for node in ordered:
-        nodes_so_far.append(node)
-        prefix_key = _prefix_hash(circuit_qpy, nodes_so_far)
-        prefix_types = {n.type for n in nodes_so_far}
-
-        # ---- cache hit: return saved result + restore ctx ----
-        # A cached entry that is itself nondeterministic must NEVER
-        # be served — it'd be the same scientific bug we're fixing.
-        # This guards against (a) legacy entries from before this
-        # fix, and (b) any future handler that retroactively flips
-        # nondeterministic on. We evict and re-execute.
-        if not cache_disabled_for_tail and prefix_key in _step_cache:
-            cached_result, cached_ctx = _step_cache[prefix_key]
-            if cached_result.nondeterministic:
-                logger.debug(
-                    "Step cache EVICT (nondet legacy) %s (%s)",
-                    node.type, prefix_key[:8],
-                )
-                del _step_cache[prefix_key]
-                cache_disabled_for_tail = True
-                # Fall through to the miss path.
-            else:
-                ctx.update(cached_ctx)
-                _step_cache.move_to_end(prefix_key)  # refresh LRU
-                logger.debug("Step cache HIT for %s (%s)", node.type, prefix_key[:8])
-                yield cached_result.model_copy(update={"from_step_cache": True})
-                continue
-
-        # ---- cache miss: execute the step ----
-        logger.debug("Step cache MISS for %s (%s)", node.type, prefix_key[:8])
-
-        if node.type == "input_circuit":
-            result = _make_step(
-                node,
-                "ok",
-                summary={
-                    "num_qubits": circuit.num_qubits,
-                    "depth": circuit.depth(),
-                    "num_parameters": circuit.num_parameters,
-                },
-                circuit_shape=_shape_of(circuit),
-            )
-            if not cache_disabled_for_tail:
-                _cache_put(prefix_key, result, ctx, prefix_types)
-            yield result
-            continue
-
-        handler = _HANDLERS.get(node.type)
-        if handler is not None:
-            try:
-                result = handler(node, ctx, settings)
-                if result.status == "ok" and "circuit" in ctx:
-                    result = result.model_copy(
-                        update={"circuit_shape": _shape_of(ctx["circuit"])},
-                    )
-                # A nondeterministic step (e.g. sampled fidelity) trips
-                # the sticky flag so this step itself AND any
-                # downstream step in the same run no longer write to
-                # the cache, AND future runs of the same prefix won't
-                # lookup-hit a stale draw. Crucially the flag is set
-                # BEFORE _cache_put so the nondeterministic step's
-                # own result is also not written.
-                if result.nondeterministic:
-                    cache_disabled_for_tail = True
-                if not cache_disabled_for_tail:
-                    _cache_put(prefix_key, result, ctx, prefix_types)
-                yield result
-                # Same break-on-error policy as run_pipeline above:
-                # status="error" stops the chain so downstream steps
-                # don't silently execute on stale ctx.
-                if result.status == "error":
-                    break
-            except Exception as exc:
-                # Same policy as run_pipeline above: log traceback +
-                # surface the exception class + first line of message.
-                logger.exception(
-                    "Built-in handler %s crashed (stream) for node %s",
-                    node.type, node.id,
-                )
-                detail = _format_exception_for_user(exc)
-                result = _make_step(
-                    node, "error",
-                    message=(
-                        f"The {node.type} block hit an unexpected error: {detail}"
-                    ),
-                )
-                yield result
-                break
-            continue
-
-        # Not a built-in — plugin dispatch path.
-        if user_id:
-            result = _handle_plugin(node, ctx, settings, user_id=user_id)
-            if result.status == "ok" and "circuit" in ctx:
-                result = result.model_copy(
-                    update={"circuit_shape": _shape_of(ctx["circuit"])},
-                )
-            # Flag first so a plugin marking itself nondeterministic
-            # is treated like sampled fidelity: its own result isn't
-            # cached, and nothing downstream is.
-            if result.nondeterministic:
-                cache_disabled_for_tail = True
-            # Only cache successful plugin runs so a transient crash
-            # doesn't get pinned to the prefix, and respect the flag.
-            if result.status == "ok" and not cache_disabled_for_tail:
-                _cache_put(prefix_key, result, ctx, prefix_types)
-            yield result
-            if result.status == "error":
-                break
-            continue
-
-        result = _make_step(
-            node, "skipped",
-            message=f"No handler for node type {node.type!r}",
-        )
-        if not cache_disabled_for_tail:
-            _cache_put(prefix_key, result, ctx, prefix_types)
-        yield result
+    """Streaming wrapper for the SSE route. Yields each StepResult as
+    soon as it completes so the UI can show progressive output."""
+    yield from _execute_pipeline(
+        circuit=circuit, nodes=nodes, edges=edges,
+        settings=settings, user_id=user_id,
+    )
