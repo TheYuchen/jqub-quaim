@@ -79,11 +79,6 @@ def qpy_dump_bytes(qc: QuantumCircuit) -> bytes:
     return buf.getvalue()
 
 
-# Backward-compatible private alias for the older name (only one
-# call site, but keep both visible for one cycle).
-_qpy_bytes = qpy_dump_bytes
-
-
 def compute_cache_key(
     circuit: QuantumCircuit,
     nodes: Iterable[FlowNode | dict[str, Any]],
@@ -92,7 +87,7 @@ def compute_cache_key(
 ) -> str:
     """Hash the semantic content of a run request into a short hex key."""
     h = hashlib.sha256()
-    h.update(_qpy_bytes(circuit))
+    h.update(qpy_dump_bytes(circuit))
     payload = {
         "nodes": [_normalize_node(n) for n in nodes],
         "edges": [_normalize_edge(e) for e in edges],

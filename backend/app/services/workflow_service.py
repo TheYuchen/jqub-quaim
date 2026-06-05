@@ -20,6 +20,7 @@ import hashlib
 import io
 import json
 import logging
+import re
 import time
 from collections import OrderedDict
 from typing import Callable, Generator
@@ -30,6 +31,39 @@ from app.config import Settings, ibm_history_cache_path
 from app.schemas import FlowEdge, FlowNode, StepResult
 
 logger = logging.getLogger(__name__)
+
+
+# ---- Enums + scale limits referenced by handlers below -------------------
+#
+# Kept module-level so they're trivially discoverable from outside (tests,
+# tooling) and so the allowed-value lists in user-facing error messages
+# stay in lock-step with the runtime branches.
+
+# Fake backends we ship support for. Anything else is rejected with an
+# actionable error (rather than silently coerced to FakeFez, which used to
+# eat typos like "FakeBollywood" without telling the user).
+_FAKE_BACKENDS_AVAILABLE: tuple[str, ...] = ("FakeFez", "FakeMarrakesh", "FakeTorino")
+
+# Fidelity estimator choices. `statevector` is the noiseless analytic
+# fidelity; `sampled` runs the circuit on the upstream backend with N
+# shots and reports the observed |0...0> fraction.
+_FIDELITY_METHODS: frozenset[str] = frozenset({"statevector", "sampled"})
+
+# How Fidelity handles unbound parameters: silently bind to zero (matches
+# QuBound's convention, good demo default), or refuse with an actionable
+# error directing the user to bind upstream.
+_FIDELITY_UNBOUND_POLICIES: frozenset[str] = frozenset({"bind_zero", "error"})
+
+# CompressVQC builds a QUBO with `num_rotation_instances * theta_grid_size`
+# binary variables and feeds it to QAOA on a state-vector simulator.
+# Anything past ~25 qubits exhausts memory ("Maximum allowed dimension
+# exceeded"). 22 leaves headroom; a 22-qubit statevector is ~64 MB.
+_COMPVQC_MAX_QP_VARS: int = 22
+
+# Rotation gate names CompressVQC considers compressible. Mirrors
+# qlib.compvqc.VQC_GATE_TYPES. Kept here so the user-facing scale-guard
+# message can count instances without importing the heavy module.
+_COMPVQC_ROTATION_GATES: frozenset[str] = frozenset({"ry", "rx", "rz", "p"})
 
 
 def _now() -> float:
@@ -110,9 +144,11 @@ def _cache_put(
     ctx: dict,
     prefix_types: set[str] | None = None,
 ) -> None:
-    # Deep-copy QuantumCircuit objects to prevent a future handler that
-    # mutates in-place from silently corrupting the cached snapshot.
-    # Other ctx values (backend, floats) are either immutable or cheap.
+    # Deep-copy QuantumCircuit objects so that downstream handlers that
+    # mutate in-place (we audited the built-ins and they all defensively
+    # copy now, but a future plugin author may not) can't silently
+    # corrupt the cached snapshot. Other ctx values (backend, floats)
+    # are either immutable or cheap to share by reference.
     snapshot = {}
     for k, v in ctx.items():
         if isinstance(v, QuantumCircuit):
@@ -183,10 +219,10 @@ def _format_exception_for_user(exc: BaseException) -> str:
     raw = str(exc).strip()
     first_line = raw.splitlines()[0] if raw else ""
     # Strip absolute /paths/... that frequently appear in qiskit /
-    # numpy errors, replace with <path>.
-    import re
+    # numpy errors, replace with <path>. (re imported at module top.)
     sanitised = re.sub(r"(?:/[\w.-]+)+\.\w+", "<path>", first_line)
-    sanitised = sanitised[:240].rstrip() + ("…" if len(sanitised) > 240 else "")
+    if len(sanitised) > 240:
+        sanitised = sanitised[:240].rstrip() + "…"
     return f"{cls}: {sanitised}" if sanitised else cls
 
 
@@ -204,11 +240,17 @@ def _default_label(node_type: str) -> str:
     }.get(node_type, node_type)
 
 
-_FAKE_BACKENDS_AVAILABLE = ("FakeFez", "FakeMarrakesh", "FakeTorino")
-
-
 def _load_fake_backend(name: str):
-    """Lazy-import a fake backend by name; falls back to FakeFez."""
+    """Lazy-import a fake backend by name; falls back to FakeFez on
+    unknown values. Callers that want the strict behavior (refuse
+    unknown names) should validate against ``_FAKE_BACKENDS_AVAILABLE``
+    first — this function is the soft-fallback used by other handlers
+    (e.g. QuCAD) that need *some* backend even when the user hasn't
+    wired one up.
+
+    The supported names here must stay in sync with
+    ``_FAKE_BACKENDS_AVAILABLE`` at the top of the module.
+    """
     from qiskit_ibm_runtime.fake_provider import FakeFez, FakeMarrakesh, FakeTorino
 
     return {
@@ -216,10 +258,6 @@ def _load_fake_backend(name: str):
         "FakeMarrakesh": FakeMarrakesh,
         "FakeTorino": FakeTorino,
     }.get(name, FakeFez)()
-
-
-def _is_known_fake_backend(name: str) -> bool:
-    return name in _FAKE_BACKENDS_AVAILABLE
 
 
 # ---------- Per-node handlers ----------
@@ -239,16 +277,16 @@ def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> Step
         return _make_step(
             node, "error", started_at=t0,
             message=(
-                f"Backend name must be a non-empty string. Allowed values: "
-                f"{', '.join(_FAKE_BACKENDS_AVAILABLE)}."
+                f"Backend name must be a non-empty string. "
+                f"Choose one of: {', '.join(_FAKE_BACKENDS_AVAILABLE)}."
             ),
         )
-    if not _is_known_fake_backend(name_raw):
+    if name_raw not in _FAKE_BACKENDS_AVAILABLE:
         return _make_step(
             node, "error", started_at=t0,
             message=(
-                f"Unknown fake backend {name_raw!r}. Allowed values: "
-                f"{', '.join(_FAKE_BACKENDS_AVAILABLE)}."
+                f"Unknown fake backend {name_raw!r}. "
+                f"Choose one of: {', '.join(_FAKE_BACKENDS_AVAILABLE)}."
             ),
         )
     name = name_raw
@@ -290,6 +328,22 @@ def _handle_ibm_backend(node: FlowNode, ctx: dict, settings: Settings) -> StepRe
             message="Live IBM call disabled; falling back to FakeFez.",
             summary={"fallback": "FakeFez", "shots": shots},
         )
+    # Validate the requested backend name up front. IBM's set of live
+    # backends is dynamic (depends on the user's plan and IBM's current
+    # roster), so we can't enumerate them like the fake backends. The
+    # most we can do is refuse empty / non-string values and surface a
+    # clear error if the IBM service rejects the lookup.
+    name_raw = node.data.get("backend_name", "ibm_fez")
+    if not isinstance(name_raw, str) or not name_raw.strip():
+        return _make_step(
+            node, "error", started_at=t0,
+            message=(
+                "Live IBM backend name must be a non-empty string "
+                "(e.g. 'ibm_fez', 'ibm_torino', 'ibm_marrakesh')."
+            ),
+        )
+    name = name_raw.strip()
+
     from qiskit_ibm_runtime import QiskitRuntimeService
 
     service = QiskitRuntimeService(
@@ -297,8 +351,19 @@ def _handle_ibm_backend(node: FlowNode, ctx: dict, settings: Settings) -> StepRe
         token=settings.ibm_token,
         plans_preference=["open"],
     )
-    name = node.data.get("backend_name", "ibm_fez")
-    backend = service.backend(name)
+    try:
+        backend = service.backend(name)
+    except Exception as exc:
+        # IBM raises various exception types for unknown / unavailable
+        # backends; collapse them into a single user-facing message
+        # with the underlying reason so the user can react.
+        return _make_step(
+            node, "error", started_at=t0,
+            message=(
+                f"IBM service could not resolve backend {name!r}: "
+                f"{_format_exception_for_user(exc)}"
+            ),
+        )
     ctx["backend"] = backend
     ctx["backend_is_live"] = True
     ctx["shots"] = shots
@@ -364,12 +429,13 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
     qc: QuantumCircuit = ctx["circuit"]
     backend = ctx.get("backend")
 
-    # Bind any free parameters with zeros so Aer can simulate them.
-    # Also defensively copy so downstream steps see the same circuit
-    # we received — qbound's internals attach measurements while
-    # building training labels, and if we didn't deep-copy that
-    # mutation would leak into ctx['circuit'] and break Qshot /
-    # Fidelity / Output for the rest of the pipeline.
+    # Always work on a private copy so downstream steps see the same
+    # circuit we received. qbound's training-label builder used to
+    # attach measurements directly to the caller's circuit; the qlib
+    # function itself was patched to copy, but we belt-and-suspenders
+    # at the handler boundary in case a future qlib refactor regresses.
+    # assign_parameters already returns a fresh circuit when params
+    # exist; we only need an explicit copy on the no-params branch.
     if qc.num_parameters > 0:
         qc = qc.assign_parameters([0.0] * qc.num_parameters)
     else:
@@ -471,19 +537,18 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
     qp = quadraticProgram_luttoqp(qc, lut)
     # Scale guard. CompressVQC solves the QUBO via QAOA on a state-
     # vector simulator. QAOA needs one qubit per binary variable, so
-    # the statevector grows as 2^(num_vars). Anything past ~25 vars
-    # exhausts memory ("Maximum allowed dimension exceeded" from
-    # numpy). Skip cleanly with an actionable message rather than
-    # crashing 30 s into the run.
+    # the statevector grows as 2^(num_vars). Past ~25 vars numpy
+    # refuses with "Maximum allowed dimension exceeded". Skip cleanly
+    # rather than crashing 30 s into the run. The threshold lives in
+    # _COMPVQC_MAX_QP_VARS at the top of this module.
     n_vars = qp.get_num_vars()
-    COMPVQC_MAX_VARS = 22  # 2^22 ≈ 4M complex = 64 MB
-    if n_vars > COMPVQC_MAX_VARS:
+    if n_vars > _COMPVQC_MAX_QP_VARS:
         # Count actual parametric rotation INSTANCES (not unique
         # Parameter objects) so the message stays meaningful when a
         # single Parameter is reused across many gates.
         n_instances = sum(
             1 for inst in qc.data
-            if inst.operation.name in {"ry", "rx", "rz", "p"}
+            if inst.operation.name in _COMPVQC_ROTATION_GATES
         )
         return _make_step(
             node,
@@ -493,7 +558,7 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
                 f"CompressVQC would build a {n_vars}-binary-variable QUBO "
                 f"from {n_instances} parameterised rotation gate instance(s) "
                 f"in this circuit, and the underlying QAOA solver runs on a "
-                f"state-vector simulator capped near {COMPVQC_MAX_VARS} "
+                f"state-vector simulator capped near {_COMPVQC_MAX_QP_VARS} "
                 f"qubits. Try a circuit with fewer parameterised rotations "
                 f"(e.g. fewer reps in EfficientSU2 / a smaller HEA), or "
                 f"split the circuit and compress per-block."
@@ -502,7 +567,7 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
                 "lut_size": len(lut),
                 "num_qp_vars": n_vars,
                 "num_rotation_instances": n_instances,
-                "qaoa_max_vars": COMPVQC_MAX_VARS,
+                "qaoa_max_vars": _COMPVQC_MAX_QP_VARS,
             },
         )
     result = admmOptimizedCompVQC(qp)
@@ -629,8 +694,6 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
 
     # Validate enums explicitly. Silently coercing "banana" → statevector
     # produced confusing UX (user saw a value they didn't ask for).
-    _FIDELITY_METHODS = {"statevector", "sampled"}
-    _FIDELITY_POLICIES = {"bind_zero", "error"}
     if method not in _FIDELITY_METHODS:
         return _make_step(
             node, "error", started_at=t0,
@@ -639,12 +702,12 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
                 f"Choose one of: {', '.join(sorted(_FIDELITY_METHODS))}."
             ),
         )
-    if unbound_policy not in _FIDELITY_POLICIES:
+    if unbound_policy not in _FIDELITY_UNBOUND_POLICIES:
         return _make_step(
             node, "error", started_at=t0,
             message=(
                 f"Unknown unbound_param_policy {unbound_policy!r}. "
-                f"Choose one of: {', '.join(sorted(_FIDELITY_POLICIES))}."
+                f"Choose one of: {', '.join(sorted(_FIDELITY_UNBOUND_POLICIES))}."
             ),
         )
 
