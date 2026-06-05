@@ -72,7 +72,44 @@ def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode]) -> str:
     return h.hexdigest()[:16]
 
 
-def _cache_put(key: str, result: StepResult, ctx: dict) -> None:
+def invalidate_step_cache_for_node_type(node_type: str) -> int:
+    """Drop every in-memory step-cache entry whose pipeline prefix
+    contains a node of the given type. Called from
+    plugin_service.install_plugin_zip after (re-)installing a plugin
+    so a code change is reflected immediately instead of being masked
+    by a stale cache entry from the previous version.
+
+    Returns the number of entries evicted. We can't be surgical about
+    "only the prefix that includes the changed plugin" because the
+    cache stores the prefix HASH, not the prefix node list. The
+    blast-radius approach (drop any entry that mentions the kind)
+    deletes a few extra entries but is correct.
+
+    Implementation note: we lazily re-key the cache by tracking which
+    node types each entry's prefix covered in a sidecar set.
+    """
+    evicted = 0
+    for k in list(_step_cache.keys()):
+        # The sidecar set is populated by _cache_put.
+        types = _step_cache_node_types.get(k, set())
+        if node_type in types:
+            _step_cache.pop(k, None)
+            _step_cache_node_types.pop(k, None)
+            evicted += 1
+    return evicted
+
+
+# Sidecar map: prefix_key → set of node.types covered by this prefix.
+# Populated by _cache_put; consulted by invalidate_step_cache_for_node_type.
+_step_cache_node_types: dict[str, set[str]] = {}
+
+
+def _cache_put(
+    key: str,
+    result: StepResult,
+    ctx: dict,
+    prefix_types: set[str] | None = None,
+) -> None:
     # Deep-copy QuantumCircuit objects to prevent a future handler that
     # mutates in-place from silently corrupting the cached snapshot.
     # Other ctx values (backend, floats) are either immutable or cheap.
@@ -84,8 +121,15 @@ def _cache_put(key: str, result: StepResult, ctx: dict) -> None:
             snapshot[k] = v
     _step_cache[key] = (result, snapshot)
     _step_cache.move_to_end(key)
+    # Track which node types this prefix covers so plugin reinstalls
+    # can surgically invalidate only the affected entries. None means
+    # 'caller didn't supply' — the entry is still cached but won't be
+    # invalidated by node-type lookup.
+    if prefix_types is not None:
+        _step_cache_node_types[key] = set(prefix_types)
     while len(_step_cache) > _STEP_CACHE_MAX:
-        _step_cache.popitem(last=False)
+        old_key, _ = _step_cache.popitem(last=False)
+        _step_cache_node_types.pop(old_key, None)
 
 
 def _make_step(
@@ -997,6 +1041,7 @@ def run_pipeline_stream(
     for node in ordered:
         nodes_so_far.append(node)
         prefix_key = _prefix_hash(circuit_qpy, nodes_so_far)
+        prefix_types = {n.type for n in nodes_so_far}
 
         # ---- cache hit: return saved result + restore ctx ----
         # A cached entry that is itself nondeterministic must NEVER
@@ -1036,7 +1081,7 @@ def run_pipeline_stream(
                 circuit_shape=_shape_of(circuit),
             )
             if not cache_disabled_for_tail:
-                _cache_put(prefix_key, result, ctx)
+                _cache_put(prefix_key, result, ctx, prefix_types)
             yield result
             continue
 
@@ -1058,7 +1103,7 @@ def run_pipeline_stream(
                 if result.nondeterministic:
                     cache_disabled_for_tail = True
                 if not cache_disabled_for_tail:
-                    _cache_put(prefix_key, result, ctx)
+                    _cache_put(prefix_key, result, ctx, prefix_types)
                 yield result
                 # Same break-on-error policy as run_pipeline above:
                 # status="error" stops the chain so downstream steps
@@ -1098,7 +1143,7 @@ def run_pipeline_stream(
             # Only cache successful plugin runs so a transient crash
             # doesn't get pinned to the prefix, and respect the flag.
             if result.status == "ok" and not cache_disabled_for_tail:
-                _cache_put(prefix_key, result, ctx)
+                _cache_put(prefix_key, result, ctx, prefix_types)
             yield result
             if result.status == "error":
                 break
@@ -1109,5 +1154,5 @@ def run_pipeline_stream(
             message=f"No handler for node type {node.type!r}",
         )
         if not cache_disabled_for_tail:
-            _cache_put(prefix_key, result, ctx)
+            _cache_put(prefix_key, result, ctx, prefix_types)
         yield result

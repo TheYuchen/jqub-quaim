@@ -393,6 +393,21 @@ def install_plugin_zip(
 
     logger.info("Installed plugin %s/%s", user_id, manifest.kind)
 
+    # Re-uploading a plugin with the same kind+params would otherwise
+    # hit stale cache entries pinned to the previous code. Invalidate
+    # every prefix-cache entry whose prefix included this kind.
+    try:
+        from app.services.workflow_service import invalidate_step_cache_for_node_type
+        n_evicted = invalidate_step_cache_for_node_type(manifest.kind)
+        if n_evicted:
+            logger.info(
+                "Evicted %d step-cache entries for plugin kind %r after re-install",
+                n_evicted, manifest.kind,
+            )
+    except Exception:
+        # Cache invalidation is best-effort; don't fail an install for it.
+        logger.exception("Plugin cache invalidation failed (non-fatal)")
+
     # Mirror to the HF Datasets backing store so authenticated users'
     # plugins survive container restarts. No-op for anon users.
     if not _skip_dataset_sync:
