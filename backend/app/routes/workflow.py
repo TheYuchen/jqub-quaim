@@ -70,13 +70,19 @@ def run_workflow(req: RunRequest, request: Request) -> RunResponse:
         if cached is not None:
             return cached
 
-    steps = run_pipeline(
-        circuit=qc,
-        nodes=req.nodes,
-        edges=req.edges,
-        settings=settings,
-        user_id=effective_user_id,
-    )
+    try:
+        steps = run_pipeline(
+            circuit=qc,
+            nodes=req.nodes,
+            edges=req.edges,
+            settings=settings,
+            user_id=effective_user_id,
+        )
+    except ValueError as exc:
+        # topological_order raises ValueError for cycles / bad graphs.
+        # Surface as 422 instead of a generic 500 so the user sees the
+        # actual diagnosis.
+        raise HTTPException(status_code=422, detail=str(exc)) from None
 
     ok = all(s.status != "error" for s in steps)
     final_metrics: dict = {}
@@ -126,7 +132,18 @@ def run_workflow_stream(req: RunRequest, request: Request):
                 yield "data: [CACHED]\n\n"
             return StreamingResponse(cached_stream(), media_type="text/event-stream")
 
-    # Cache miss → stream steps one by one.
+    # Cache miss → stream steps one by one. We pre-flight the
+    # topological sort up here so a cyclic / malformed graph gets
+    # a clean 422 instead of a 500 inside the streaming response
+    # (where the client would see an empty body and no diagnosis).
+    try:
+        # Cheap: just exercises the same ordering call that
+        # run_pipeline_stream does first.
+        from app.services.workflow_service import topological_order
+        topological_order(req.nodes, req.edges)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
     def step_stream():
         for step in run_pipeline_stream(
             circuit=qc, nodes=req.nodes, edges=req.edges,
