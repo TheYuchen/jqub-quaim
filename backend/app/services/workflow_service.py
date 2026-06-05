@@ -399,22 +399,30 @@ def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResul
     n_vars = qp.get_num_vars()
     COMPVQC_MAX_VARS = 22  # 2^22 ≈ 4M complex = 64 MB
     if n_vars > COMPVQC_MAX_VARS:
+        # Count actual parametric rotation INSTANCES (not unique
+        # Parameter objects) so the message stays meaningful when a
+        # single Parameter is reused across many gates.
+        n_instances = sum(
+            1 for inst in qc.data
+            if inst.operation.name in {"ry", "rx", "rz", "p"}
+        )
         return _make_step(
             node,
             "skipped",
             started_at=t0,
             message=(
                 f"CompressVQC would build a {n_vars}-binary-variable QUBO "
-                f"({qc.num_parameters} rotations × {n_vars // max(1, qc.num_parameters)} "
-                f"theta candidates), and the underlying QAOA solver runs on a "
-                f"state-vector simulator capped near {COMPVQC_MAX_VARS} qubits. "
-                f"Try a circuit with fewer parameterised rotations (e.g. fewer "
-                f"reps in EfficientSU2 / a smaller HEA), or split the circuit "
-                f"and compress per-block."
+                f"from {n_instances} parameterised rotation gate instance(s) "
+                f"in this circuit, and the underlying QAOA solver runs on a "
+                f"state-vector simulator capped near {COMPVQC_MAX_VARS} "
+                f"qubits. Try a circuit with fewer parameterised rotations "
+                f"(e.g. fewer reps in EfficientSU2 / a smaller HEA), or "
+                f"split the circuit and compress per-block."
             ),
             summary={
                 "lut_size": len(lut),
                 "num_qp_vars": n_vars,
+                "num_rotation_instances": n_instances,
                 "qaoa_max_vars": COMPVQC_MAX_VARS,
             },
         )
