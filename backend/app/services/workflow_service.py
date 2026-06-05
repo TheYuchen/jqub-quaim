@@ -160,6 +160,9 @@ def _default_label(node_type: str) -> str:
     }.get(node_type, node_type)
 
 
+_FAKE_BACKENDS_AVAILABLE = ("FakeFez", "FakeMarrakesh", "FakeTorino")
+
+
 def _load_fake_backend(name: str):
     """Lazy-import a fake backend by name; falls back to FakeFez."""
     from qiskit_ibm_runtime.fake_provider import FakeFez, FakeMarrakesh, FakeTorino
@@ -171,6 +174,10 @@ def _load_fake_backend(name: str):
     }.get(name, FakeFez)()
 
 
+def _is_known_fake_backend(name: str) -> bool:
+    return name in _FAKE_BACKENDS_AVAILABLE
+
+
 # ---------- Per-node handlers ----------
 
 def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
@@ -179,7 +186,28 @@ def _handle_fake_backend(node: FlowNode, ctx: dict, _settings: Settings) -> Step
     actually run measurements (e.g. Fidelity in `sampled` mode) can
     pick it up from ctx without each having its own shots param."""
     t0 = _now()
-    name = node.data.get("backend_name", "FakeFez")
+    name_raw = node.data.get("backend_name", "FakeFez")
+    # Refuse empty / unknown names with a clear message instead of
+    # silently picking FakeFez — users typo backend names and got
+    # confused that their "FakeBollywood" run mysteriously matched
+    # FakeFez results.
+    if not isinstance(name_raw, str) or not name_raw:
+        return _make_step(
+            node, "error", started_at=t0,
+            message=(
+                f"Backend name must be a non-empty string. Allowed values: "
+                f"{', '.join(_FAKE_BACKENDS_AVAILABLE)}."
+            ),
+        )
+    if not _is_known_fake_backend(name_raw):
+        return _make_step(
+            node, "error", started_at=t0,
+            message=(
+                f"Unknown fake backend {name_raw!r}. Allowed values: "
+                f"{', '.join(_FAKE_BACKENDS_AVAILABLE)}."
+            ),
+        )
+    name = name_raw
     # Clamp shots to a sensible range to avoid DOS via "shots=10**9".
     shots_raw = node.data.get("shots", 1024)
     shots = int(shots_raw) if isinstance(shots_raw, (int, float)) else 1024
@@ -554,6 +582,27 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
 
     method = node.data.get("method", "statevector")
     unbound_policy = node.data.get("unbound_param_policy", "bind_zero")
+
+    # Validate enums explicitly. Silently coercing "banana" → statevector
+    # produced confusing UX (user saw a value they didn't ask for).
+    _FIDELITY_METHODS = {"statevector", "sampled"}
+    _FIDELITY_POLICIES = {"bind_zero", "error"}
+    if method not in _FIDELITY_METHODS:
+        return _make_step(
+            node, "error", started_at=t0,
+            message=(
+                f"Unknown fidelity method {method!r}. "
+                f"Choose one of: {', '.join(sorted(_FIDELITY_METHODS))}."
+            ),
+        )
+    if unbound_policy not in _FIDELITY_POLICIES:
+        return _make_step(
+            node, "error", started_at=t0,
+            message=(
+                f"Unknown unbound_param_policy {unbound_policy!r}. "
+                f"Choose one of: {', '.join(sorted(_FIDELITY_POLICIES))}."
+            ),
+        )
 
     try:
         if method == "sampled":
