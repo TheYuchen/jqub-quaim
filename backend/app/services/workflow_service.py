@@ -844,6 +844,15 @@ def run_pipeline(
                         update={"circuit_shape": _shape_of(ctx["circuit"])},
                     )
                 steps.append(step)
+                # A handler that returned status="error" (e.g. QuCAD
+                # raised "needs a backend upstream") must stop the
+                # chain — downstream steps would otherwise execute on
+                # whatever ctx['circuit'] the upstream handed in,
+                # silently producing misleading results. status="skipped"
+                # is fine to continue past (the user is told the block
+                # didn't run, and ctx remains valid).
+                if step.status == "error":
+                    break
             except Exception as exc:
                 # Log the full traceback server-side; surface the
                 # exception class + first line of str(exc) to the
@@ -1002,6 +1011,11 @@ def run_pipeline_stream(
                 if not cache_disabled_for_tail:
                     _cache_put(prefix_key, result, ctx)
                 yield result
+                # Same break-on-error policy as run_pipeline above:
+                # status="error" stops the chain so downstream steps
+                # don't silently execute on stale ctx.
+                if result.status == "error":
+                    break
             except Exception as exc:
                 # Same policy as run_pipeline above: log traceback +
                 # surface the exception class + first line of message.
