@@ -79,6 +79,11 @@ export interface StepResult {
   figures?: Array<Record<string, unknown>> | null;
   /** Shape of the circuit AFTER this step ran. */
   circuit_shape?: CircuitShape | null;
+  /** True when this step's output is intentionally fresh-each-run
+   *  (e.g. sampled fidelity with N shots). The streaming executor
+   *  refuses to cache the result, and the UI can surface a small
+   *  "Live each run" chip so users know what to expect. */
+  nondeterministic?: boolean;
 }
 
 export interface RunResponse {

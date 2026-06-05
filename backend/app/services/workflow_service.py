@@ -521,7 +521,13 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
 
     ctx["fidelity"] = float(fid)
     summary: dict = {"fidelity": float(fid), **meta}
-    return _make_step(node, "ok", started_at=t0, summary=summary)
+    step = _make_step(node, "ok", started_at=t0, summary=summary)
+    # Sampled fidelity draws fresh shots every run — caching one draw
+    # and replaying it would silently lie about the noise variance.
+    # Statevector is fully deterministic and stays cacheable.
+    if method == "sampled":
+        step = step.model_copy(update={"nondeterministic": True})
+    return step
 
 
 def _handle_output(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
@@ -853,17 +859,31 @@ def run_pipeline_stream(
     # every prefix hash in this run.
     circuit_qpy = _qpy_bytes_for_hash(circuit)
     nodes_so_far: list[FlowNode] = []
+    # Sticky flag: once a step emits nondeterministic=True (e.g.
+    # sampled fidelity), the in-memory prefix cache must stop
+    # participating for the rest of the run. Reasons:
+    #   * THIS step's result is fresh-each-run by design; caching it
+    #     would freeze a single shot draw and replay it.
+    #   * EVERY downstream step's prefix hash would match a previous
+    #     run's, but the ctx it depends on (e.g. ctx['fidelity']) is
+    #     stale, so a lookup hit would restore a contradictory state.
+    cache_disabled_for_tail = False
 
     for node in ordered:
         nodes_so_far.append(node)
         prefix_key = _prefix_hash(circuit_qpy, nodes_so_far)
 
         # ---- cache hit: return saved result + restore ctx ----
-        if prefix_key in _step_cache:
+        if not cache_disabled_for_tail and prefix_key in _step_cache:
             cached_result, cached_ctx = _step_cache[prefix_key]
             ctx.update(cached_ctx)
             _step_cache.move_to_end(prefix_key)  # refresh LRU
             logger.debug("Step cache HIT for %s (%s)", node.type, prefix_key[:8])
+            # If a cached step was itself nondeterministic (e.g. an
+            # OLD cache entry from before this fix), trip the flag
+            # so downstream prefixes don't get served stale either.
+            if cached_result.nondeterministic:
+                cache_disabled_for_tail = True
             yield cached_result.model_copy(update={"from_step_cache": True})
             continue
 
@@ -881,7 +901,8 @@ def run_pipeline_stream(
                 },
                 circuit_shape=_shape_of(circuit),
             )
-            _cache_put(prefix_key, result, ctx)
+            if not cache_disabled_for_tail:
+                _cache_put(prefix_key, result, ctx)
             yield result
             continue
 
@@ -893,7 +914,15 @@ def run_pipeline_stream(
                     result = result.model_copy(
                         update={"circuit_shape": _shape_of(ctx["circuit"])},
                     )
-                _cache_put(prefix_key, result, ctx)
+                if not cache_disabled_for_tail:
+                    _cache_put(prefix_key, result, ctx)
+                # A nondeterministic step (e.g. sampled fidelity) trips
+                # the sticky flag so this run AND any downstream step
+                # in the same call no longer write to the cache, and
+                # future runs of the same prefix won't lookup-hit
+                # downstream entries that depend on stale ctx.
+                if result.nondeterministic:
+                    cache_disabled_for_tail = True
                 yield result
             except Exception:
                 # Same policy as run_pipeline above: log traceback,
@@ -921,9 +950,13 @@ def run_pipeline_stream(
                     update={"circuit_shape": _shape_of(ctx["circuit"])},
                 )
             # Only cache successful plugin runs so a transient crash
-            # doesn't get pinned to the prefix.
-            if result.status == "ok":
+            # doesn't get pinned to the prefix. Also respect the
+            # nondeterministic-tail flag (a plugin downstream of
+            # sampled fidelity shouldn't cache its derived output).
+            if result.status == "ok" and not cache_disabled_for_tail:
                 _cache_put(prefix_key, result, ctx)
+            if result.nondeterministic:
+                cache_disabled_for_tail = True
             yield result
             if result.status == "error":
                 break
@@ -933,5 +966,6 @@ def run_pipeline_stream(
             node, "skipped",
             message=f"No handler for node type {node.type!r}",
         )
-        _cache_put(prefix_key, result, ctx)
+        if not cache_disabled_for_tail:
+            _cache_put(prefix_key, result, ctx)
         yield result

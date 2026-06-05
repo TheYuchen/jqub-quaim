@@ -180,6 +180,14 @@ function StepCard({ step }: { step: StepResult }) {
                 cached
               </span>
             )}
+            {step.nondeterministic && !step.from_step_cache && (
+              <span
+                className="chip !border-warn/30 !text-warn text-[9px]"
+                title="Fresh each run — the per-node cache is bypassed for this step and everything downstream."
+              >
+                live
+              </span>
+            )}
           </div>
           <div className="text-[11px] text-mute">
             {dur.toFixed(2)}s · node <span className="font-mono">{step.node_id}</span>

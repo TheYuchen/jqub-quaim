@@ -363,6 +363,14 @@ function RunResultStrip({
             cached
           </span>
         )}
+        {step.nondeterministic && !step.from_step_cache && (
+          <span
+            className="text-[9px] px-1 py-0.5 rounded border border-warn/30 text-warn"
+            title="Result is intentionally fresh each run (e.g. sampled shots). The per-node cache is bypassed for this step and every downstream step."
+          >
+            live
+          </span>
+        )}
         {durationS !== null && (
           <span
             className={`text-[9px] px-1 py-0.5 rounded border font-mono ${durBadgeClass}`}

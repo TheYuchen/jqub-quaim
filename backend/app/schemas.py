@@ -111,6 +111,14 @@ class StepResult(BaseModel):
     # plugin executed with no upstream) or that errored before the
     # circuit was computable.
     circuit_shape: CircuitShape | None = None
+    # True when this step's result is intentionally nondeterministic
+    # (e.g. sampled fidelity, where the user wants a fresh shot
+    # distribution every run). The streaming executor uses this flag
+    # to disable the in-memory step cache from this step onward —
+    # caching a single sampled draw and replaying it would be a
+    # silent scientific bug. The frontend can also surface it as a
+    # "Live each run" chip so users know what to expect.
+    nondeterministic: bool = False
 
 
 class RunResponse(BaseModel):
