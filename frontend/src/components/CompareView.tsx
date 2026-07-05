@@ -16,18 +16,34 @@ import { X } from "lucide-react";
 import type { StepResult } from "../lib/api";
 import { useApp } from "../lib/store";
 import { getRun, type RunRecord } from "../lib/runStore";
-import { transformationOf } from "./TransformationSignature";
+import { SignatureGlyph, transformationOf } from "./TransformationSignature";
 
 function sigText(step: StepResult | undefined): string {
   const t = transformationOf(step);
   if (!t || !t.changed) return "·";
   const parts: string[] = [];
   const d = t.delta;
-  if (d.num_qubits) parts.push(`Q${d.num_qubits > 0 ? "+" : ""}${d.num_qubits}`);
   if (d.depth) parts.push(`D${d.depth > 0 ? "+" : ""}${d.depth}`);
   if (d.size) parts.push(`G${d.size > 0 ? "+" : ""}${d.size}`);
   if (d.num_parameters) parts.push(`P${d.num_parameters > 0 ? "+" : ""}${d.num_parameters}`);
+  if (d.num_qubits) parts.push(`Q${d.num_qubits > 0 ? "+" : ""}${d.num_qubits}`);
   return parts.join(" ") || "·";
+}
+
+/** Table cell: the shared delta-strip glyph, one per side per step.
+ *  Rendering the strip even for pass-through steps (all faint ticks)
+ *  keeps every row the same shape, so scanning a column reads as
+ *  aligned small multiples; sigText survives as the hover tooltip
+ *  carrying the exact numbers. Steps with no circuit in scope at all
+ *  fall back to the old middot. */
+function SigCell({ step }: { step: StepResult | undefined }) {
+  const t = transformationOf(step);
+  if (!t) return <span className="font-mono text-mute">·</span>;
+  return (
+    <span className="inline-block align-middle" title={sigText(step)}>
+      <SignatureGlyph t={t} size="tile" />
+    </span>
+  );
 }
 
 function fidelityStep(r: RunRecord): StepResult | undefined {
@@ -231,8 +247,8 @@ export function CompareView() {
                   <span className="text-warn ml-1" title={`A: ${r.a.node_type}, B: ${r.b.node_type}`}>≠</span>
                 )}
               </td>
-              <td className="py-0.5 font-mono text-mute">{sigText(r.a)}</td>
-              <td className="py-0.5 font-mono text-mute">{sigText(r.b)}</td>
+              <td className="py-0.5 pr-2"><SigCell step={r.a} /></td>
+              <td className="py-0.5 pr-2"><SigCell step={r.b} /></td>
               <td className="py-0.5 font-mono text-mute">
                 {r.a?.status ?? "—"} / {r.b?.status ?? "—"}
               </td>
