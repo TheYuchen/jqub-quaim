@@ -1,20 +1,52 @@
-// Provenance timeline — the archive of every run this browser has
-// executed, newest first. Each entry can be:
+// Provenance lineage view — the archive of every run this browser has
+// executed, drawn as a vertical lineage graph (newest at top) rather
+// than a plain list. Encoding rationale (one field per channel):
 //
-//   * restored  — canvas + params + circuit come back exactly as run,
-//                 next run counts as a fork of this one;
-//   * replayed  — restore + pin the recorded root seed, so pressing
-//                 Run reproduces the exact stochastic draw;
-//   * deleted   — drop the record.
+//   * node HUE      = config_hash. Vertical position already encodes
+//     time, so hue is the only channel that stays legible at 8-px
+//     marks; a stable hash->hue mapping keeps one configuration the
+//     same color across panels, sessions and screenshots.
+//   * node RING     = seed_mode. Pinned (replayed) runs carry an
+//     annulus around the dot — visually "sealed", i.e. deterministic.
+//     Fresh runs are bare dots.
+//   * HOLLOW+SLASH  = status. Errored runs render hollow with a red
+//     slash: failure stays visible without stealing the hue channel.
+//   * curved EDGES  = forked_from descent (restore / replay). Edges
+//     take the child's hue, so you trace where a configuration came
+//     from by following its own color upward through time.
+//   * lane BAND + SPINE = a contiguous block of replicates of one
+//     configuration (what the xN replicate runner produces). The band
+//     plus the per-group dot STRIP above each block make distribution
+//     buildup readable directly in the timeline: each strip shows all
+//     headline values archived up to that moment, so older strips
+//     have fewer dots.
 //
-// The colored #hash chip identifies the *configuration* (structural
-// hash of circuit + graph + params): runs sharing a chip are
-// replicates of the same experiment and feed one distribution.
+// Node size is deliberately constant — magnitude lives in the strip,
+// not the graph, so the lineage stays comparable dot-to-dot.
+//
+// All list behaviors are preserved: restore / replay(pin seed) /
+// delete per run, compare checkboxes (max 2, wired to useApp), the
+// collapsible header. Hovering a row (or its dot) highlights the full
+// lineage chain — ancestors via forked_from plus every descendant —
+// by dimming unrelated rows, nodes and edges.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { deleteRun, listRuns, type RunRecord } from "../lib/runStore";
+
+// --- layout constants (px) --------------------------------------------------
+// Fixed row heights let the SVG gutter compute node centers arithmetically:
+// HTML rows and SVG marks stay aligned without ever measuring the DOM.
+const GUTTER_W = 58; // lineage gutter width; row content starts right of it
+const RUN_H = 28; // height of one run row
+const STRIP_H = 20; // height of a group distribution-strip row
+const LANE_X0 = 13; // x of lane 0 inside the gutter
+const LANE_DX = 11; // horizontal distance between lanes
+const N_LANES = 4; // lanes cycle mod 4 — enough separation for edges to read
+const R_NODE = 4; // constant node radius (size is intentionally NOT a channel)
+const R_RING = 6.5; // pinned-seed ring radius
+const STRIP_W = 92; // width of the 0-1 distribution mini strip
 
 function timeLabel(ts: number): string {
   const d = new Date(ts);
@@ -31,6 +63,191 @@ function hashHue(hash: string): number {
   return h % 360;
 }
 
+/** House style for group hues (same recipe the config chips used). */
+function hueCss(hue: number, alpha = 1): string {
+  return `hsl(${hue} 60% 55% / ${alpha})`;
+}
+
+/** Multi-line native tooltip carrying the full provenance detail. */
+function nodeTitle(r: RunRecord): string {
+  const lines = [
+    `run ${r.run_id}`,
+    new Date(r.created_at).toLocaleString(),
+    `config #${r.config_hash} · ${r.sample_key ?? r.circuit_name ?? "uploaded circuit"}`,
+    r.root_seed != null
+      ? `${r.seed_mode ?? "?"} seed · root ${r.root_seed}`
+      : "no seed recorded (pre-provenance run or cached response)",
+    r.headline_value != null
+      ? `${r.headline_label ?? "metric"} = ${(r.headline_value * 100).toFixed(2)}%`
+      : "no headline metric",
+    `${r.n_steps} steps · ${r.ok ? "completed" : "errored"}`,
+  ];
+  if (r.forked_from) lines.push(`forked from run ${r.forked_from}`);
+  return lines.join("\n");
+}
+
+/** Cubic bezier from a child run down to its ancestor. Same-lane edges
+ *  bow left so they separate from the straight lane spine. */
+function edgePath(c: { x: number; y: number }, p: { x: number; y: number }): string {
+  const dy = p.y - c.y;
+  if (c.x === p.x) {
+    const bow = c.x - 8;
+    return `M ${c.x} ${c.y + R_NODE} C ${bow} ${c.y + dy * 0.3} ${bow} ${p.y - dy * 0.3} ${p.x} ${p.y - R_NODE}`;
+  }
+  return `M ${c.x} ${c.y + R_NODE} C ${c.x} ${c.y + dy * 0.5} ${p.x} ${p.y - dy * 0.5} ${p.x} ${p.y - R_NODE}`;
+}
+
+// --- layout model -------------------------------------------------------
+
+interface NodePos {
+  x: number;
+  y: number;
+}
+
+type Row =
+  | { kind: "run"; rec: RunRecord }
+  | {
+      kind: "strip";
+      hash: string;
+      hue: number;
+      /** Headline values (clamped 0-1) of every run of this config
+       *  archived up to this block; inSection = belongs to the block
+       *  directly below (drawn brighter than older replicates). */
+      dots: { v: number; inSection: boolean }[];
+      mean: number;
+    };
+
+interface Layout {
+  rows: Row[];
+  totalH: number;
+  nodeAt: Map<string, NodePos>;
+  edges: { childId: string; parentId: string; hue: number }[];
+  /** Children whose ancestor fell outside the visible window. */
+  stubs: { childId: string }[];
+  spines: { x: number; y0: number; y1: number; hue: number; ids: string[] }[];
+  parentOf: Map<string, string | null>;
+}
+
+function computeLayout(records: RunRecord[]): Layout {
+  // Lane per configuration, in order of first (newest) appearance.
+  // Lanes cycle mod N_LANES: only contiguity + hue identify a group,
+  // so distant groups may share a column without ambiguity.
+  const laneOf = new Map<string, number>();
+  for (const r of records)
+    if (!laneOf.has(r.config_hash)) laneOf.set(r.config_hash, laneOf.size % N_LANES);
+
+  const groupTotal = new Map<string, number>();
+  for (const r of records)
+    groupTotal.set(r.config_hash, (groupTotal.get(r.config_hash) ?? 0) + 1);
+
+  // Contiguous same-config sections (records arrive newest-first).
+  const sections: RunRecord[][] = [];
+  for (const r of records) {
+    const last = sections[sections.length - 1];
+    if (last && last[0].config_hash === r.config_hash) last.push(r);
+    else sections.push([r]);
+  }
+
+  const rows: Row[] = [];
+  const nodeAt = new Map<string, NodePos>();
+  const spines: Layout["spines"] = [];
+  let y = 0;
+
+  for (const sec of sections) {
+    const hash = sec[0].config_hash;
+    const hue = hashHue(hash);
+    const x = LANE_X0 + (laneOf.get(hash) ?? 0) * LANE_DX;
+
+    // Distribution strip: only when the group has >=2 runs AND >=2 of
+    // them (up to this point in time) carry a headline value. "Up to
+    // this point" = created at or before this section's newest run,
+    // which is what makes buildup visible when scrolling down the past.
+    if ((groupTotal.get(hash) ?? 0) >= 2) {
+      const cutoff = sec[0].created_at;
+      const inSec = new Set(sec.map((r) => r.run_id));
+      const dots = records
+        .filter(
+          (r) =>
+            r.config_hash === hash &&
+            r.created_at <= cutoff &&
+            r.headline_value != null,
+        )
+        .map((r) => ({
+          v: Math.max(0, Math.min(1, r.headline_value ?? 0)),
+          inSection: inSec.has(r.run_id),
+        }));
+      if (dots.length >= 2) {
+        const mean = dots.reduce((a, d) => a + d.v, 0) / dots.length;
+        rows.push({ kind: "strip", hash, hue, dots, mean });
+        y += STRIP_H;
+      }
+    }
+
+    const y0 = y + RUN_H / 2;
+    for (const rec of sec) {
+      rows.push({ kind: "run", rec });
+      nodeAt.set(rec.run_id, { x, y: y + RUN_H / 2 });
+      y += RUN_H;
+    }
+    if (sec.length >= 2)
+      spines.push({ x, y0, y1: y - RUN_H / 2, hue, ids: sec.map((r) => r.run_id) });
+  }
+
+  const edges: Layout["edges"] = [];
+  const stubs: Layout["stubs"] = [];
+  for (const r of records) {
+    if (!r.forked_from) continue;
+    if (nodeAt.has(r.forked_from))
+      edges.push({ childId: r.run_id, parentId: r.forked_from, hue: hashHue(r.config_hash) });
+    else stubs.push({ childId: r.run_id });
+  }
+
+  return {
+    rows,
+    totalH: y,
+    nodeAt,
+    edges,
+    stubs,
+    spines,
+    parentOf: new Map(records.map((r) => [r.run_id, r.forked_from])),
+  };
+}
+
+/** Lineage chain of the hovered run: the run itself, every ancestor
+ *  reachable via forked_from, and every descendant whose ancestor walk
+ *  passes through it. Cycle-guarded (should never happen, but the data
+ *  is user-editable IndexedDB). */
+function lineageOf(
+  hoverId: string,
+  records: RunRecord[],
+  parentOf: Map<string, string | null>,
+): Set<string> {
+  const chain = new Set<string>([hoverId]);
+  const seen = new Set<string>([hoverId]);
+  let cur = parentOf.get(hoverId) ?? null;
+  while (cur && !seen.has(cur)) {
+    chain.add(cur);
+    seen.add(cur);
+    cur = parentOf.get(cur) ?? null;
+  }
+  for (const r of records) {
+    if (chain.has(r.run_id)) continue;
+    const path = [r.run_id];
+    const walked = new Set<string>([r.run_id]);
+    let p = parentOf.get(r.run_id) ?? null;
+    while (p && !walked.has(p)) {
+      if (chain.has(p)) {
+        for (const id of path) chain.add(id);
+        break;
+      }
+      walked.add(p);
+      path.push(p);
+      p = parentOf.get(p) ?? null;
+    }
+  }
+  return chain;
+}
+
 export function RunHistory() {
   const historyVersion = useApp((s) => s.historyVersion);
   const requestRestore = useApp((s) => s.requestRestore);
@@ -38,6 +255,7 @@ export function RunHistory() {
   const toggleCompare = useApp((s) => s.toggleCompare);
   const [records, setRecords] = useState<RunRecord[]>([]);
   const [open, setOpen] = useState(false);
+  const [hoverId, setHoverId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +271,13 @@ export function RunHistory() {
     };
   }, [historyVersion]);
 
+  const layout = useMemo(() => computeLayout(records), [records]);
+
+  const related = useMemo(
+    () => (hoverId ? lineageOf(hoverId, records, layout.parentOf) : null),
+    [hoverId, records, layout],
+  );
+
   if (records.length === 0) return null;
 
   const restore = (r: RunRecord, pin: boolean) =>
@@ -62,6 +287,9 @@ export function RunHistory() {
       pinSeed: pin ? r.root_seed : null,
       sourceRunId: r.run_id,
     });
+
+  const enter = (id: string) => setHoverId(id);
+  const leave = (id: string) => setHoverId((h) => (h === id ? null : h));
 
   return (
     <div className="panel-alt overflow-hidden">
@@ -74,93 +302,278 @@ export function RunHistory() {
         <History className="w-3.5 h-3.5 text-mute" />
         <span className="text-xs font-semibold text-ink">Run history</span>
         <span className="chip">{records.length}</span>
-        <span className="ml-auto text-[10px] text-mute">
-          {open ? "hide" : "show"}
-        </span>
+        <span className="ml-auto text-[10px] text-mute">{open ? "hide" : "show"}</span>
       </button>
       {open && (
-        <ul className="max-h-64 overflow-y-auto divide-y divide-edge/60">
-          {records.map((r) => (
-            <li key={r.run_id} className="px-3 py-1.5 flex items-center gap-2 text-[11px]">
-              <input
-                type="checkbox"
-                className="w-3 h-3 accent-current shrink-0 cursor-pointer"
-                checked={compareIds.includes(r.run_id)}
-                onChange={() => toggleCompare(r.run_id)}
-                title="Select for comparison (pick two runs)"
-                aria-label={`Select run ${r.run_id} for comparison`}
-              />
-              <span
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.ok ? "bg-ok" : "bg-danger"}`}
-                title={r.ok ? "completed" : "errored"}
-              />
-              <span className="text-mute font-mono shrink-0">{timeLabel(r.created_at)}</span>
-              <span
-                className="chip shrink-0"
-                style={{ borderColor: `hsl(${hashHue(r.config_hash)} 60% 55% / 0.6)` }}
-                title={`Configuration ${r.config_hash} — rows with the same tag are replicates of the same experiment${r.forked_from ? `\nForked from run ${r.forked_from}` : ""}`}
-              >
-                #{r.config_hash.slice(0, 4)}
-              </span>
-              <span className="truncate text-ink" title={r.sample_key ?? r.circuit_name ?? "uploaded circuit"}>
-                {r.sample_key ?? r.circuit_name ?? "upload"}
-              </span>
-              {r.headline_value != null && (
-                <span className="font-mono text-mute shrink-0">
-                  F={(r.headline_value * 100).toFixed(1)}%
-                </span>
-              )}
-              <span
-                className={`shrink-0 ${r.seed_mode === "pinned" ? "text-accent" : "text-mute"}`}
-                title={
-                  r.root_seed != null
-                    ? `${r.seed_mode} seed — root ${r.root_seed}. Replay reproduces this draw exactly.`
-                    : "no seed recorded (pre-provenance run or cached response)"
-                }
-              >
-                {r.seed_mode === "pinned" ? "⚲" : "∿"}
-              </span>
-              <span className="ml-auto flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  className="p-0.5 text-mute hover:text-ink rounded hover:bg-surfaceAlt"
-                  title="Restore this run's graph + circuit onto the canvas"
-                  aria-label="Restore run"
-                  onClick={() => restore(r, false)}
-                >
-                  <RotateCcw className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  className="p-0.5 text-mute hover:text-accent rounded hover:bg-surfaceAlt disabled:opacity-30"
-                  title={
-                    r.root_seed != null
-                      ? "Replay: restore + pin this run's seed. Pressing Run then reproduces the exact numbers."
-                      : "This run has no recorded seed (cached response) — plain restore is available."
-                  }
-                  aria-label="Replay run"
-                  disabled={r.root_seed == null}
-                  onClick={() => restore(r, true)}
-                >
-                  <Play className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  className="p-0.5 text-mute hover:text-danger rounded hover:bg-surfaceAlt"
-                  title="Delete this record"
-                  aria-label="Delete run record"
-                  onClick={() => {
-                    void deleteRun(r.run_id).then(() =>
-                      useApp.getState().bumpHistoryVersion(),
+        <>
+          <div className="max-h-[320px] overflow-y-auto">
+            {/* Relative wrapper: the SVG gutter is absolutely positioned
+                inside the scrolled content, so lineage marks scroll in
+                lockstep with the rows they annotate. */}
+            <div className="relative">
+              <div role="list">
+                {layout.rows.map((row, i) => {
+                  if (row.kind === "strip") {
+                    const mx = 1 + row.mean * (STRIP_W - 2);
+                    return (
+                      <div
+                        key={`strip-${row.hash}-${i}`}
+                        className="flex items-center gap-1.5 border-b border-edge/40 bg-surfaceAlt/40"
+                        style={{ height: STRIP_H, paddingLeft: GUTTER_W }}
+                      >
+                        <span
+                          className="font-mono text-[9px] shrink-0"
+                          style={{ color: hueCss(row.hue, 0.9) }}
+                        >
+                          #{row.hash.slice(0, 4)}
+                        </span>
+                        <span className="text-[9px] text-mute shrink-0">×{row.dots.length}</span>
+                        <svg
+                          width={STRIP_W}
+                          height={12}
+                          className="shrink-0"
+                          role="img"
+                          aria-label={`Replicate distribution for configuration ${row.hash}`}
+                        >
+                          <title>
+                            {`headline values of all #${row.hash.slice(0, 4)} runs archived up to this block, on a 0-1 scale\nbright dots = this block · faint dots = older replicates · tick = mean`}
+                          </title>
+                          <line x1={1} y1={6} x2={STRIP_W - 1} y2={6} stroke="rgb(var(--color-edge))" strokeWidth={1} />
+                          <line x1={1} y1={3} x2={1} y2={9} stroke="rgb(var(--color-edge))" strokeWidth={1} />
+                          <line x1={STRIP_W - 1} y1={3} x2={STRIP_W - 1} y2={9} stroke="rgb(var(--color-edge))" strokeWidth={1} />
+                          <line x1={mx} y1={2} x2={mx} y2={10} stroke="rgb(var(--color-ink) / 0.6)" strokeWidth={1} />
+                          {row.dots.map((d, j) => (
+                            <circle
+                              key={j}
+                              cx={1 + d.v * (STRIP_W - 2)}
+                              cy={6}
+                              r={2.2}
+                              fill={hueCss(row.hue, d.inSection ? 0.95 : 0.4)}
+                            />
+                          ))}
+                        </svg>
+                        <span className="font-mono text-[9px] text-mute shrink-0">
+                          μ={(row.mean * 100).toFixed(1)}%
+                        </span>
+                      </div>
                     );
-                  }}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
+                  }
+                  const r = row.rec;
+                  const hue = hashHue(r.config_hash);
+                  const dimmed = related != null && !related.has(r.run_id);
+                  return (
+                    <div
+                      key={r.run_id}
+                      role="listitem"
+                      className="flex items-center gap-2 pr-2 text-[11px] border-b border-edge/40 hover:bg-surfaceAlt transition-opacity"
+                      style={{ height: RUN_H, paddingLeft: GUTTER_W, opacity: dimmed ? 0.35 : 1 }}
+                      onMouseEnter={() => enter(r.run_id)}
+                      onMouseLeave={() => leave(r.run_id)}
+                    >
+                      <input
+                        type="checkbox"
+                        className="w-3 h-3 accent-current shrink-0 cursor-pointer"
+                        checked={compareIds.includes(r.run_id)}
+                        onChange={() => toggleCompare(r.run_id)}
+                        title="Select for comparison (pick two runs)"
+                        aria-label={`Select run ${r.run_id} for comparison`}
+                      />
+                      <span className="text-mute font-mono text-[10px] shrink-0">
+                        {timeLabel(r.created_at)}
+                      </span>
+                      <span
+                        className="font-mono text-[10px] shrink-0"
+                        style={{ color: hueCss(hue, 0.9) }}
+                        title={`Configuration ${r.config_hash} — same color = replicates of the same experiment${r.forked_from ? `\nForked from run ${r.forked_from}` : ""}`}
+                      >
+                        #{r.config_hash.slice(0, 4)}
+                      </span>
+                      <span
+                        className="truncate text-ink"
+                        title={r.sample_key ?? r.circuit_name ?? "uploaded circuit"}
+                      >
+                        {r.sample_key ?? r.circuit_name ?? "upload"}
+                      </span>
+                      {r.headline_value != null && (
+                        <span className="font-mono text-mute shrink-0">
+                          F={(r.headline_value * 100).toFixed(1)}%
+                        </span>
+                      )}
+                      <span
+                        className={`shrink-0 ${r.seed_mode === "pinned" ? "text-accent" : "text-mute"}`}
+                        title={
+                          r.root_seed != null
+                            ? `${r.seed_mode} seed — root ${r.root_seed}. Replay reproduces this draw exactly.`
+                            : "no seed recorded (pre-provenance run or cached response)"
+                        }
+                      >
+                        {r.seed_mode === "pinned" ? "⚲" : "∿"}
+                      </span>
+                      <span className="ml-auto flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          className="p-0.5 text-mute hover:text-ink rounded hover:bg-surfaceAlt"
+                          title="Restore this run's graph + circuit onto the canvas"
+                          aria-label="Restore run"
+                          onClick={() => restore(r, false)}
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className="p-0.5 text-mute hover:text-accent rounded hover:bg-surfaceAlt disabled:opacity-30"
+                          title={
+                            r.root_seed != null
+                              ? "Replay: restore + pin this run's seed. Pressing Run then reproduces the exact numbers."
+                              : "This run has no recorded seed (cached response) — plain restore is available."
+                          }
+                          aria-label="Replay run"
+                          disabled={r.root_seed == null}
+                          onClick={() => restore(r, true)}
+                        >
+                          <Play className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className="p-0.5 text-mute hover:text-danger rounded hover:bg-surfaceAlt"
+                          title="Delete this record"
+                          aria-label="Delete run record"
+                          onClick={() => {
+                            void deleteRun(r.run_id).then(() =>
+                              useApp.getState().bumpHistoryVersion(),
+                            );
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Lineage gutter. Rendered AFTER the rows so marks paint
+                  above the row hover background; pointer events off except
+                  on the node hit-targets (tooltips + hover-highlight). */}
+              <svg
+                className="absolute top-0 left-0"
+                width={GUTTER_W}
+                height={layout.totalH}
+                style={{ pointerEvents: "none" }}
+                role="img"
+                aria-label="Run lineage graph: dots are runs colored by configuration, rings mark pinned seeds, curved edges link forked runs to their ancestors"
+              >
+                {/* replicate bands + spines (background layer) */}
+                {layout.spines.map((s, i) => {
+                  const dimmed = related != null && !s.ids.some((id) => related.has(id));
+                  return (
+                    <g key={`spine-${i}`} className="transition-opacity" style={{ opacity: dimmed ? 0.15 : 1 }}>
+                      <rect
+                        x={s.x - 7}
+                        y={s.y0 - 10}
+                        width={14}
+                        height={s.y1 - s.y0 + 20}
+                        rx={7}
+                        fill={hueCss(s.hue, 0.1)}
+                      />
+                      <line x1={s.x} y1={s.y0} x2={s.x} y2={s.y1} stroke={hueCss(s.hue, 0.35)} strokeWidth={2} />
+                    </g>
+                  );
+                })}
+                {/* fork edges: child -> ancestor, in the child's hue */}
+                {layout.edges.map((e) => {
+                  const c = layout.nodeAt.get(e.childId);
+                  const p = layout.nodeAt.get(e.parentId);
+                  if (!c || !p) return null;
+                  const lit =
+                    related == null || (related.has(e.childId) && related.has(e.parentId));
+                  return (
+                    <path
+                      key={`edge-${e.childId}`}
+                      d={edgePath(c, p)}
+                      fill="none"
+                      stroke={hueCss(e.hue, 0.55)}
+                      strokeWidth={related != null && lit ? 1.8 : 1.2}
+                      className="transition-opacity"
+                      style={{ opacity: lit ? 1 : 0.12 }}
+                    />
+                  );
+                })}
+                {/* dangling stubs: ancestor deleted or beyond the window */}
+                {layout.stubs.map((s) => {
+                  const c = layout.nodeAt.get(s.childId);
+                  if (!c) return null;
+                  return (
+                    <path
+                      key={`stub-${s.childId}`}
+                      d={`M ${c.x} ${c.y + R_NODE} C ${c.x - 5} ${c.y + 8} ${c.x - 6} ${c.y + 12} ${c.x - 6} ${c.y + 16}`}
+                      fill="none"
+                      stroke="rgb(var(--color-mute))"
+                      strokeWidth={1.2}
+                      strokeDasharray="2 2"
+                      opacity={0.45}
+                    />
+                  );
+                })}
+                {/* run nodes */}
+                {records.map((rec) => {
+                  const pos = layout.nodeAt.get(rec.run_id);
+                  if (!pos) return null;
+                  const hue = hashHue(rec.config_hash);
+                  const dimmed = related != null && !related.has(rec.run_id);
+                  return (
+                    <g key={rec.run_id} className="transition-opacity" style={{ opacity: dimmed ? 0.2 : 1 }}>
+                      {rec.seed_mode === "pinned" && (
+                        <circle cx={pos.x} cy={pos.y} r={R_RING} fill="none" stroke={hueCss(hue, 0.9)} strokeWidth={1.3} />
+                      )}
+                      {rec.ok ? (
+                        <circle
+                          cx={pos.x}
+                          cy={pos.y}
+                          r={R_NODE}
+                          fill={hueCss(hue, 0.95)}
+                          stroke={`hsl(${hue} 60% 38%)`}
+                          strokeWidth={0.8}
+                        />
+                      ) : (
+                        <>
+                          <circle cx={pos.x} cy={pos.y} r={R_NODE} fill="none" stroke={hueCss(hue, 0.9)} strokeWidth={1.2} />
+                          <line
+                            x1={pos.x - R_NODE - 1}
+                            y1={pos.y + R_NODE + 1}
+                            x2={pos.x + R_NODE + 1}
+                            y2={pos.y - R_NODE - 1}
+                            stroke="rgb(var(--color-danger))"
+                            strokeWidth={1.3}
+                          />
+                        </>
+                      )}
+                      {/* oversized invisible hit-target: tooltip + lineage hover */}
+                      <circle
+                        cx={pos.x}
+                        cy={pos.y}
+                        r={R_RING + 2.5}
+                        fill="transparent"
+                        style={{ pointerEvents: "auto" }}
+                        onMouseEnter={() => enter(rec.run_id)}
+                        onMouseLeave={() => leave(rec.run_id)}
+                      >
+                        <title>{nodeTitle(rec)}</title>
+                      </circle>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          </div>
+          {/* legend: one line, doubles as the figure caption key */}
+          <div className="px-3 py-1 border-t border-edge/60 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9px] text-mute">
+            <span>hue = configuration</span>
+            <span>ring = pinned seed</span>
+            <span>slash = error</span>
+            <span>curve = forked from</span>
+            <span>strip = replicate metrics (0–1)</span>
+          </div>
+        </>
       )}
     </div>
   );
