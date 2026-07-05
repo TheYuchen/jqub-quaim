@@ -34,6 +34,8 @@ function hashHue(hash: string): number {
 export function RunHistory() {
   const historyVersion = useApp((s) => s.historyVersion);
   const requestRestore = useApp((s) => s.requestRestore);
+  const compareIds = useApp((s) => s.compareIds);
+  const toggleCompare = useApp((s) => s.toggleCompare);
   const [records, setRecords] = useState<RunRecord[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -80,6 +82,14 @@ export function RunHistory() {
         <ul className="max-h-64 overflow-y-auto divide-y divide-edge/60">
           {records.map((r) => (
             <li key={r.run_id} className="px-3 py-1.5 flex items-center gap-2 text-[11px]">
+              <input
+                type="checkbox"
+                className="w-3 h-3 accent-current shrink-0 cursor-pointer"
+                checked={compareIds.includes(r.run_id)}
+                onChange={() => toggleCompare(r.run_id)}
+                title="Select for comparison (pick two runs)"
+                aria-label={`Select run ${r.run_id} for comparison`}
+              />
               <span
                 className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.ok ? "bg-ok" : "bg-danger"}`}
                 title={r.ok ? "completed" : "errored"}

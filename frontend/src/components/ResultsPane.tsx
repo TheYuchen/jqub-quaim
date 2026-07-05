@@ -24,6 +24,7 @@ import { PluginFigures } from "./PluginFigures";
 import { RunStatusChips } from "./RunStatusChips";
 import { RunHistory } from "./RunHistory";
 import { SignatureCard } from "./TransformationSignature";
+import { CompareView } from "./CompareView";
 
 export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const run = useApp((s) => s.run);
@@ -75,6 +76,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+        <CompareView />
         <RunHistory />
         {!run && !running && <EmptyHint />}
         {running && <RunningHint />}

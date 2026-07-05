@@ -80,6 +80,15 @@ interface AppState {
   restoredFrom: string | null;
   setRestoredFrom: (v: string | null) => void;
 
+  /**
+   * Comparison selection: up to two archived run_ids. When two are
+   * chosen the CompareView panel renders them side by side. Toggling
+   * a third id replaces the older selection (keep-latest-two).
+   */
+  compareIds: string[];
+  toggleCompare: (runId: string) => void;
+  clearCompare: () => void;
+
   health: HealthResponse | null;
   setHealth: (h: HealthResponse | null) => void;
 
@@ -195,6 +204,14 @@ export const useApp = create<AppState>((set) => ({
   clearRestore: () => set({ pendingRestore: null }),
   restoredFrom: null,
   setRestoredFrom: (v) => set({ restoredFrom: v }),
+  compareIds: [],
+  toggleCompare: (runId) =>
+    set((s) => {
+      if (s.compareIds.includes(runId))
+        return { compareIds: s.compareIds.filter((x) => x !== runId) };
+      return { compareIds: [...s.compareIds, runId].slice(-2) };
+    }),
+  clearCompare: () => set({ compareIds: [] }),
   health: null,
   setHealth: (h) => set({ health: h }),
   running: false,
