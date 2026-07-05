@@ -29,6 +29,7 @@ from qiskit import QuantumCircuit, qpy, transpile
 
 from app.config import Settings, ibm_history_cache_path
 from app.schemas import FlowEdge, FlowNode, StepResult
+from app.services.circuit_diff import diff_lanes
 from app.services.run_cache import qpy_dump_bytes
 from app.services.stats import wilson_interval
 
@@ -1208,6 +1209,22 @@ def _execute_pipeline(
         # transformation vocabulary must not depend on each handler
         # remembering to fill it in.
         before_snapshot = _transform_snapshot(ctx.get("circuit"))
+        # Copy the circuit BEFORE dispatch, not just keep a reference:
+        # handlers may mutate ctx["circuit"] in place (the historical
+        # QuBound measure_all bug did exactly that), in which case a
+        # bare reference would diff the mutated object against itself
+        # and report "nothing changed". The copy is the ground truth
+        # for the gate-level lane diff below.
+        before_qc_for_diff = None
+        try:
+            _pre = ctx.get("circuit")
+            if _pre is not None:
+                before_qc_for_diff = _pre.copy()
+        except Exception:  # diff is best-effort; never block the run
+            logger.exception(
+                "pre-dispatch circuit copy failed for node %s "
+                "(gate diff will be omitted)", node.id,
+            )
         result = _dispatch_one_node(node, ctx, circuit, settings, user_id)
         ctx.pop("node_seed", None)
 
@@ -1215,12 +1232,30 @@ def _execute_pipeline(
         # the canvas can draw data-flow labels on outgoing edges.
         if result.status == "ok" and "circuit" in ctx:
             after_snapshot = _transform_snapshot(ctx.get("circuit"))
+            transformation = _build_transformation(
+                before_snapshot, after_snapshot,
+            )
+            # Gate-level lane diff, only when the step actually changed
+            # the circuit. Best-effort by contract: any failure here is
+            # logged and omitted — the diff must never break a run.
+            if (
+                transformation is not None
+                and transformation.get("changed")
+                and before_qc_for_diff is not None
+            ):
+                try:
+                    transformation["gate_diff"] = diff_lanes(
+                        before_qc_for_diff, ctx["circuit"],
+                    )
+                except Exception:
+                    logger.exception(
+                        "gate-level diff failed for node %s (omitted)",
+                        node.id,
+                    )
             result = result.model_copy(
                 update={
                     "circuit_shape": _shape_of(ctx["circuit"]),
-                    "transformation": _build_transformation(
-                        before_snapshot, after_snapshot,
-                    ),
+                    "transformation": transformation,
                 },
             )
 

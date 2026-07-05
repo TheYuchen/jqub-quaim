@@ -60,6 +60,7 @@
 //                  for the results pane.
 
 import type { StepResult } from "../lib/api";
+import CircuitDiff from "./CircuitDiff";
 
 export interface TransformationPayload {
   before: {
@@ -365,6 +366,7 @@ export function SignatureCard({ step }: { step: StepResult }) {
           })}
         </div>
       )}
+      <CircuitDiff t={t} />
     </div>
   );
 }
