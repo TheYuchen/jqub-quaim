@@ -89,8 +89,8 @@ vqc_2q_small showed P-2; interval-overlap callout fires).
     derivation, threaded into sampled fidelity as seed_simulator; the
     exported script reproduces the archived run's exact draw.
 
-Backend test lane: 49 green (test_provenance_phase0 24,
-test_gate_diff 14, test_workflow_helpers 11).
+Backend test lane: 57 green (test_provenance_phase0 24,
+test_gate_diff 14, test_workflow_helpers 11, test_seed_coverage 8).
 
 ## Shipped, third push (waves E-F, commits 324791f → 4bf1a9d)
 
@@ -111,19 +111,40 @@ test_gate_diff 14, test_workflow_helpers 11).
     decision surface and the paper's second hero figure (multiverse
     analysis narrative anchor).
 
+## Shipped, fourth push (claim-integrity wave)
+
+15. **Seed coverage: QuBound + Qshot** — the last two stochastic
+    handlers now honour the executor's per-node seed. QuBound: both ok
+    paths (live IBM / cached-history pickle) always train the LSTM, so
+    both seed the global RNGs via `_seed_stochastic_libs` (random +
+    numpy + lazily-imported torch) AND thread `seed=` into qlib
+    (Aer `seed_simulator`, Sabre `seed_transpiler`); results are
+    `nondeterministic=True` + `seed_used`. Qshot: the pilot's
+    "fixed" internal seed mixed in `hash(str(base))`, which Python
+    salts per process — reproducible only until a restart. `pilot_seed`
+    is now threaded `predict → recommend_shots → compute_pilot_pf`, so
+    the recommendation is reproducible across processes given the
+    seed; marked nondeterministic since fresh runs draw fresh seeds.
+16. **Cost estimate chip** (`cost-estimate`) — `lib/costModel.ts`
+    learns median per-kind step durations from the browser's own run
+    archive (ok steps only, cache hits excluded) and the canvas
+    toolbar shows "est ~Ns" (+ "M unknown" when a kind has no
+    history) next to Run; ×N replicates add (N−1)×Σ(stochastic
+    blocks), approximating the cached-prefix effect.
+
 ## Not done yet (ordered backlog)
 
 * **Phase 3.5 leftovers** — pick-which-fidelity-node in comparison,
   dual-canvas visual diff, >2-way comparison.
-* **Phase 4 leftovers** — cost preview (per-node runtime estimates,
-  replicate budget); opt-in interaction logging (schema first —
-  needed for the user study). Reproducible export is DONE.
+* **Phase 4 leftovers** — opt-in interaction logging (schema first —
+  needed for the user study). Reproducible export and the cost
+  preview are DONE.
 * **Gate-diff niceties** — pair remove+add of the same op with only a
   param change into a "modified" state; column-align lanes across
   qubits by circuit moment.
-* **Seeding audit** — QuBound LSTM training and Qshot pilot runs are
-  stochastic but not yet seed-plumbed; only sampled fidelity is.
-  Their distribution payloads are also missing.
+* **Distribution payloads for QuBound/Qshot** — seed-plumbed now
+  (see 15), but they still emit scalar summaries only; no
+  across-replicate distribution payload like sampled fidelity's.
 * **Prewarm decision** — precomputed disk cache untouched and still
   served (fresh-mode namespace unchanged), but responses in it lack
   provenance/transformation fields. Either re-run

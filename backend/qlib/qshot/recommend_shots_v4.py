@@ -1515,6 +1515,7 @@ def recommend_shots(
     actual_real_curve=None, actual_converged=None,
     gnn_fallback=None,
     noise_json=None,
+    pilot_seed=None,
 ):
     # --- Transpile + extract features ---
     qc_meas = base.copy()
@@ -1592,9 +1593,14 @@ def recommend_shots(
 
     # --- Run pilot PF ---
     print(f"  Running pilot ({pilot_reps} reps per level)...")
+    # pilot_seed (when given) makes the pilot reproducible ACROSS
+    # processes. The historical fallback mixes hash(str(base)) into the
+    # seed, and Python salts str hashes per process (PYTHONHASHSEED), so
+    # it is only stable until the next server restart.
     pilot_pf, pilot_pf_stds = compute_pilot_pf(
         tqc, nq, pilot_shots, sim, reps=pilot_reps,
-        seed=99991 + hash(str(base)) % (2**20))
+        seed=(pilot_seed if pilot_seed is not None
+              else 99991 + hash(str(base)) % (2**20)))
 
     print(f"  Pilot PF: { {s: f'{v:.4f}' for s, v in pilot_pf.items()} }")
 
@@ -1978,6 +1984,7 @@ class QshotRecommender:
         pilot_points=PILOT_POINTS,
         pilot_reps=PILOT_REPS,
         plot_prefix=None,
+        pilot_seed=None,
     ):
         """Recommend shots for one circuit under one noise condition.
 
@@ -2035,6 +2042,7 @@ class QshotRecommender:
             plot_prefix=plot_prefix,
             gnn_fallback=self.gnn_fallback,
             noise_json=nj,
+            pilot_seed=pilot_seed,
         )
 
 

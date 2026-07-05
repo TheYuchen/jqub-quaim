@@ -20,6 +20,7 @@ import hashlib
 import io
 import json
 import logging
+import random
 import re
 import time
 from collections import OrderedDict
@@ -496,6 +497,45 @@ def _handle_qucad(node: FlowNode, ctx: dict, settings: Settings) -> StepResult:
     )
 
 
+def _seed_stochastic_libs(seed: int | None) -> list[str]:
+    """Seed every global RNG a stochastic handler may draw from.
+
+    QuBound's LSTM training consumes torch's global RNG (weight init,
+    Adam step order) and numpy/random for library-internal shuffling;
+    Qshot's GNN fallback touches torch as well. Handlers call this with
+    the executor-injected per-node seed so a pinned replay re-trains /
+    re-samples from the same starting point.
+
+    torch is imported lazily and guarded with try/except: the unit-test
+    lane runs torch-free, and /api/health must stay answerable even if
+    torch failed to install. numpy is guarded for symmetry (it is a
+    hard dependency in the real backend env). Returns the list of
+    libraries actually seeded so torch-less tests can still assert
+    behaviour.
+    """
+    if seed is None:
+        return []
+    random.seed(seed)
+    seeded = ["random"]
+    try:
+        import numpy as _np
+
+        _np.random.seed(seed % (2**32))  # numpy requires seed < 2**32
+        seeded.append("numpy")
+    except Exception:  # pragma: no cover — numpy is a hard dep in prod
+        logger.exception("numpy seeding failed; continuing unseeded")
+    try:
+        import torch as _torch
+
+        _torch.manual_seed(seed)
+        seeded.append("torch")
+    except Exception:
+        # torch genuinely absent (unit lane) or broken — QuBound will
+        # fail loudly later if it actually needs it; seeding must not.
+        pass
+    return seeded
+
+
 def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult:
     """QuBound — LSTM-based hardware-aware error bound predictor.
 
@@ -532,6 +572,23 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
     threshold_raw = node.data.get("threshold")
     threshold = float(threshold_raw) if isinstance(threshold_raw, (int, float)) and threshold_raw > 0 else None
 
+    # Seeding determination (claim audit: "every run is exactly
+    # replayable"): BOTH ok paths below — live IBM history and the
+    # cached-pickle path — end in qbound._train_and_predict, which
+    # trains a fresh LSTM every call. There is NO purely-precomputed
+    # branch inside this handler (the executor-level prefix cache and
+    # the disk prewarm cache sit ABOVE the handler), so every ok result
+    # here comes from actual training and is marked nondeterministic.
+    # The only path that skips training is the missing-cache-file error
+    # below, which stays deterministic. Training draws from torch's
+    # global RNG and the label builder samples Aer + runs Sabre
+    # transpilation, so we (a) seed the global RNGs here and (b) thread
+    # node_seed into qlib (seed_simulator / seed_transpiler). Given the
+    # same node_seed the predicted bound is reproducible; in fresh mode
+    # each run derives a new node_seed → honestly a new draw.
+    node_seed = ctx.get("node_seed")
+    _seed_stochastic_libs(node_seed)
+
     def _build_summary(bound_value: float, source: str, extra: dict | None = None) -> dict:
         out: dict = {
             "predicted_error_bound": float(bound_value),
@@ -549,14 +606,19 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
     # Prefer live IBM history when we have a token and it's enabled.
     if settings.has_ibm_token and settings.allow_live_ibm:
         reference = backend or _load_fake_backend("FakeFez")
-        bound, _model = call_QuBound(qc, reference, token=settings.ibm_token)
+        bound, _model = call_QuBound(
+            qc, reference, token=settings.ibm_token, seed=node_seed,
+        )
         ctx["qubound_value"] = float(bound)
-        return _make_step(
+        step = _make_step(
             node,
             "ok",
             started_at=t0,
             summary=_build_summary(bound, "live_ibm"),
+            seed_used=node_seed,
         )
+        # LSTM training ran → fresh draw on every unpinned run.
+        return step.model_copy(update={"nondeterministic": True})
 
     # Offline path — use cached 14-day pickle shipped with the repo.
     cache_backend_name = node.data.get("cache_backend", "ibm_fez")
@@ -574,9 +636,11 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
         )
 
     reference = backend  # may be None — call_QuBound_from_cache will default to FakeFez
-    bound, _model, meta = call_QuBound_from_cache(qc, cache_path, reference_backend=reference)
+    bound, _model, meta = call_QuBound_from_cache(
+        qc, cache_path, reference_backend=reference, seed=node_seed,
+    )
     ctx["qubound_value"] = float(bound)
-    return _make_step(
+    step = _make_step(
         node,
         "ok",
         started_at=t0,
@@ -588,7 +652,12 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
                 "num_days": meta["num_days"],
             },
         ),
+        seed_used=node_seed,
     )
+    # The 'cached' here is cached CALIBRATION HISTORY, not a cached
+    # result — the LSTM still trains on it every call, so this path is
+    # just as stochastic as the live one.
+    return step.model_copy(update={"nondeterministic": True})
 
 
 def _handle_compvqc(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
@@ -707,9 +776,27 @@ def _handle_qshot(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
     if qc.num_parameters > 0:
         qc = qc.assign_parameters([0.0] * qc.num_parameters)
 
+    # Seeding determination: Qshot's pilot measurements draw their
+    # seed_simulator values from a PRIVATE np.random.default_rng — they
+    # never touch the global RNGs — and the internal transpile is
+    # already pinned (seed_transpiler=1234). But the historical default
+    # pilot seed mixed in hash(str(base)), and Python salts str hashes
+    # per process (PYTHONHASHSEED), so it was only "fixed" until the
+    # next server restart: same inputs could yield a different
+    # recommendation after a redeploy. We therefore thread the
+    # executor's per-node seed through predict() → recommend_shots() →
+    # compute_pilot_pf(), which makes the result reproducible ACROSS
+    # processes given the seed. The global seeding below is
+    # belt-and-suspenders for residual library entropy (the GNN
+    # fallback is eval-mode torch inference, deterministic).
+    node_seed = ctx.get("node_seed")
+    _seed_stochastic_libs(node_seed)
+
     noise_path = resolve_noise_snapshot(snapshot_key)
     recommender = get_recommender()
-    result = recommender.predict(qc, noise_path, alpha=alpha)
+    result = recommender.predict(
+        qc, noise_path, alpha=alpha, pilot_seed=node_seed,
+    )
 
     if result is None:
         return _make_step(
@@ -751,7 +838,22 @@ def _handle_qshot(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
             str(k): float(v) for k, v in (result.get("pilot_pf") or {}).items()
         },
     }
-    return _make_step(node, "ok", started_at=t0, summary=summary)
+    step = _make_step(
+        node, "ok", started_at=t0, summary=summary, seed_used=node_seed,
+    )
+    if node_seed is not None:
+        # With node_seed threaded into the pilot, the recommendation
+        # depends on the per-run seed draw: fresh mode derives a new
+        # node_seed each run → a genuinely new pilot → the result must
+        # not be served from the fresh-namespace cache. (Pinned runs
+        # re-derive the same node_seed, so the seed-salted namespace
+        # may still cache it — executor logic, unchanged.)
+        step = step.model_copy(update={"nondeterministic": True})
+    # node_seed is None only if a caller bypasses the executor (which
+    # always injects one). Then the legacy in-process fixed seed
+    # applies: same inputs → same output within a process → honestly
+    # deterministic, and we leave the flag off.
+    return step
 
 
 def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:

@@ -113,7 +113,10 @@ def look_back_window_ForError(
 
 
 def get_labels_fromNoise(
-    qc: QuantumCircuit, historic_data: list[dict[str, Any]], backend: Any
+    qc: QuantumCircuit,
+    historic_data: list[dict[str, Any]],
+    backend: Any,
+    seed: int | None = None,
 ) -> torch.Tensor:
     """For each historical day, compute the Hellinger distance between
     the noiseless counts and the noisy counts (noise model built from
@@ -129,17 +132,27 @@ def get_labels_fromNoise(
     # a counts-string delimiter and crash.
     qc = qc.copy()
     qc.measure_all()
-    qc = transpile(qc, backend, optimization_level=3)
+    # seed_transpiler / seed_simulator: None keeps the historical
+    # (unseeded) behaviour; an int pins Sabre layout AND every Aer
+    # sampling draw below, so training labels are reproducible given
+    # the workflow executor's per-node seed.
+    qc = transpile(qc, backend, optimization_level=3, seed_transpiler=seed)
 
     simulator = AerSimulator()
-    nonoise_value = simulator.run(qc, shots=SHOTS).result().get_counts()
+    nonoise_value = (
+        simulator.run(qc, shots=SHOTS, seed_simulator=seed).result().get_counts()
+    )
 
     labels: list[float] = []
     for history in historic_data:
         properties = history["properties"]
         noise_model = NoiseModel.from_backend(backend, properties)
         noisy_simulator = AerSimulator(noise_model=noise_model)
-        noise_value = noisy_simulator.run(qc, shots=SHOTS).result().get_counts()
+        noise_value = (
+            noisy_simulator.run(qc, shots=SHOTS, seed_simulator=seed)
+            .result()
+            .get_counts()
+        )
 
         # Hellinger is a proper metric on probability distributions,
         # bounded in [0, 1] — convenient for training.
@@ -269,7 +282,10 @@ def predict_vqc_bound(model: QuPred, x_train: torch.Tensor) -> float:
 
 
 def _train_and_predict(
-    qc: QuantumCircuit, historic_data: list[dict[str, Any]], provider: Any
+    qc: QuantumCircuit,
+    historic_data: list[dict[str, Any]],
+    provider: Any,
+    seed: int | None = None,
 ) -> tuple[float, QuPred]:
     """Shared QuBound pipeline once ``historic_data`` is available.
 
@@ -284,7 +300,7 @@ def _train_and_predict(
     normalized_df = (combined_df - combined_df.mean()) / combined_df.std()
 
     x_train = create_sequences(normalized_df, window_size=SEQUENCE_WINDOW_SIZE)
-    y_train = get_labels_fromNoise(qc, historic_data, provider)
+    y_train = get_labels_fromNoise(qc, historic_data, provider, seed=seed)
     y_train = y_train[SEQUENCE_WINDOW_SIZE:].unsqueeze(1)
 
     model = train_loop(x_train, y_train)
@@ -297,6 +313,7 @@ def call_QuBound(
     provider: Any,
     token: str,
     date: datetime | None = None,
+    seed: int | None = None,
 ) -> tuple[float, QuPred]:
     """Run QuBound against the **live** IBM Quantum Platform API.
 
@@ -321,13 +338,14 @@ def call_QuBound(
     )
     backend = service.backend("ibm_fez")
     historic_data = look_back_window_ForError(backend, date)
-    return _train_and_predict(qc, historic_data, provider)
+    return _train_and_predict(qc, historic_data, provider, seed=seed)
 
 
 def call_QuBound_from_cache(
     qc: QuantumCircuit,
     cached_history_path: str | Path,
     reference_backend: Any = None,
+    seed: int | None = None,
 ) -> tuple[float, QuPred, dict[str, Any]]:
     """Run QuBound against a pickle of pre-fetched 14-day backend
     properties.
@@ -357,7 +375,7 @@ def call_QuBound_from_cache(
     if reference_backend is None:
         reference_backend = FakeFez()
 
-    bound, model = _train_and_predict(qc, historic_data, reference_backend)
+    bound, model = _train_and_predict(qc, historic_data, reference_backend, seed=seed)
     metadata = {
         "backend_name": payload.get("backend_name"),
         "fetched_at": payload.get("fetched_at"),

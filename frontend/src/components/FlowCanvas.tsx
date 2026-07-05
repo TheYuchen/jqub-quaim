@@ -54,7 +54,13 @@ import {
   readHashPayload,
   type SharePayload,
 } from "../lib/share";
-import { buildRunRecord, saveRun } from "../lib/runStore";
+import { buildRunRecord, listRuns, saveRun } from "../lib/runStore";
+import {
+  estimatePipeline,
+  formatSeconds,
+  replicateExtraS,
+  type PipelineEstimate,
+} from "../lib/costModel";
 import { QNode, type QNodeData } from "./QNode";
 import { RibbonEdge } from "./RibbonEdge";
 import { PresetPicker } from "./PresetPicker";
@@ -165,6 +171,74 @@ export function FlowCanvas() {
   const setReplicateCount = useApp((s) => s.setReplicateCount);
   const pendingRestore = useApp((s) => s.pendingRestore);
   const [notice, setNotice] = useState<Notice>(null);
+  // cost-estimate: per-kind medians from this browser's run archive,
+  // recomputed when the canvas kind-set changes or a run is archived
+  // (historyVersion bump). Purely client-side — see lib/costModel.ts.
+  const historyVersion = useApp((s) => s.historyVersion);
+  const [costEst, setCostEst] = useState<PipelineEstimate | null>(null);
+  // Kind multiset key: dragging nodes around must not refetch, but
+  // adding/removing/retyping a block must.
+  const kindsKey = useMemo(
+    () =>
+      nodes
+        .map((n) => (n.data as QNodeData).kind)
+        .sort()
+        .join("|"),
+    [nodes],
+  );
+  useEffect(() => {
+    let alive = true;
+    if (nodes.length === 0) {
+      setCostEst(null);
+      return;
+    }
+    listRuns(100)
+      .then((records) => {
+        if (!alive) return;
+        setCostEst(
+          estimatePipeline(
+            nodes.map((n) => ({ id: n.id, kind: (n.data as QNodeData).kind })),
+            records,
+          ),
+        );
+      })
+      .catch(() => {
+        if (alive) setCostEst(null); // archive unreadable → just no chip
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- kindsKey stands in for nodes
+  }, [kindsKey, historyVersion]);
+  const costChip = useMemo(() => {
+    if (!costEst || nodes.length === 0) return null;
+    const unknownN = costEst.unknownKinds.length;
+    // Nothing observed for ANY canvas kind → an "estimate" would be
+    // pure fiction; show nothing until at least one run is archived.
+    if (costEst.knownS <= 0 && unknownN > 0) return null;
+    let text = `est ~${formatSeconds(costEst.knownS)}`;
+    if (unknownN > 0) text += ` + ${unknownN} unknown`;
+    let title =
+      `Estimated from ${costEst.sampleRuns} archived run(s) in this ` +
+      `browser's own run history — median duration per block kind, ` +
+      `cache hits excluded.`;
+    if (unknownN > 0) {
+      title += ` No history yet for: ${costEst.unknownKinds.join(", ")}.`;
+    }
+    if (replicateCount > 1 && pinnedSeed == null) {
+      const extra = replicateExtraS(
+        costEst,
+        nodes.map((n) => ({ id: n.id, kind: (n.data as QNodeData).kind })),
+        replicateCount,
+      );
+      text += ` · ×${replicateCount} ≈ ${formatSeconds(costEst.knownS + extra)}`;
+      title +=
+        ` Replicate approximation: the deterministic prefix is served ` +
+        `from cache after run 1; only stochastic blocks (sampled ` +
+        `fidelity / QuBound / Qshot) re-run each time.`;
+    }
+    return { text, title };
+  }, [costEst, nodes, replicateCount, pinnedSeed]);
   // Non-danger toasts auto-fade; success is quick, warnings linger a bit
   // longer so the user has time to read every bullet. Runner errors stay
   // put until the next action (Run, Clear, preset change) clears them —
@@ -1067,6 +1141,20 @@ export function FlowCanvas() {
               <option value={10}>×10</option>
               <option value={20}>×20</option>
             </select>
+          )}
+          {/* cost-estimate chip: what will pressing Run cost, judged
+              from this browser's own archived step timings. Sits next
+              to Run so the price tag is read together with the
+              trigger. Mute styling on purpose — it's advisory, not a
+              gate. */}
+          {costChip && (
+            <span
+              data-marker="cost-estimate"
+              className="chip hidden md:inline-flex whitespace-nowrap"
+              title={costChip.title}
+            >
+              {costChip.text}
+            </span>
           )}
           <button
             onClick={runPipeline}
