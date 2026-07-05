@@ -54,17 +54,54 @@ All verified on the live Space (pinned replay reproduces bit-exact;
 5-replicate distribution accumulation; signature on QuCAD pruning of
 vqc_2q_small showed P-2; interval-overlap callout fires).
 
+## Shipped, second push (waves A–D, commits cfb84a4 → f25d955)
+
+7. **Provenance lineage view** — history is now a real visualization:
+   SVG lineage gutter (dots hued by config_hash, rings = pinned seed,
+   hollow+slash = errored, bezier forked_from edges, lane bands for
+   replicate groups), per-group distribution strips (dots on 0-1 with
+   mean tick, buildup visible over time), hover = lineage-chain
+   highlight. No new deps.
+8. **Delta-strip signature glyph** — designed SVG glyph replaces text
+   chips: fixed channel order D/G/P/Q, diverging bars around a zero
+   axis (left/green = decrease = optimizer goal, right/amber =
+   increase, qubits neutral), relative-change normalization capped at
+   ±100%, constant silhouette via zero-ticks. Tile (46×14) and card
+   (180×56) sizes; used on canvas nodes, results cards, comparison
+   table. Per-op diverging bar list in the card.
+9. **Gate-level circuit diff** — backend circuit_diff.py tokenizes
+   per-qubit lanes (op + 3dp param fingerprint, ·c/·t role tags) and
+   LCS-aligns before/after; executor copies the circuit pre-dispatch
+   (mutation-proof) and stamps gate_diff into the transformation
+   payload (≤12q, ≤600 gates, else truncated). Frontend lane view in
+   the signature card (kept dimmed / removed green strikethrough /
+   added amber). Live-verified: QuCAD on vqc_2q_small shows
+   ry(theta_0) removed → ry(0) added, cx kept.
+10. **Evidence pane IA** — pane renamed Evidence with three tabs
+    (Current run / History / Compare), count badges, auto-switch on
+    run start and on second compare selection.
+11. **Comparison shared-prefix folding** — identical leading steps
+    fold into one expandable row; first divergence gets an accent
+    marker ("where do these compositions part ways?").
+12. **Reproducible export** — exported Python embeds the provenance
+    header (run_id/seed_mode/root_seed/app_version) and a
+    _derive_seed helper reproducing the backend's per-node seed
+    derivation, threaded into sampled fidelity as seed_simulator; the
+    exported script reproduces the archived run's exact draw.
+
+Backend test lane: 49 green (test_provenance_phase0 24,
+test_gate_diff 14, test_workflow_helpers 11).
+
 ## Not done yet (ordered backlog)
 
-* **Phase 2.5** — gate-level circuit diff (qubit-lane aligned,
-  changed gates highlighted) in the signature card. Demo scale only
-  (≤10q); big circuits → cite Quantivine as the scaling story.
-* **Phase 3.5** — comparison upgrades: pick-which-fidelity-node,
-  dual-canvas visual diff, >2-way comparison table.
-* **Phase 4** — cost preview (per-node runtime estimates, replicate
-  budget), reproducibility export (manifest + runnable script,
-  extend exportPython with seed), opt-in interaction logging
-  (schema first — needed for the user study).
+* **Phase 3.5 leftovers** — pick-which-fidelity-node in comparison,
+  dual-canvas visual diff, >2-way comparison.
+* **Phase 4 leftovers** — cost preview (per-node runtime estimates,
+  replicate budget); opt-in interaction logging (schema first —
+  needed for the user study). Reproducible export is DONE.
+* **Gate-diff niceties** — pair remove+add of the same op with only a
+  param change into a "modified" state; column-align lanes across
+  qubits by circuit moment.
 * **Seeding audit** — QuBound LSTM training and Qshot pilot runs are
   stochastic but not yet seed-plumbed; only sampled fidelity is.
   Their distribution payloads are also missing.
