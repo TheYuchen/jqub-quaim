@@ -15,6 +15,7 @@ import {
 } from "../lib/nodeCatalog";
 import { NodeParamEditor } from "./NodeParamEditor";
 import { RunStatusChips } from "./RunStatusChips";
+import { SignatureTile } from "./TransformationSignature";
 import { TipIcon } from "./TipIcon";
 import { useApp } from "../lib/store";
 import { FAMILY_HINTS } from "../lib/familyHints";
@@ -337,7 +338,9 @@ function RunResultStrip({
         ? `${Math.round(durationS * 1000)}ms`
         : `${durationS.toFixed(durationS < 10 ? 2 : 1)}s`;
   return (
-    <div className="mt-2 pt-1.5 border-t border-edge/40 flex items-baseline justify-between gap-2">
+    <div className="mt-2 pt-1.5 border-t border-edge/40">
+      <SignatureTile step={step} />
+      <div className="flex items-baseline justify-between gap-2">
       {headline ? (
         <div className="min-w-0 flex-1">
           <div className="text-[9px] uppercase tracking-wider text-mute/70 truncate">
@@ -373,6 +376,7 @@ function RunResultStrip({
             {durFormatted}
           </span>
         )}
+      </div>
       </div>
     </div>
   );

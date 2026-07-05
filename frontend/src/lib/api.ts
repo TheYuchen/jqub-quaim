@@ -92,6 +92,11 @@ export interface StepResult {
    *  deterministic steps. Sampled fidelity: {kind: "binomial", shots,
    *  successes, point, ci95: [lo, hi], counts_top, distinct_outcomes}. */
   distribution?: Record<string, unknown> | null;
+  /** Uniform circuit-transformation payload captured by the executor:
+   *  before/after structural snapshots + shape delta + per-op count
+   *  delta. Same vocabulary for every block type. null when no
+   *  circuit was in scope; changed=false marks pass-through steps. */
+  transformation?: Record<string, unknown> | null;
 }
 
 export interface RunResponse {

@@ -135,6 +135,15 @@ class StepResult(BaseModel):
     # {"kind": "binomial", "shots", "successes", "point", "ci95",
     # "counts_top", "distinct_outcomes"}.
     distribution: dict[str, Any] | None = None
+    # What this step DID to the circuit, in a representation that is
+    # uniform across every block type (built-ins and plugins alike):
+    # before/after snapshots (shape + gate-count-by-op), the shape
+    # delta, and the per-op count delta. Captured centrally by the
+    # executor — handlers never build this themselves, which is what
+    # keeps the vocabulary consistent. None when the step ran without
+    # a circuit in scope; changed=False marks pass-through steps
+    # (metrics, sinks) that read the circuit but left it alone.
+    transformation: dict[str, Any] | None = None
 
 
 class RunResponse(BaseModel):

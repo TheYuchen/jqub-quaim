@@ -185,6 +185,61 @@ def _cache_put(
         _step_cache_node_types.pop(old_key, None)
 
 
+def _transform_snapshot(qc) -> dict | None:
+    """Cheap structural snapshot used for the uniform transformation
+    signature: shape numbers + gate counts by op name. None when there
+    is no circuit in scope."""
+    if qc is None:
+        return None
+    return {
+        "num_qubits": qc.num_qubits,
+        "depth": qc.depth(),
+        "size": qc.size(),
+        "num_parameters": qc.num_parameters,
+        "ops": {str(k): int(v) for k, v in qc.count_ops().items()},
+    }
+
+
+def _build_transformation(before: dict | None, after: dict | None) -> dict | None:
+    """Uniform before/after diff for the transformation signature.
+
+    The whole point is that this vocabulary is the SAME for every block
+    (QuCAD pruning, CompVQC folding, a transpile, a user plugin): shape
+    delta + per-op count delta. Kind-specific detail stays in each
+    handler's summary; this payload is what makes transformations
+    comparable across algorithms.
+    """
+    if before is None and after is None:
+        return None
+    if before is None or after is None:
+        # Circuit appeared (source) or disappeared (never happens
+        # today, but plugins could). Report what exists; delta is
+        # relative to an empty snapshot.
+        empty = {"num_qubits": 0, "depth": 0, "size": 0, "num_parameters": 0, "ops": {}}
+        b = before or empty
+        a = after or empty
+    else:
+        b, a = before, after
+    delta = {
+        k: a[k] - b[k]
+        for k in ("num_qubits", "depth", "size", "num_parameters")
+    }
+    all_ops = set(b["ops"]) | set(a["ops"])
+    ops_delta = {
+        op: a["ops"].get(op, 0) - b["ops"].get(op, 0)
+        for op in sorted(all_ops)
+        if a["ops"].get(op, 0) != b["ops"].get(op, 0)
+    }
+    changed = any(v != 0 for v in delta.values()) or bool(ops_delta)
+    return {
+        "before": before,
+        "after": after,
+        "delta": delta,
+        "ops_delta": ops_delta,
+        "changed": changed,
+    }
+
+
 def _make_step(
     node: FlowNode,
     status: str,
@@ -1148,14 +1203,25 @@ def _execute_pipeline(
         # cached ctx snapshots.
         if root_seed is not None:
             ctx["node_seed"] = derive_node_seed(root_seed, node.id)
+        # Snapshot the circuit before dispatch so the executor (not the
+        # handlers) can report what the step did to it — the uniform
+        # transformation vocabulary must not depend on each handler
+        # remembering to fill it in.
+        before_snapshot = _transform_snapshot(ctx.get("circuit"))
         result = _dispatch_one_node(node, ctx, circuit, settings, user_id)
         ctx.pop("node_seed", None)
 
         # Stamp the post-step circuit shape onto successful results so
         # the canvas can draw data-flow labels on outgoing edges.
         if result.status == "ok" and "circuit" in ctx:
+            after_snapshot = _transform_snapshot(ctx.get("circuit"))
             result = result.model_copy(
-                update={"circuit_shape": _shape_of(ctx["circuit"])},
+                update={
+                    "circuit_shape": _shape_of(ctx["circuit"]),
+                    "transformation": _build_transformation(
+                        before_snapshot, after_snapshot,
+                    ),
+                },
             )
 
         # Disable cache forward of the first nondeterministic step.

@@ -23,6 +23,7 @@ import { StepBody } from "./results/cards";
 import { PluginFigures } from "./PluginFigures";
 import { RunStatusChips } from "./RunStatusChips";
 import { RunHistory } from "./RunHistory";
+import { SignatureCard } from "./TransformationSignature";
 
 export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const run = useApp((s) => s.run);
@@ -207,6 +208,7 @@ function StepCard({ step }: { step: StepResult }) {
       {step.status === "ok" && step.summary && Object.keys(step.summary).length > 0 && (
         <StepBody step={step} />
       )}
+      {step.status === "ok" && <SignatureCard step={step} />}
       {step.status === "ok" && step.figures && step.figures.length > 0 && (
         <PluginFigures figures={step.figures} />
       )}

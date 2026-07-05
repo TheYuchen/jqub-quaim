@@ -198,5 +198,58 @@ class SampledReproducibilityTests(unittest.TestCase):
         self.assertIsNone(step.distribution)
 
 
+
+
+class TransformationSignatureTests(unittest.TestCase):
+    """The executor-level uniform transformation capture: shape delta +
+    per-op count delta, same vocabulary for every block type."""
+
+    def test_none_when_no_circuit(self) -> None:
+        self.assertIsNone(ws._build_transformation(None, None))
+
+    def test_pass_through_marked_unchanged(self) -> None:
+        snap = {"num_qubits": 2, "depth": 2, "size": 2,
+                "num_parameters": 0, "ops": {"h": 1, "cx": 1}}
+        t = ws._build_transformation(snap, dict(snap))
+        assert t is not None
+        self.assertFalse(t["changed"])
+        self.assertEqual(t["ops_delta"], {})
+        self.assertEqual(t["delta"]["depth"], 0)
+
+    def test_pruning_delta(self) -> None:
+        before = {"num_qubits": 4, "depth": 12, "size": 30,
+                  "num_parameters": 24, "ops": {"ry": 24, "cx": 6}}
+        after = {"num_qubits": 4, "depth": 8, "size": 18,
+                 "num_parameters": 12, "ops": {"ry": 12, "cx": 6}}
+        t = ws._build_transformation(before, after)
+        assert t is not None
+        self.assertTrue(t["changed"])
+        self.assertEqual(t["delta"],
+                         {"num_qubits": 0, "depth": -4, "size": -12,
+                          "num_parameters": -12})
+        self.assertEqual(t["ops_delta"], {"ry": -12})
+
+    def test_source_materializes_from_empty(self) -> None:
+        after = {"num_qubits": 2, "depth": 2, "size": 2,
+                 "num_parameters": 0, "ops": {"h": 1, "cx": 1}}
+        t = ws._build_transformation(None, after)
+        assert t is not None
+        self.assertTrue(t["changed"])
+        self.assertIsNone(t["before"])
+        self.assertEqual(t["delta"]["size"], 2)
+
+    @unittest.skipUnless(HAVE_AER, "qiskit not installed")
+    def test_snapshot_of_real_circuit(self) -> None:
+        from qiskit import QuantumCircuit
+        qc = QuantumCircuit(2)
+        qc.h(0)
+        qc.cx(0, 1)
+        snap = ws._transform_snapshot(qc)
+        assert snap is not None
+        self.assertEqual(snap["num_qubits"], 2)
+        self.assertEqual(snap["ops"], {"h": 1, "cx": 1})
+        self.assertIsNone(ws._transform_snapshot(None))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
