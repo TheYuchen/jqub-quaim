@@ -183,3 +183,28 @@ mirror synced ONLY on explicit request. After push: ~2-4 min rebuild,
 smoke = /api/health + a pinned-seed run. Unit lane:
 backend/tests/*.py runnable directly, no torch needed
 (29 tests green as of d105dc7).
+
+## Novelty roadmap (full-system review, 2026-07-05)
+
+Honest standing: the shipped five (multiverse, lineage, signatures+gate
+diff, interval comparison, ribbon canvas) are a strong design-study
+core but individually assemble known vocabulary. Two more waves carry
+genuinely unnamed ideas; both DEEPEN the existing narrative
+(stochastic+costly evidence) rather than widening it:
+
+* **Wave I — Anytime evidence steering** (in progress): sampled steps
+  stream shot batches; CIs narrow LIVE on node faces and cards; a
+  target-precision affordance ("stop at ±2pp") makes optional
+  stopping a visual interaction. Sequential-analysis steering has no
+  prior art in VIS. Pinned replay must stay bit-exact via per-batch
+  seeds derived from node_seed.
+* **Wave J — Uncertainty-in-provenance** (next session): lineage nodes
+  ARE distributions; encode evidence mass (node weight) and its
+  split/accumulation across forks. Minimal honest version only — no
+  decoration without a task.
+* Wave K (paper discussion, not build): difference-of-differences
+  ("did more shots help bell more than vqc?") as future work.
+
+Audit bar for every wave: tsc+build+57 tests, live seeded regression,
+pinned-replay bit-exactness, fresh-visitor first paint, encoding
+rationale comments, this doc updated.
