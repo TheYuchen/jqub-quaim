@@ -30,6 +30,7 @@ from qiskit import QuantumCircuit, qpy, transpile
 from app.config import Settings, ibm_history_cache_path
 from app.schemas import FlowEdge, FlowNode, StepResult
 from app.services.run_cache import qpy_dump_bytes
+from app.services.stats import wilson_interval
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,20 @@ def _now() -> float:
     return time.time()
 
 
+def derive_node_seed(root_seed: int, node_id: str) -> int:
+    """Per-node seed derived from the run's root seed and the node id.
+
+    Deterministic and independent of both execution order and the rest
+    of the graph: adding or removing an unrelated node never changes
+    this node's draw under the same root seed, which keeps A/B
+    comparisons honest (the only thing that varies is what the user
+    actually changed). 31-bit so it fits every simulator seed
+    parameter we feed it to.
+    """
+    digest = hashlib.sha256(f"{root_seed}:{node_id}".encode()).digest()
+    return int.from_bytes(digest[:4], "big") % (2**31)
+
+
 # ---- Per-node intermediate result cache --------------------------------
 #
 # After each step, we snapshot the StepResult + the ctx dict (shallow
@@ -87,12 +102,18 @@ _step_cache: OrderedDict[str, tuple[StepResult, dict]] = OrderedDict()
 
 
 
-def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode]) -> str:
+def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode], salt: str = "") -> str:
     """Hash the pipeline prefix up to and including the last node in
     ``nodes_so_far``. Two runs with the same circuit + same node
     sequence (types and params) will produce the same prefix hash at
     each step, enabling cache hits for unchanged prefixes."""
     h = hashlib.sha256(circuit_qpy)
+    if salt:
+        # Seed-pinned runs get their own cache namespace: a stochastic
+        # step's cached result is only valid for the exact seed that
+        # produced it. Unsalted (fresh) runs keep today's namespace so
+        # precomputed/prewarmed entries stay reachable.
+        h.update(salt.encode())
     for n in nodes_so_far:
         h.update(
             json.dumps(
@@ -173,6 +194,8 @@ def _make_step(
     label: str | None = None,
     figures: list[dict] | None = None,
     circuit_shape: dict | None = None,
+    distribution: dict | None = None,
+    seed_used: int | None = None,
 ) -> StepResult:
     t0 = started_at if started_at is not None else _now()
     return StepResult(
@@ -186,6 +209,8 @@ def _make_step(
         message=message,
         figures=figures,
         circuit_shape=circuit_shape,  # type: ignore[arg-type]
+        distribution=distribution,
+        seed_used=seed_used,
     )
 
 
@@ -719,9 +744,11 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
         if method == "sampled":
             backend = ctx.get("backend")
             shots = int(ctx.get("shots", 1024))
+            node_seed = ctx.get("node_seed")
             fid, meta = sampledFidelityEstimator(
                 ctx["circuit"], backend, shots,
                 unbound_param_policy=unbound_policy,
+                seed=node_seed,
             )
         else:
             fid, meta = simpleFidelityEstimator(
@@ -745,10 +772,37 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
 
     ctx["fidelity"] = float(fid)
     summary: dict = {"fidelity": float(fid), **meta}
-    step = _make_step(node, "ok", started_at=t0, summary=summary)
+
+    distribution: dict | None = None
+    seed_used: int | None = None
+    if method == "sampled":
+        # Structured uncertainty payload: the point estimate is a
+        # binomial proportion (|0…0⟩ successes over shots), so we
+        # report a Wilson interval alongside the raw histogram
+        # material. This is what the frontend renders as a
+        # distribution instead of a bare scalar.
+        shots_n = int(meta.get("shots", 0)) or 1
+        successes = int(meta.get("observed_zero_counts", 0))
+        lo, hi = wilson_interval(successes, shots_n)
+        distribution = {
+            "kind": "binomial",
+            "shots": shots_n,
+            "successes": successes,
+            "point": float(fid),
+            "ci95": [lo, hi],
+            "counts_top": meta.get("counts_top", {}),
+            "distinct_outcomes": meta.get("distinct_outcomes"),
+        }
+        seed_used = meta.get("seed")
+
+    step = _make_step(
+        node, "ok", started_at=t0, summary=summary,
+        distribution=distribution, seed_used=seed_used,
+    )
     # Sampled fidelity draws fresh shots every run — caching one draw
     # and replaying it would silently lie about the noise variance.
-    # Statevector is fully deterministic and stays cacheable.
+    # (Under a pinned seed the executor re-enables caching: the draw
+    # is then reproducible by construction.)
     if method == "sampled":
         step = step.model_copy(update={"nondeterministic": True})
     return step
@@ -1034,6 +1088,8 @@ def _execute_pipeline(
     edges: list[FlowEdge],
     settings: Settings,
     user_id: str | None,
+    root_seed: int | None = None,
+    seed_pinned: bool = False,
 ) -> Generator[StepResult, None, None]:
     """Single execution loop for a pipeline graph.
 
@@ -1063,10 +1119,11 @@ def _execute_pipeline(
     circuit_qpy = qpy_dump_bytes(circuit)  # expensive; reuse across prefixes
     nodes_so_far: list[FlowNode] = []
     cache_disabled = False
+    cache_salt = f"seed:{root_seed}" if seed_pinned else ""
 
     for node in ordered:
         nodes_so_far.append(node)
-        prefix_key = _prefix_hash(circuit_qpy, nodes_so_far)
+        prefix_key = _prefix_hash(circuit_qpy, nodes_so_far, salt=cache_salt)
         prefix_types = {n.type for n in nodes_so_far}
 
         # Cache hit path. A nondeterministic cached entry MUST NEVER
@@ -1074,7 +1131,7 @@ def _execute_pipeline(
         # actively evicted so they can't haunt future runs).
         if not cache_disabled and prefix_key in _step_cache:
             cached_result, cached_ctx = _step_cache[prefix_key]
-            if cached_result.nondeterministic:
+            if cached_result.nondeterministic and not seed_pinned:
                 del _step_cache[prefix_key]
                 _step_cache_node_types.pop(prefix_key, None)
                 cache_disabled = True
@@ -1085,8 +1142,14 @@ def _execute_pipeline(
                 yield cached_result.model_copy(update={"from_step_cache": True})
                 continue
 
-        # Cache miss: actually run the node.
+        # Cache miss: actually run the node. Stochastic handlers read
+        # their per-node seed from ctx; it is injected just for the
+        # dispatch and popped right after, so it never leaks into the
+        # cached ctx snapshots.
+        if root_seed is not None:
+            ctx["node_seed"] = derive_node_seed(root_seed, node.id)
         result = _dispatch_one_node(node, ctx, circuit, settings, user_id)
+        ctx.pop("node_seed", None)
 
         # Stamp the post-step circuit shape onto successful results so
         # the canvas can draw data-flow labels on outgoing edges.
@@ -1098,7 +1161,7 @@ def _execute_pipeline(
         # Disable cache forward of the first nondeterministic step.
         # Set the flag BEFORE _cache_put so this step itself isn't
         # written — otherwise a single shot draw would get cached.
-        if result.nondeterministic:
+        if result.nondeterministic and not seed_pinned:
             cache_disabled = True
         if not cache_disabled and result.status in ("ok", "skipped"):
             _cache_put(prefix_key, result, ctx, prefix_types)
@@ -1119,11 +1182,14 @@ def run_pipeline(
     edges: list[FlowEdge],
     settings: Settings,
     user_id: str | None = None,
+    root_seed: int | None = None,
+    seed_pinned: bool = False,
 ) -> list[StepResult]:
     """Eager wrapper: run the pipeline and collect StepResults."""
     return list(_execute_pipeline(
         circuit=circuit, nodes=nodes, edges=edges,
         settings=settings, user_id=user_id,
+        root_seed=root_seed, seed_pinned=seed_pinned,
     ))
 
 
@@ -1134,10 +1200,13 @@ def run_pipeline_stream(
     edges: list[FlowEdge],
     settings: Settings,
     user_id: str | None = None,
+    root_seed: int | None = None,
+    seed_pinned: bool = False,
 ) -> Generator[StepResult, None, None]:
     """Streaming wrapper for the SSE route. Yields each StepResult as
     soon as it completes so the UI can show progressive output."""
     yield from _execute_pipeline(
         circuit=circuit, nodes=nodes, edges=edges,
         settings=settings, user_id=user_id,
+        root_seed=root_seed, seed_pinned=seed_pinned,
     )

@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import secrets
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app._version import APP_VERSION
 from app.config import get_settings
 from app.schemas import RunRequest, RunResponse
 from app.services import auth_service
@@ -47,6 +50,13 @@ def run_workflow(req: RunRequest, request: Request) -> RunResponse:
     settings = get_settings()
     effective_user_id = _effective_user_id(request, req.user_id)
 
+    # Provenance envelope: every run gets an id, and every run gets a
+    # root seed — drawn fresh unless the caller pinned one — so any
+    # historical run can be replayed exactly.
+    seed_pinned = req.seed is not None
+    root_seed = int(req.seed) if seed_pinned else secrets.randbelow(2**31)
+    run_id = uuid4().hex[:12]
+
     # If caller requests live IBM but the server forbids it, refuse loudly
     # (better UX than silently swapping in a fake backend for the whole run).
     if req.use_live_ibm and not (settings.has_ibm_token and settings.allow_live_ibm):
@@ -64,11 +74,21 @@ def run_workflow(req: RunRequest, request: Request) -> RunResponse:
     # Plugin runs also bypass the precomputed cache — the cache was built
     # against built-in handlers only and has no idea what the user's
     # plugin will do.
-    if not req.use_live_ibm and not _uses_plugins(req.nodes):
+    # Seed-pinned runs bypass the precomputed cache: those responses
+    # were generated without the caller's seed and would misreport the
+    # provenance of any stochastic step.
+    if not req.use_live_ibm and not _uses_plugins(req.nodes) and not seed_pinned:
         key = compute_cache_key(qc, req.nodes, req.edges, use_live_ibm=False)
         cached = load_cached_response(key, circuit_id=req.circuit_id)
         if cached is not None:
-            return cached
+            return cached.model_copy(update={
+                "run_id": run_id,
+                "seed_mode": "fresh",
+                # The cached numbers were not produced with this run's
+                # seed draw — advertising one would be provenance fraud.
+                "root_seed": None,
+                "app_version": APP_VERSION,
+            })
 
     try:
         steps = run_pipeline(
@@ -77,6 +97,8 @@ def run_workflow(req: RunRequest, request: Request) -> RunResponse:
             edges=req.edges,
             settings=settings,
             user_id=effective_user_id,
+            root_seed=root_seed,
+            seed_pinned=seed_pinned,
         )
     except ValueError as exc:
         # topological_order raises ValueError for cycles / bad graphs.
@@ -97,6 +119,10 @@ def run_workflow(req: RunRequest, request: Request) -> RunResponse:
         from_cache=False,
         steps=steps,
         final_metrics=final_metrics,
+        run_id=run_id,
+        seed_mode="pinned" if seed_pinned else "fresh",
+        root_seed=root_seed,
+        app_version=APP_VERSION,
     )
 
 
@@ -121,14 +147,38 @@ def run_workflow_stream(req: RunRequest, request: Request):
     if req.use_live_ibm and not (settings.has_ibm_token and settings.allow_live_ibm):
         raise HTTPException(status_code=403, detail="Live IBM execution is disabled.")
 
+    seed_pinned = req.seed is not None
+    root_seed = int(req.seed) if seed_pinned else secrets.randbelow(2**31)
+    run_id = uuid4().hex[:12]
+
+    def _meta_event(*, cached: bool) -> str:
+        payload = {
+            "run_meta": {
+                "run_id": run_id,
+                "seed_mode": "pinned" if seed_pinned else "fresh",
+                # A disk-cache hit predates this run's seed draw — its
+                # numbers were not produced with root_seed.
+                "root_seed": None if cached else root_seed,
+                "app_version": APP_VERSION,
+            }
+        }
+        return f"data: {json.dumps(payload)}\n\n"
+
     # Cache hit → emit all steps at once and close. Plugins bypass the
     # precomputed cache (their behavior is user-specific).
-    if not req.use_live_ibm and not _uses_plugins(req.nodes):
+    if not req.use_live_ibm and not _uses_plugins(req.nodes) and not seed_pinned:
         key = compute_cache_key(qc, req.nodes, req.edges, use_live_ibm=False)
         cached = load_cached_response(key, circuit_id=req.circuit_id)
         if cached is not None:
+            enriched = cached.model_copy(update={
+                "run_id": run_id,
+                "seed_mode": "fresh",
+                "root_seed": None,
+                "app_version": APP_VERSION,
+            })
             def cached_stream():
-                yield f"data: {cached.model_dump_json()}\n\n"
+                yield _meta_event(cached=True)
+                yield f"data: {enriched.model_dump_json()}\n\n"
                 yield "data: [CACHED]\n\n"
             return StreamingResponse(cached_stream(), media_type="text/event-stream")
 
@@ -145,9 +195,11 @@ def run_workflow_stream(req: RunRequest, request: Request):
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
     def step_stream():
+        yield _meta_event(cached=False)
         for step in run_pipeline_stream(
             circuit=qc, nodes=req.nodes, edges=req.edges,
             settings=settings, user_id=effective_user_id,
+            root_seed=root_seed, seed_pinned=seed_pinned,
         ):
             yield f"data: {step.model_dump_json()}\n\n"
         yield "data: [DONE]\n\n"

@@ -84,6 +84,14 @@ export interface StepResult {
    *  refuses to cache the result, and the UI can surface a small
    *  "Live each run" chip so users know what to expect. */
   nondeterministic?: boolean;
+  /** Seed actually consumed by this step's stochastic computation.
+   *  null/absent for deterministic steps. Recorded even in "fresh"
+   *  seed mode, which is what makes every historical run replayable. */
+  seed_used?: number | null;
+  /** Structured uncertainty payload for stochastic results. null for
+   *  deterministic steps. Sampled fidelity: {kind: "binomial", shots,
+   *  successes, point, ci95: [lo, hi], counts_top, distinct_outcomes}. */
+  distribution?: Record<string, unknown> | null;
 }
 
 export interface RunResponse {
@@ -92,6 +100,13 @@ export interface RunResponse {
   from_cache: boolean;
   steps: StepResult[];
   final_metrics: Record<string, unknown>;
+  /** Provenance envelope (server-stamped). run_id is an opaque handle;
+   *  seed_mode/root_seed let the client replay this exact run later;
+   *  app_version records which build produced the numbers. */
+  run_id?: string | null;
+  seed_mode?: "fresh" | "pinned" | null;
+  root_seed?: number | null;
+  app_version?: string | null;
 }
 
 export interface FlowNodePayload {
@@ -122,6 +137,10 @@ export interface RunRequest {
    *  up the right user's uploaded plugins when dispatching nodes
    *  whose `type` isn't a built-in kind. */
   user_id?: string;
+  /** Pin the run's root seed to replay a historical run exactly.
+   *  Omit for a fresh draw — the server reports the drawn seed back
+   *  in RunResponse.root_seed either way. */
+  seed?: number | null;
 }
 
 /** /api/auth/status — public capability probe. The frontend uses
@@ -331,6 +350,7 @@ export const api = {
       let buffer = "";
       const steps: StepResult[] = [];
       let cachedResponse: RunResponse | null = null;
+      let runMeta: Partial<RunResponse> | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -346,6 +366,11 @@ export const api = {
           if (payload === "[DONE]" || payload === "[CACHED]") continue;
           try {
             const parsed = JSON.parse(payload);
+            // Run-level provenance envelope, sent as the first event.
+            if (parsed.run_meta) {
+              runMeta = parsed.run_meta as Partial<RunResponse>;
+              continue;
+            }
             // Cache hit sends a full RunResponse object (has .steps array)
             if (Array.isArray(parsed.steps)) {
               cachedResponse = parsed as RunResponse;
@@ -380,6 +405,7 @@ export const api = {
         from_cache: false,
         steps,
         final_metrics: finalMetrics,
+        ...(runMeta ?? {}),
       });
     } catch (err) {
       onError(err instanceof Error ? err : new Error(String(err)));

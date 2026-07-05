@@ -70,6 +70,12 @@ class RunRequest(BaseModel):
     # Anonymous browser-side UUID for per-user plugin lookup. None when
     # the request uses only built-in blocks.
     user_id: str | None = None
+    # Root seed for stochastic steps. None (default) → the server draws
+    # a fresh root seed and reports it back in the RunResponse, so ANY
+    # run can be replayed later by pinning that seed. Set → "pinned"
+    # replay mode: every stochastic step derives its per-node seed from
+    # this value and the run becomes exactly reproducible.
+    seed: int | None = Field(default=None, ge=0, lt=2**31)
 
 
 
@@ -119,6 +125,16 @@ class StepResult(BaseModel):
     # silent scientific bug. The frontend can also surface it as a
     # "Live each run" chip so users know what to expect.
     nondeterministic: bool = False
+    # Seed actually consumed by this step's stochastic computation.
+    # None for deterministic steps. Recording it even in "fresh" seed
+    # mode is what makes every historical run replayable.
+    seed_used: int | None = None
+    # Structured uncertainty payload for stochastic results. None for
+    # deterministic steps (the scalar in ``summary`` is the whole
+    # truth). Always carries "kind" and "point"; sampled fidelity emits
+    # {"kind": "binomial", "shots", "successes", "point", "ci95",
+    # "counts_top", "distinct_outcomes"}.
+    distribution: dict[str, Any] | None = None
 
 
 class RunResponse(BaseModel):
@@ -127,6 +143,13 @@ class RunResponse(BaseModel):
     from_cache: bool = False
     steps: list[StepResult] = Field(default_factory=list)
     final_metrics: dict[str, Any] = Field(default_factory=dict)
+    # ---- Provenance envelope. run_id is a server-generated opaque
+    # handle; seed_mode/root_seed let the client replay this exact run
+    # later; app_version stamps which build produced the numbers.
+    run_id: str | None = None
+    seed_mode: Literal["fresh", "pinned"] | None = None
+    root_seed: int | None = None
+    app_version: str | None = None
 
 
 # ---------- Backends ----------

@@ -100,6 +100,7 @@ def sampledFidelityEstimator(
     shots: int,
     *,
     unbound_param_policy: str = "bind_zero",
+    seed: int | None = None,
 ) -> tuple[float, dict]:
     """Run the circuit on ``backend`` (which carries the noise model)
     with ``shots`` measurements, return the observed |0…0⟩
@@ -154,7 +155,13 @@ def sampledFidelityEstimator(
         meta["backend_fallback"] = True
 
     transpiled = transpile(qc, sim, optimization_level=0)
-    counts = sim.run(transpiled, shots=int(shots)).result().get_counts()
+    run_kwargs: dict = {"shots": int(shots)}
+    if seed is not None:
+        # Pinning the simulator seed makes this draw exactly
+        # reproducible — the backbone of "replay this historical run".
+        run_kwargs["seed_simulator"] = int(seed)
+        meta["seed"] = int(seed)
+    counts = sim.run(transpiled, **run_kwargs).result().get_counts()
 
     # 5. Observed |0…0⟩ probability. Qiskit reports bits as a string
     #    with classical-bit indexing; the all-zeros string is the
@@ -163,5 +170,11 @@ def sampledFidelityEstimator(
     n_zero = counts.get(zero_key, 0)
     fidelity = float(n_zero) / float(int(shots))
     meta["observed_zero_counts"] = int(n_zero)
+    # Compact histogram material for the frontend's distribution view:
+    # top outcomes by count (capped so the payload stays small even for
+    # wide circuits) plus how many distinct outcomes were observed.
+    top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:16]
+    meta["counts_top"] = {k: int(v) for k, v in top}
+    meta["distinct_outcomes"] = len(counts)
     logger.debug("sampledFidelityEstimator: fidelity=%.6f meta=%s", fidelity, meta)
     return fidelity, meta
