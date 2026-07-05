@@ -22,6 +22,10 @@ import type { QNodeData } from "../components/QNode";
 import type { NodeKind } from "./nodeCatalog";
 
 interface PipelineNode {
+  /** Canvas node id — the SAME id the backend keyed this node's
+   *  per-node seed on (StepResult.node_id), so the exported script's
+   *  _derive_seed(root, id) reproduces the run's exact draw. */
+  id: string;
   kind: NodeKind;
   params: Record<string, unknown>;
 }
@@ -29,6 +33,20 @@ interface PipelineNode {
 interface EmitContext {
   /** Filename suggestion for an Option A QPY load. */
   sampleKey: string | null;
+  /** Root seed of the exported run, non-null ONLY when the script
+   *  preamble emitted the _derive_seed helper — emitters may then
+   *  thread per-node seeds into stochastic calls. */
+  rootSeed: number | null;
+}
+
+/** Provenance envelope of the run this export descends from (the
+ *  store's most recent run). Stamped into the script header so any
+ *  number the script produces can be traced back to a run_id + seed. */
+export interface ExportProvenance {
+  runId: string | null;
+  seedMode: "fresh" | "pinned" | null;
+  rootSeed: number | null;
+  appVersion: string | null;
 }
 
 type Emitter = (b: PipelineNode, stepNum: number, ctx: EmitContext) => string[];
@@ -229,10 +247,19 @@ const emitQshot: Emitter = (b) => {
   ];
 };
 
-const emitFidelity: Emitter = (b) => {
+const emitFidelity: Emitter = (b, _step, ctx) => {
   const method = asStr(b.params.method, "statevector");
   const policy = asStr(b.params.unbound_param_policy, "bind_zero");
   if (method === "sampled") {
+    // Reproducibility: `seed=` threads through to AerSimulator's
+    // seed_simulator inside sampledFidelityEstimator. With the run's
+    // root seed and this node's id, the derived seed is identical to
+    // the one the backend used — the script reproduces the studio
+    // run's exact sampled draw.
+    const seedLines =
+      ctx.rootSeed != null
+        ? [`    seed=_derive_seed(ROOT_SEED, "${b.id}"),  # -> seed_simulator`]
+        : [];
     return [
       `from qlib.qiskit_utils import sampledFidelityEstimator`,
       ``,
@@ -241,6 +268,7 @@ const emitFidelity: Emitter = (b) => {
       `    backend if 'backend' in dir() else None,`,
       `    shots=shots if 'shots' in dir() else 1024,`,
       `    unbound_param_policy="${policy}",`,
+      ...seedLines,
       `)`,
       `print(f"Fidelity (sampled, shots={meta['shots']}): {fidelity:.6f}")`,
     ];
@@ -292,19 +320,47 @@ export function generatePythonScript(
   nodes: Node[],
   edges: Edge[],
   sampleKey: string | null,
+  provenance: ExportProvenance | null = null,
 ): string {
   const sorted = topoSort(nodes, edges);
   const blocks: PipelineNode[] = sorted.map((n) => ({
+    id: n.id,
     kind: (n.data as QNodeData).kind,
     params: ((n.data as QNodeData).params as Record<string, unknown>) ?? {},
   }));
 
+  // Reproducibility: when the exported run recorded a root seed AND
+  // the pipeline contains a stochastic step we can seed (sampled
+  // fidelity), the script gets a _derive_seed helper replicating the
+  // backend's per-node derivation, so exported numbers match archived
+  // numbers bit-for-bit.
+  const rootSeed = provenance?.rootSeed ?? null;
+  const needsSeedHelper =
+    rootSeed != null &&
+    blocks.some(
+      (b) =>
+        b.kind === "fidelity" &&
+        asStr(b.params.method, "statevector") === "sampled",
+    );
+
   const lines: string[] = [];
 
-  // Header
+  // Header — provenance stamp ties the file to the exact archived run
+  // it was exported from (reviewer-traceable: number -> run_id -> seed).
   lines.push(`"""`);
   lines.push(`Pipeline exported from QuDA Studio`);
   lines.push(`https://jqub21-quaim.hf.space/`);
+  if (provenance) {
+    lines.push(``);
+    lines.push(`Provenance of the run this pipeline was exported from:`);
+    if (provenance.runId) lines.push(`  run_id      : ${provenance.runId}`);
+    if (provenance.seedMode) lines.push(`  seed_mode   : ${provenance.seedMode}`);
+    if (provenance.rootSeed != null)
+      lines.push(`  root_seed   : ${provenance.rootSeed}`);
+    if (provenance.appVersion)
+      lines.push(`  app_version : ${provenance.appVersion}`);
+    lines.push(`  exported    : ${new Date().toISOString()}`);
+  }
   lines.push(`"""`);
   lines.push(``);
 
@@ -319,11 +375,30 @@ export function generatePythonScript(
     imports.add("from qiskit_aer import AerSimulator");
     imports.add("from qiskit_aer.noise import NoiseModel");
   }
+  if (needsSeedHelper) imports.add("import hashlib");
   lines.push([...imports].sort().join("\n"));
   lines.push(``);
 
+  if (needsSeedHelper) {
+    lines.push(``);
+    lines.push(`# Per-node seed, matching QuDA Studio's backend derivation exactly:`);
+    lines.push(`# sha256(f"{root}:{node_id}") -> first 4 bytes -> 31-bit int.`);
+    lines.push(`# Order-independent: editing unrelated nodes never changes this`);
+    lines.push(`# node's draw under the same root seed.`);
+    lines.push(`def _derive_seed(root: int, node_id: str) -> int:`);
+    lines.push(`    digest = hashlib.sha256(f"{root}:{node_id}".encode()).digest()`);
+    lines.push(`    return int.from_bytes(digest[:4], "big") % (2**31)`);
+    lines.push(``);
+    lines.push(``);
+    lines.push(`ROOT_SEED = ${rootSeed}  # recorded by QuDA Studio for this run`);
+    lines.push(``);
+  }
+
   const sep = `# ${"─".repeat(60)}`;
-  const ctx: EmitContext = { sampleKey };
+  const ctx: EmitContext = {
+    sampleKey,
+    rootSeed: needsSeedHelper ? rootSeed : null,
+  };
   blocks.forEach((b, i) => {
     const stepNum = i + 1;
     const emitter = EMITTERS[b.kind];

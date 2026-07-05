@@ -46,6 +46,51 @@ function SigCell({ step }: { step: StepResult | undefined }) {
   );
 }
 
+interface StepPair {
+  a: StepResult | undefined;
+  b: StepResult | undefined;
+}
+
+/** One aligned step row. `divergence` marks the first row where the
+ *  two compositions part ways — accent left border + tiny label, so
+ *  the eye lands exactly where the evidence starts. */
+function CompareRow({
+  pair,
+  divergence = false,
+}: {
+  pair: StepPair;
+  divergence?: boolean;
+}) {
+  const { a, b } = pair;
+  return (
+    <tr className="border-t border-edge/40">
+      <td
+        className={`py-0.5 text-ink ${
+          divergence ? "border-l-2 border-l-accent/70 pl-1.5" : ""
+        }`}
+      >
+        {a?.label ?? b?.label ?? "—"}
+        {a && b && a.node_type !== b.node_type && (
+          <span className="text-warn ml-1" title={`A: ${a.node_type}, B: ${b.node_type}`}>≠</span>
+        )}
+        {divergence && (
+          <span
+            className="ml-1.5 text-[8px] uppercase tracking-wider text-accent"
+            title="First step where the two compositions differ (node kind, params, or transformation signature). Everything above is shared prefix."
+          >
+            divergence point
+          </span>
+        )}
+      </td>
+      <td className="py-0.5 pr-2"><SigCell step={a} /></td>
+      <td className="py-0.5 pr-2"><SigCell step={b} /></td>
+      <td className="py-0.5 font-mono text-mute">
+        {a?.status ?? "—"} / {b?.status ?? "—"}
+      </td>
+    </tr>
+  );
+}
+
 function fidelityStep(r: RunRecord): StepResult | undefined {
   for (let i = r.response.steps.length - 1; i >= 0; i--) {
     const s = r.response.steps[i];
@@ -151,10 +196,51 @@ export function CompareView() {
     ciA && ciB ? Math.max(0, Math.min(ciA[1], ciB[1]) - Math.max(ciA[0], ciB[0])) > 0 : null;
 
   const n = Math.max(A.response.steps.length, B.response.steps.length);
-  const rows = Array.from({ length: n }, (_, i) => ({
+  const rows: StepPair[] = Array.from({ length: n }, (_, i) => ({
     a: A.response.steps[i],
     b: B.response.steps[i],
   }));
+
+  // ---- shared-prefix folding -------------------------------------
+  // The analytical question a comparison answers is "where do these
+  // compositions part ways, and what did it cost?" Leading steps that
+  // are identical on both sides carry no part of that answer — they
+  // only push the divergence point (where the evidence lives) below
+  // the fold. A leading row folds when (1) both sides run the same
+  // node kind, (2) the structural param diff above found nothing for
+  // that kind, and (3) both sides' transformation signatures report
+  // the same delta. Such rows collapse into one expandable "shared
+  // prefix" row; the first row that breaks any condition is the
+  // divergence point and gets an accent marker.
+  const diffTouchesKind = (kind: string): boolean =>
+    diffs.some(
+      (d) =>
+        d.where === kind ||
+        d.where.startsWith(`${kind}.`) ||
+        // the circuit-level diff is reported as `where: "circuit"`
+        // but structurally belongs to the input step
+        (d.where === "circuit" && kind === "input_circuit"),
+    );
+  const sameSignature = (x?: StepResult, y?: StepResult): boolean => {
+    const sx = transformationOf(x);
+    const sy = transformationOf(y);
+    if (!sx && !sy) return true; // both signature-less (analysis-only steps)
+    if (!sx || !sy) return false;
+    return (["depth", "size", "num_parameters", "num_qubits"] as const).every(
+      (k) => sx.delta[k] === sy.delta[k],
+    );
+  };
+  let prefixLen = 0;
+  while (prefixLen < rows.length) {
+    const { a, b } = rows[prefixLen];
+    if (!a || !b || a.node_type !== b.node_type) break;
+    if (diffTouchesKind(a.node_type)) break;
+    if (!sameSignature(a, b)) break;
+    prefixLen++;
+  }
+  if (prefixLen < 2) prefixLen = 0; // folding a single row saves nothing
+  const divergenceIdx =
+    prefixLen > 0 && prefixLen < rows.length ? prefixLen : -1;
 
   return (
     <div className="panel-alt p-3 space-y-2 border !border-accent/40">
@@ -239,20 +325,33 @@ export function CompareView() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-t border-edge/40">
-              <td className="py-0.5 text-ink">
-                {r.a?.label ?? r.b?.label ?? "—"}
-                {r.a && r.b && r.a.node_type !== r.b.node_type && (
-                  <span className="text-warn ml-1" title={`A: ${r.a.node_type}, B: ${r.b.node_type}`}>≠</span>
-                )}
-              </td>
-              <td className="py-0.5 pr-2"><SigCell step={r.a} /></td>
-              <td className="py-0.5 pr-2"><SigCell step={r.b} /></td>
-              <td className="py-0.5 font-mono text-mute">
-                {r.a?.status ?? "—"} / {r.b?.status ?? "—"}
+          {prefixLen > 0 && (
+            <tr className="border-t border-edge/40">
+              <td colSpan={4} className="py-0.5">
+                <details>
+                  <summary className="cursor-pointer select-none text-mute hover:text-ink">
+                    shared prefix · {prefixLen} steps
+                    <span className="ml-1 text-mute/60">
+                      (identical kind, params and signature on both sides)
+                    </span>
+                  </summary>
+                  <table className="w-full mt-0.5">
+                    <tbody>
+                      {rows.slice(0, prefixLen).map((pair, i) => (
+                        <CompareRow key={i} pair={pair} />
+                      ))}
+                    </tbody>
+                  </table>
+                </details>
               </td>
             </tr>
+          )}
+          {rows.slice(prefixLen).map((pair, i) => (
+            <CompareRow
+              key={prefixLen + i}
+              pair={pair}
+              divergence={divergenceIdx !== -1 && i === 0}
+            />
           ))}
         </tbody>
       </table>

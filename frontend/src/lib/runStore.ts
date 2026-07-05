@@ -102,6 +102,13 @@ export function getRun(runId: string): Promise<RunRecord | undefined> {
   return tx("readonly", (s) => s.get(runId)) as Promise<RunRecord | undefined>;
 }
 
+/** Archive size without materializing records — IDBObjectStore.count.
+ *  Cheap enough to call on every historyVersion bump (badge material
+ *  for the Evidence pane's History tab). */
+export function countRuns(): Promise<number> {
+  return tx("readonly", (s) => s.count());
+}
+
 /** Newest-first list. Uses the created_at index with a reverse cursor
  *  so we never materialize more than `limit` records. */
 export function listRuns(limit = 100): Promise<RunRecord[]> {

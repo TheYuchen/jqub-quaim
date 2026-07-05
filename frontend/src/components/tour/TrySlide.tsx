@@ -10,6 +10,7 @@ import {
   Atom,
   CircleDot,
   Code2,
+  History,
   LogIn,
   Package,
   Play,
@@ -150,6 +151,15 @@ export function TrySlide({ onClose }: { onClose?: () => void } = {}) {
               download the current pipeline as a runnable Python script for
               your own Jupyter / slurm setup. Tweak parameters and re-run
               inside QuDA to compare a few values side by side.
+            </span>
+          </div>
+          <div className="flex items-start gap-2 text-[12px]">
+            <History className="w-3.5 h-3.5 mt-0.5 text-accent shrink-0" />
+            <span className="text-mute leading-relaxed">
+              <span className="text-ink font-medium">Evidence pane</span> —
+              every run is archived with its seed: replay, fork, and compare
+              runs from the History tab; sampled results show confidence
+              intervals, not bare numbers.
             </span>
           </div>
           <div className="flex items-start gap-2 text-[12px]">

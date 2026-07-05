@@ -248,7 +248,16 @@ function lineageOf(
   return chain;
 }
 
-export function RunHistory() {
+/** Provenance lineage panel.
+ *
+ * Hosting modes:
+ *   standalone (default) — collapsible header + capped height (the
+ *                          pre-tabs layout, kept for reuse);
+ *   embedded             — inside the Evidence pane's History tab:
+ *                          always fully expanded, no toggle, no height
+ *                          cap (the tab body owns scrolling).
+ */
+export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const historyVersion = useApp((s) => s.historyVersion);
   const requestRestore = useApp((s) => s.requestRestore);
   const compareIds = useApp((s) => s.compareIds);
@@ -278,7 +287,14 @@ export function RunHistory() {
     [hoverId, records, layout],
   );
 
-  if (records.length === 0) return null;
+  if (records.length === 0)
+    return embedded ? (
+      <div className="panel-alt p-4 text-[12px] text-mute leading-relaxed">
+        No archived runs yet. Every run is archived here automatically,
+        seed included — run the pipeline once and it will appear, ready
+        to restore, replay (exact numbers), or compare.
+      </div>
+    ) : null;
 
   const restore = (r: RunRecord, pin: boolean) =>
     requestRestore({
@@ -293,20 +309,22 @@ export function RunHistory() {
 
   return (
     <div className="panel-alt overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-surfaceAlt"
-        aria-expanded={open}
-      >
-        <History className="w-3.5 h-3.5 text-mute" />
-        <span className="text-xs font-semibold text-ink">Run history</span>
-        <span className="chip">{records.length}</span>
-        <span className="ml-auto text-[10px] text-mute">{open ? "hide" : "show"}</span>
-      </button>
-      {open && (
+      {!embedded && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full px-3 py-2 flex items-center gap-2 text-left hover:bg-surfaceAlt"
+          aria-expanded={open}
+        >
+          <History className="w-3.5 h-3.5 text-mute" />
+          <span className="text-xs font-semibold text-ink">Run history</span>
+          <span className="chip">{records.length}</span>
+          <span className="ml-auto text-[10px] text-mute">{open ? "hide" : "show"}</span>
+        </button>
+      )}
+      {(embedded || open) && (
         <>
-          <div className="max-h-[320px] overflow-y-auto">
+          <div className={embedded ? "" : "max-h-[320px] overflow-y-auto"}>
             {/* Relative wrapper: the SVG gutter is absolutely positioned
                 inside the scrolled content, so lineage marks scroll in
                 lockstep with the rows they annotate. */}

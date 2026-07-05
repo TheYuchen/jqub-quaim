@@ -4,6 +4,7 @@
 // keeps the pane's own scaffolding (header, empty/running states, final
 // metrics roll-up).
 
+import { useEffect, useState } from "react";
 import { useApp } from "../lib/store";
 import type { StepResult } from "../lib/api";
 import {
@@ -23,17 +24,59 @@ import { StepBody } from "./results/cards";
 import { PluginFigures } from "./PluginFigures";
 import { RunStatusChips } from "./RunStatusChips";
 import { RunHistory } from "./RunHistory";
+import { countRuns } from "../lib/runStore";
 import { SignatureCard } from "./TransformationSignature";
 import { CompareView } from "./CompareView";
+
+type EvidenceTab = "current" | "history" | "compare";
 
 export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const run = useApp((s) => s.run);
   const running = useApp((s) => s.running);
+  const compareIds = useApp((s) => s.compareIds);
+  const historyVersion = useApp((s) => s.historyVersion);
+
+  // Tabbed information architecture. The pane is an evidence
+  // workbench with three analytical modes — the live run (cards),
+  // the archive (lineage view), and the cross-run comparison — and
+  // each mode gets the full pane height instead of fighting for
+  // scroll space in one vertical stack.
+  const [tab, setTab] = useState<EvidenceTab>("current");
+
+  // Archive size for the History badge. countRuns() is a bare
+  // IndexedDB count (no record materialization), refreshed whenever a
+  // run is archived (historyVersion bump) — cheaper than threading a
+  // callback out of RunHistory, and it works while that tab is
+  // unmounted.
+  const [archived, setArchived] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    countRuns()
+      .then((n) => {
+        if (!cancelled) setArchived(n);
+      })
+      .catch(() => {
+        /* IndexedDB unavailable (private mode etc.) — badge stays 0 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [historyVersion]);
+
+  // Auto-switching: starting a run pulls focus to the live cards;
+  // ticking the 2nd compare checkbox (in History) jumps straight to
+  // the comparison verdict.
+  useEffect(() => {
+    if (running) setTab("current");
+  }, [running]);
+  useEffect(() => {
+    if (compareIds.length === 2) setTab("compare");
+  }, [compareIds.length]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink truncate">Results</h3>
+        <h3 className="text-sm font-semibold text-ink truncate">Evidence</h3>
         <div className="flex items-center gap-1.5 shrink-0">
           {run?.seed_mode && (
             <span
@@ -42,7 +85,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
                 run.seed_mode === "pinned"
                   ? `Replayed with pinned root seed ${run.root_seed} — stochastic steps reproduce exactly.`
                   : run.root_seed != null
-                    ? `Fresh draw. Recorded root seed ${run.root_seed} — replay it any time from the run history below.`
+                    ? `Fresh draw. Recorded root seed ${run.root_seed} — replay it any time from the History tab.`
                     : "Served from the precomputed cache — no seed was drawn for this response."
               }
             >
@@ -67,23 +110,125 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
               type="button"
               onClick={onCollapse}
               className="text-mute hover:text-ink rounded hover:bg-surfaceAlt p-0.5"
-              title="Collapse results pane"
-              aria-label="Collapse results pane"
+              title="Collapse evidence pane"
+              aria-label="Collapse evidence pane"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
-        <CompareView />
-        <RunHistory />
-        {!run && !running && <EmptyHint />}
-        {running && <RunningHint />}
-        {run && run.steps.map((s) => <StepCard key={s.node_id} step={s} />)}
-        {run && run.final_metrics && <FinalMetrics metrics={run.final_metrics} />}
-        {run && !running && run.ok && <NextStepsHint />}
+      {/* Segmented tab control. flex-wrap so it degrades gracefully at
+          mobile-drawer widths (this pane is also hosted in MobileDrawer). */}
+      <div
+        className="shrink-0 border-b border-edge px-2 py-1.5 flex flex-wrap items-center gap-1"
+        role="tablist"
+        aria-label="Evidence views"
+      >
+        <TabButton
+          label="Current run"
+          active={tab === "current"}
+          onClick={() => setTab("current")}
+        />
+        <TabButton
+          label="History"
+          active={tab === "history"}
+          onClick={() => setTab("history")}
+          badge={archived > 0 ? archived : null}
+        />
+        <TabButton
+          label="Compare"
+          active={tab === "compare"}
+          onClick={() => setTab("compare")}
+          badge={compareIds.length > 0 ? compareIds.length : null}
+        />
       </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+        {tab === "current" && (
+          <>
+            {!run && !running && <EmptyHint />}
+            {running && <RunningHint />}
+            {run && run.steps.map((s) => <StepCard key={s.node_id} step={s} />)}
+            {run && run.final_metrics && <FinalMetrics metrics={run.final_metrics} />}
+            {run && !running && run.ok && <NextStepsHint />}
+          </>
+        )}
+        {tab === "history" && <RunHistory embedded />}
+        {tab === "compare" &&
+          (compareIds.length === 2 ? (
+            <CompareView />
+          ) : (
+            <CompareEmptyHint
+              selected={compareIds.length}
+              onGoToHistory={() => setTab("history")}
+            />
+          ))}
+      </div>
+    </div>
+  );
+}
+
+function TabButton({
+  label,
+  active,
+  onClick,
+  badge = null,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  badge?: number | null;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors border ${
+        active
+          ? "border-edge bg-surfaceAlt text-ink font-medium"
+          : "border-transparent text-mute hover:text-ink hover:bg-surfaceAlt"
+      }`}
+    >
+      {label}
+      {badge != null && (
+        <span className={`chip !px-1 !py-0 ${active ? "!border-accent/40 !text-accent" : ""}`}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** Compare tab, fewer than two runs selected: the checkboxes live in
+ *  the History tab, so point there instead of rendering nothing. */
+function CompareEmptyHint({
+  selected,
+  onGoToHistory,
+}: {
+  selected: number;
+  onGoToHistory: () => void;
+}) {
+  return (
+    <div className="panel-alt p-4 text-[12px] text-mute leading-relaxed">
+      <p className="text-ink font-medium mb-1">Compare two archived runs.</p>
+      <p>
+        The compare checkboxes live in the{" "}
+        <button
+          type="button"
+          className="text-accent hover:underline"
+          onClick={onGoToHistory}
+        >
+          History tab
+        </button>{" "}
+        — tick two runs there and this panel lays out their configuration
+        diff, fidelity as confidence intervals, and step-aligned
+        transformation signatures.
+        {selected === 1 && (
+          <span className="text-ink"> One run selected — pick one more.</span>
+        )}
+      </p>
     </div>
   );
 }
@@ -106,6 +251,11 @@ function EmptyHint() {
         (LSTM training) or <span className="text-ink">Qshot</span> (HDBSCAN
         warmup + pilot measurements) run on the shared HF CPU can take
         1–3&nbsp;minutes; every other block finishes within seconds.
+      </p>
+      <p className="mt-2 text-[11px]">
+        Every run is archived with its seed — replay, fork, and compare
+        runs from the <span className="text-ink">History</span> tab;
+        sampled results show confidence intervals, not bare numbers.
       </p>
     </div>
   );

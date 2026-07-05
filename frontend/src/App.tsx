@@ -434,7 +434,7 @@ export default function App() {
           >
             {rightCollapsed ? (
               <CollapsedStrip
-                label="Results"
+                label="Evidence"
                 side="right"
                 onExpand={() => setRightCollapsed(false)}
               />
@@ -464,7 +464,7 @@ export default function App() {
             open={rightDrawerOpen}
             onClose={() => setRightDrawerOpen(false)}
             side="right"
-            title="Results"
+            title="Evidence"
           >
             <ResultsPane />
           </MobileDrawer>

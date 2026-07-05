@@ -655,16 +655,33 @@ export function FlowCanvas() {
       setNotice({ text: "Nothing to export — add some blocks first.", tone: "warn" });
       return;
     }
-    const script = generatePythonScript(nodes, edges, sampleKey);
-    // Download as .py file
+    // Provenance of the most recent run rides along: header stamp
+    // (run_id / seed_mode / root_seed / app_version) + per-node seed
+    // derivation, so the exported script reproduces that run exactly.
+    const lastRun = useApp.getState().run;
+    const provenance =
+      lastRun && (lastRun.run_id || lastRun.root_seed != null)
+        ? {
+            runId: lastRun.run_id ?? null,
+            seedMode: lastRun.seed_mode ?? null,
+            rootSeed: lastRun.root_seed ?? null,
+            appVersion: lastRun.app_version ?? null,
+          }
+        : null;
+    const script = generatePythonScript(nodes, edges, sampleKey, provenance);
+    // Download as .py file; run_id in the name links file <-> archive.
+    const safeId = provenance?.runId
+      ? provenance.runId.replace(/[^a-zA-Z0-9_-]/g, "")
+      : null;
+    const fname = safeId ? `pipeline_${safeId}.py` : "pipeline.py";
     const blob = new Blob([script], { type: "text/x-python" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "pipeline.py";
+    a.download = fname;
     a.click();
     URL.revokeObjectURL(url);
-    setNotice({ text: "Python script downloaded as pipeline.py", tone: "ok" });
+    setNotice({ text: `Python script downloaded as ${fname}`, tone: "ok" });
   };
 
   const runAutoConnect = () => {
