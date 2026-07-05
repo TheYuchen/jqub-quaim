@@ -132,6 +132,27 @@ test_gate_diff 14, test_workflow_helpers 11, test_seed_coverage 8).
     history) next to Run; ×N replicates add (N−1)×Σ(stochastic
     blocks), approximating the cached-prefix effect.
 
+## Shipped, fifth push (first-contact wave, b84dc32 + 8829e2f)
+
+17. **Noise-model memoization** — `AerSimulator.from_backend` /
+    `NoiseModel.from_backend` rebuilt the full device model per
+    sampled-fidelity/QuCAD step (~40-90 s GIL-bound each; the Space
+    once queued >30 of these and served nothing else for an hour).
+    Fake* snapshots are frozen → memoized by backend name
+    (qlib/qiskit_utils.aer_simulator_for / noise_model_for; live IBM
+    never cached). Live-verified: uncached sampled run now ~5 s.
+18. **Bundled first-visit demo archive** — src/data/demoArchive.json:
+    17 REAL RunResponses recorded against the live API (bell_state
+    512-shot ×8 + 2048-shot ×5 for the CI-width A/B; vqc_2q_small
+    QuCAD ×3 for P-2 + gate diff; one same-seed replay pair for the
+    lineage edge). All seed-pinned = every record replayable
+    bit-exact. lib/demoArchive.ts imports via buildRunRecord on first
+    visit only (flag `quda-demo-decided`, empty-archive guard, lazy
+    chunk), rebases created_at, lands the visitor on the Multiverse
+    board. Honesty: `demo: true` flag, per-row chip, banner with
+    "Clear demo data" on Multiverse + History. Tour slide 1 tagline
+    reframed to the evidence story.
+
 ## Not done yet (ordered backlog)
 
 * **Phase 3.5 leftovers** — pick-which-fidelity-node in comparison,
@@ -150,8 +171,8 @@ test_gate_diff 14, test_workflow_helpers 11, test_seed_coverage 8).
   provenance/transformation fields. Either re-run
   scripts/precompute_preset_results.py against the new schema or
   accept cold first hits.
-* **Welcome/tour copy** — still demo-oriented; reposition toward the
-  evidence workbench once features stabilize.
+* **Welcome/tour copy** — slide 1 now tells the evidence story; the
+  middle slides are still feature-tour-oriented.
 * **Formative study** — interview protocol before locking the task
   taxonomy (Meyer-Dykes INFORMED). Blocked on user's go-ahead.
 
