@@ -46,7 +46,9 @@ export function WelcomeSlide() {
         <p className="text-sm text-mute leading-relaxed">
           Drag blocks onto the canvas, hit{" "}
           <span className="kbd">Run pipeline</span>, and see what happens when
-          each algorithm meets real IBM hardware noise.
+          each algorithm meets real IBM hardware noise. Compose a pipeline,
+          then flip to Multiverse to see every configuration you've tried
+          as comparable evidence.
         </p>
       </div>
       <div className="shrink-0">

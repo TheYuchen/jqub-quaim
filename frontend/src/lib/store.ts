@@ -25,6 +25,16 @@ function loadUseLiveIbm(): boolean {
 }
 
 interface AppState {
+  /**
+   * Which workspace fills the center column. "compose" = the React
+   * Flow canvas (edit/run one pipeline). "multiverse" = the
+   * MultiverseBoard (all archived configurations as small multiples).
+   * Deliberately NOT persisted: a fresh visit should always open on
+   * the canvas, where the empty-state guidance lives.
+   */
+  workspaceMode: "compose" | "multiverse";
+  setWorkspaceMode: (m: "compose" | "multiverse") => void;
+
   circuit: CircuitInfo | null;
   setCircuit: (c: CircuitInfo | null) => void;
 
@@ -184,6 +194,8 @@ interface AppState {
 }
 
 export const useApp = create<AppState>((set) => ({
+  workspaceMode: "compose",
+  setWorkspaceMode: (m) => set({ workspaceMode: m }),
   circuit: null,
   setCircuit: (c) => set({ circuit: c }),
   sampleKey: null,

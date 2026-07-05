@@ -10,6 +10,7 @@ import { TopBar } from "./components/TopBar";
 import { NodePalette } from "./components/NodePalette";
 import { FlowCanvas } from "./components/FlowCanvas";
 import { ResultsPane } from "./components/ResultsPane";
+import { MultiverseBoard } from "./components/MultiverseBoard";
 import { CircuitPicker } from "./components/CircuitPicker";
 import { MobileDrawer } from "./components/MobileDrawer";
 import { WelcomeTour, useFirstVisitTour } from "./components/WelcomeTour";
@@ -65,6 +66,7 @@ function loadBool(key: string, def: boolean): boolean {
 export default function App() {
   const setHealth = useApp((s) => s.setHealth);
   const running = useApp((s) => s.running);
+  const workspaceMode = useApp((s) => s.workspaceMode);
   const [ready, setReady] = useState(false);
   const [tourOpen, setTourOpen] = useFirstVisitTour();
   const isDesktop = useIsDesktop();
@@ -397,11 +399,20 @@ export default function App() {
               ariaLabel="Resize pipeline input pane"
             />
           )}
-          <main className="flex-1 min-w-0 flex flex-col min-h-0 overflow-x-hidden">
+          <main className="relative flex-1 min-w-0 flex flex-col min-h-0 overflow-x-hidden">
             <NodePalette />
             <ReactFlowProvider>
               <FlowCanvas />
             </ReactFlowProvider>
+            {/* Multiverse overlay: FlowCanvas stays mounted underneath so
+                the in-progress graph and its pendingRestore watcher
+                survive mode flips (the board's Open action depends on
+                that watcher firing while the canvas is covered). */}
+            {workspaceMode === "multiverse" && (
+              <div className="absolute inset-0 z-20 bg-canvas flex flex-col min-h-0">
+                <MultiverseBoard />
+              </div>
+            )}
           </main>
           {!rightCollapsed && (
             <PaneResizer
@@ -446,11 +457,20 @@ export default function App() {
       ) : (
         /* =====================  Mobile  ====================== */
         <div className="flex-1 flex flex-col min-h-0">
-          <main className="flex-1 min-w-0 flex flex-col min-h-0 overflow-x-hidden">
+          <main className="relative flex-1 min-w-0 flex flex-col min-h-0 overflow-x-hidden">
             <NodePalette />
             <ReactFlowProvider>
               <FlowCanvas />
             </ReactFlowProvider>
+            {/* Multiverse overlay: FlowCanvas stays mounted underneath so
+                the in-progress graph and its pendingRestore watcher
+                survive mode flips (the board's Open action depends on
+                that watcher firing while the canvas is covered). */}
+            {workspaceMode === "multiverse" && (
+              <div className="absolute inset-0 z-20 bg-canvas flex flex-col min-h-0">
+                <MultiverseBoard />
+              </div>
+            )}
           </main>
           <MobileDrawer
             open={leftDrawerOpen}

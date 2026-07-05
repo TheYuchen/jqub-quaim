@@ -34,6 +34,7 @@ import { useEffect, useMemo, useState } from "react";
 import { History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { deleteRun, listRuns, type RunRecord } from "../lib/runStore";
+import { hashHue, hueCss } from "../lib/hues";
 
 // --- layout constants (px) --------------------------------------------------
 // Fixed row heights let the SVG gutter compute node centers arithmetically:
@@ -54,18 +55,6 @@ function timeLabel(ts: number): string {
   const sameDay = d.toDateString() === today.toDateString();
   const hm = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return sameDay ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
-}
-
-/** Stable pastel per config hash so replicate groups pop visually. */
-function hashHue(hash: string): number {
-  let h = 0;
-  for (let i = 0; i < hash.length; i++) h = (h * 31 + hash.charCodeAt(i)) >>> 0;
-  return h % 360;
-}
-
-/** House style for group hues (same recipe the config chips used). */
-function hueCss(hue: number, alpha = 1): string {
-  return `hsl(${hue} 60% 55% / ${alpha})`;
 }
 
 /** Multi-line native tooltip carrying the full provenance detail. */

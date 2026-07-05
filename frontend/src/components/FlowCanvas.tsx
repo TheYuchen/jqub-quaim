@@ -58,6 +58,7 @@ import { buildRunRecord, saveRun } from "../lib/runStore";
 import { QNode, type QNodeData } from "./QNode";
 import { RibbonEdge } from "./RibbonEdge";
 import { PresetPicker } from "./PresetPicker";
+import { WorkspaceToggle } from "./WorkspaceToggle";
 import { ShareButton } from "./ShareButton";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { MoreMenu } from "./MoreMenu";
@@ -951,6 +952,8 @@ export function FlowCanvas() {
             is still self-explanatory — a bare "5·4" turned out to be
             unreadable in user testing. */}
         <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-mute shrink-0">
+          <WorkspaceToggle />
+          <span className="hidden sm:inline text-edge">·</span>
           <span className="hidden sm:inline">{nodes.length} blocks</span>
           <span className="hidden sm:inline text-edge">·</span>
           <span className="hidden sm:inline">{edges.length} links</span>
