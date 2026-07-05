@@ -94,6 +94,68 @@ def simpleFidelityEstimator(
     return float(fidelity), meta
 
 
+# --- device noise-model memoization -----------------------------------------
+# ``AerSimulator.from_backend`` / ``NoiseModel.from_backend`` rebuild the
+# full device noise model from calibration data on EVERY call — for the
+# 100+ qubit Fake* snapshots that is tens of seconds of mostly
+# GIL-bound Python, and it dominated every sampled-fidelity and QuCAD
+# step (each fresh run paid ~40-90 s just to re-derive an identical
+# model). Fake backends carry a frozen calibration snapshot shipped
+# with qiskit-ibm-runtime, so the derived model is immutable for the
+# process lifetime and safe to memoize by backend name. Live IBM
+# backends are deliberately NEVER cached here: their calibration is
+# fetched fresh and drifts between fetches.
+#
+# Consumers treat the returned objects as read-only: the simulator is
+# only used for ``transpile(qc, sim)`` + ``sim.run(...)`` (per-call
+# kwargs, no ``set_options``), and QuCAD passes the noise model into
+# Aer run options untouched.
+
+_FAKE_MODEL_CACHE_MAX = 4  # one per fake backend the UI exposes
+_AER_SIM_CACHE: dict = {}
+_NOISE_MODEL_CACHE: dict = {}
+
+
+def _is_static_fake_backend(backend) -> bool:
+    """True for qiskit-ibm-runtime Fake* snapshot backends only."""
+    return type(backend).__name__.startswith("Fake")
+
+
+def _memo_get(cache: dict, backend, build):
+    name = str(getattr(backend, "name", "") or type(backend).__name__)
+    obj = cache.get(name)
+    if obj is None:
+        obj = build()
+        while len(cache) >= _FAKE_MODEL_CACHE_MAX:
+            cache.pop(next(iter(cache)))
+        cache[name] = obj
+    return obj
+
+
+def aer_simulator_for(backend):
+    """``AerSimulator.from_backend`` memoized for Fake* backends."""
+    from qiskit_aer import AerSimulator
+
+    if backend is None:
+        return AerSimulator()
+    if not _is_static_fake_backend(backend):
+        return AerSimulator.from_backend(backend)
+    return _memo_get(
+        _AER_SIM_CACHE, backend, lambda: AerSimulator.from_backend(backend)
+    )
+
+
+def noise_model_for(backend):
+    """``NoiseModel.from_backend`` memoized for Fake* backends."""
+    from qiskit_aer.noise import NoiseModel
+
+    if not _is_static_fake_backend(backend):
+        return NoiseModel.from_backend(backend)
+    return _memo_get(
+        _NOISE_MODEL_CACHE, backend, lambda: NoiseModel.from_backend(backend)
+    )
+
+
 def sampledFidelityEstimator(
     qc: QuantumCircuit,
     backend,
@@ -145,8 +207,10 @@ def sampledFidelityEstimator(
     #    calibrated noise model. Otherwise (or on failure) fall back
     #    to noiseless AerSimulator.
     try:
-        sim = AerSimulator.from_backend(backend) if backend is not None else AerSimulator()
-        meta["backend_name"] = getattr(backend, "name", None) or "noiseless"
+        sim = aer_simulator_for(backend)
+        meta["backend_name"] = (
+            getattr(backend, "name", None) or "noiseless"
+        ) if backend is not None else "noiseless"
     except Exception:
         # E.g. backend is a string or an unsupported type — silent
         # fallback to noiseless is informative enough at this point.

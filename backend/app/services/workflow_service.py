@@ -469,15 +469,14 @@ def _handle_qucad(node: FlowNode, ctx: dict, settings: Settings) -> StepResult:
         return _make_step(node, "error", started_at=t0, message="QuCAD needs a backend node upstream.")
 
     # Heavy import deferred so startup stays cheap.
-    from qiskit_aer.noise import NoiseModel
-
+    from qlib.qiskit_utils import noise_model_for
     from qlib.qucad import run_qucad_training_noisy
 
     iterations = int(node.data.get("iterations", 3))
     lam = float(node.data.get("lam", 0.005))
     rho = float(node.data.get("rho", 500.0))
 
-    noise_model = NoiseModel.from_backend(backend)
+    noise_model = noise_model_for(backend)
     theta, mask, history = run_qucad_training_noisy(
         qc, noise_model, backend, iterations=iterations, lam=lam, rho=rho
     )

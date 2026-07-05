@@ -41,6 +41,10 @@ export interface RunRecord {
   config_hash: string;
   /** run_id of the archived run this one was restored/forked from. */
   forked_from: string | null;
+  /** True for records imported from the bundled first-visit demo
+   *  archive (real seeded runs recorded against the live backend).
+   *  Lets the UI label them honestly and clear them in one click. */
+  demo?: boolean;
   ok: boolean;
   /** Cheap display fields for the timeline (avoid loading the full
    *  response just to paint a list row). */

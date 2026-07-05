@@ -35,6 +35,7 @@ import { History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { deleteRun, listRuns, type RunRecord } from "../lib/runStore";
 import { hashHue, hueCss } from "../lib/hues";
+import { DemoArchiveBanner } from "./DemoArchiveBanner";
 
 // --- layout constants (px) --------------------------------------------------
 // Fixed row heights let the SVG gutter compute node centers arithmetically:
@@ -313,6 +314,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
       )}
       {(embedded || open) && (
         <>
+          {records.some((r) => r.demo) && <DemoArchiveBanner />}
           <div className={embedded ? "" : "max-h-[320px] overflow-y-auto"}>
             {/* Relative wrapper: the SVG gutter is absolutely positioned
                 inside the scrolled content, so lineage marks scroll in
@@ -401,6 +403,14 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                       >
                         {r.sample_key ?? r.circuit_name ?? "upload"}
                       </span>
+                      {r.demo && (
+                        <span
+                          className="shrink-0 font-mono text-[9px] leading-none px-1 py-0.5 rounded border border-accent/40 text-accent"
+                          title="Bundled demo record — a real run recorded against the live backend, replayable bit-exact via its pinned seed. Use 'Clear demo data' in the banner above to remove all demo records."
+                        >
+                          demo
+                        </span>
+                      )}
                       {r.headline_value != null && (
                         <span className="font-mono text-mute shrink-0">
                           F={(r.headline_value * 100).toFixed(1)}%

@@ -26,8 +26,9 @@ export function WelcomeSlide() {
           <span className="text-ink font-medium">Q</span>uantum{" "}
           <span className="text-ink font-medium">D</span>esign{" "}
           <span className="text-ink font-medium">A</span>utomation{" "}
-          <span className="text-ink font-medium">Studio</span> — interactive
-          workflows for quantum system deployment.
+          <span className="text-ink font-medium">Studio</span> — compose
+          noise-aware quantum pipelines, and treat every run as evidence:
+          seeded, archived, comparable.
         </p>
         <p className="text-mute leading-relaxed mb-4 text-sm">
           From the{" "}
@@ -48,7 +49,9 @@ export function WelcomeSlide() {
           <span className="kbd">Run pipeline</span>, and see what happens when
           each algorithm meets real IBM hardware noise. Compose a pipeline,
           then flip to Multiverse to see every configuration you've tried
-          as comparable evidence.
+          as comparable evidence. Your first visit starts with a small
+          bundled archive of real seeded runs, so the Multiverse board
+          behind this window is already worth a look.
         </p>
       </div>
       <div className="shrink-0">

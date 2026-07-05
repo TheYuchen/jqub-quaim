@@ -34,6 +34,7 @@ import { resolveNodeSpec, type NodeSpec } from "../lib/nodeCatalog";
 import type { PluginManifest } from "../lib/api";
 import { hashHue, hueCss } from "../lib/hues";
 import { WorkspaceToggle } from "./WorkspaceToggle";
+import { DemoArchiveBanner } from "./DemoArchiveBanner";
 
 // --- grouping model ---------------------------------------------------------
 
@@ -377,6 +378,8 @@ export function MultiverseBoard() {
           <span>strip = one dot per replicate (0–100%)</span>
         </div>
       </div>
+
+      {runs != null && runs.some((r) => r.demo) && <DemoArchiveBanner />}
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         {runs == null ? (

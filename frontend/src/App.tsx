@@ -5,6 +5,7 @@ import { PanelLeft, PanelRight } from "lucide-react";
 import { api } from "./lib/api";
 import { getUserId } from "./lib/userId";
 import { useApp } from "./lib/store";
+import { ensureDemoArchive } from "./lib/demoArchive";
 import { useIsDesktop } from "./lib/useMediaQuery";
 import { TopBar } from "./components/TopBar";
 import { NodePalette } from "./components/NodePalette";
@@ -297,6 +298,17 @@ export default function App() {
   // ?auth_error=... — strip it from the URL afterwards so a reload
   // doesn't re-trigger the alert.
   const [authErr, setAuthErr] = useState<string | null>(null);
+  // First visit: seed the browser's empty run archive with the bundled
+  // demo evidence (real seeded runs; see lib/demoArchive.ts) and land
+  // on the Multiverse board, so the evidence views are populated in
+  // the first paint instead of empty-stating. Returning visitors (a
+  // decided flag or any archived runs of their own) are untouched.
+  useEffect(() => {
+    void ensureDemoArchive().then((imported) => {
+      if (imported) useApp.getState().setWorkspaceMode("multiverse");
+    });
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
