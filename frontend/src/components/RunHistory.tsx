@@ -292,6 +292,10 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
       sampleKey: r.sample_key,
       pinSeed: pin ? r.root_seed : null,
       sourceRunId: r.run_id,
+      // The optional-stopping target travels with the run: replaying
+      // an early-stopped run without it would execute all shots and
+      // reproduce nothing.
+      precisionTarget: r.precision_target ?? null,
     });
 
   const enter = (id: string) => setHoverId(id);
@@ -414,6 +418,14 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                       {r.headline_value != null && (
                         <span className="font-mono text-mute shrink-0">
                           F={(r.headline_value * 100).toFixed(1)}%
+                        </span>
+                      )}
+                      {r.stopped_early && (
+                        <span
+                          className="shrink-0 text-accent"
+                          title={`Stopped early: the precision target${r.precision_target != null ? ` (±${(r.precision_target * 100).toFixed(0)}pp)` : ""} was reached before all requested shots ran. Fewer shots = wider CI — the interval already tells that story.`}
+                        >
+                          ⏹
                         </span>
                       )}
                       <span

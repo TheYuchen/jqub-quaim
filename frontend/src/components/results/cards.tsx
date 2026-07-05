@@ -334,6 +334,14 @@ function FidelityCard({
         successes?: number;
         ci95?: [number, number];
         counts_top?: Record<string, number>;
+        shots_requested?: number;
+        stopped_early?: boolean;
+        precision_target?: number;
+        trace?: Array<{
+          shots_done: number;
+          point: number;
+          ci95: [number, number];
+        }>;
       }
     | null
     | undefined;
@@ -378,6 +386,10 @@ function FidelityCard({
           successes={dist.successes ?? 0}
           countsTop={dist.counts_top ?? {}}
           seedUsed={step?.seed_used ?? null}
+          trace={dist.trace ?? []}
+          precisionTarget={dist.precision_target ?? null}
+          stoppedEarly={dist.stopped_early ?? false}
+          shotsRequested={dist.shots_requested ?? dist.shots ?? 0}
         />
       )}
       {dist?.kind === "binomial" && <ReplicateStrip currentPoint={f} />}
@@ -395,6 +407,10 @@ function UncertaintyBlock({
   successes,
   countsTop,
   seedUsed,
+  trace = [],
+  precisionTarget = null,
+  stoppedEarly = false,
+  shotsRequested = 0,
 }: {
   point: number;
   ci: [number, number];
@@ -402,10 +418,19 @@ function UncertaintyBlock({
   successes: number;
   countsTop: Record<string, number>;
   seedUsed: number | null;
+  /** Cumulative per-batch evidence trajectory recorded by the server
+   *  (one Wilson interval per shot batch). Empty for pre-Wave-I
+   *  archived runs, which simply render no funnel. */
+  trace?: Array<{ shots_done: number; point: number; ci95: [number, number] }>;
+  precisionTarget?: number | null;
+  stoppedEarly?: boolean;
+  shotsRequested?: number;
 }) {
   const [lo, hi] = ci;
   const entries = Object.entries(countsTop).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const maxCount = entries.length > 0 ? entries[0][1] : 1;
+  const ppTarget =
+    precisionTarget != null ? (precisionTarget * 100).toFixed(0) : null;
   return (
     <div className="panel-alt p-2 space-y-2">
       <div className="flex items-center justify-between text-[10px] text-mute">
@@ -419,6 +444,37 @@ function UncertaintyBlock({
           </span>
         )}
       </div>
+      {/* Evidence funnel — the run's whole uncertainty trajectory, not
+          just its endpoint. One thin line per shot batch, oldest at
+          the top and most transparent, each drawn on the same fixed
+          0-1 scale as the main interval bar below. Read top-to-bottom
+          it narrows toward the final interval: evidence accumulating.
+          The trace is recorded server-side per batch, so the funnel
+          renders identically for live runs, archived runs and
+          replays — the trajectory is provenance, not an animation. */}
+      {trace.length > 1 && (
+        <div
+          className="evidence-funnel space-y-px"
+          role="img"
+          aria-label={`evidence funnel: ${trace.length} shot batches, interval narrowing from ${((trace[0].ci95[1] - trace[0].ci95[0]) * 100).toFixed(1)} to ${((hi - lo) * 100).toFixed(1)} percentage points wide`}
+          title={`Each line = the 95% CI after one more batch of shots (top = first batch). ${trace.length} batches; width ${((trace[0].ci95[1] - trace[0].ci95[0]) * 100).toFixed(1)}pp → ${((hi - lo) * 100).toFixed(1)}pp.`}
+        >
+          {trace.map((t, i) => (
+            <div key={t.shots_done} className="relative h-[3px]" aria-hidden>
+              <div
+                className="absolute inset-y-0 rounded-full bg-accent"
+                style={{
+                  left: `${t.ci95[0] * 100}%`,
+                  width: `${Math.max(0.5, (t.ci95[1] - t.ci95[0]) * 100)}%`,
+                  // linear opacity ramp: oldest ≈ 0.14, newest ≈ 0.55 —
+                  // history stays subtle, recency reads as saturation
+                  opacity: 0.14 + (0.41 * (i + 1)) / trace.length,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
       {/* interval bar on a fixed 0-1 scale */}
       <div className="relative h-2 rounded bg-surfaceAlt overflow-hidden" aria-hidden>
         <div
@@ -429,7 +485,36 @@ function UncertaintyBlock({
           className="absolute top-0 h-full w-0.5 bg-accent"
           style={{ left: `${point * 100}%` }}
         />
+        {/* Optional-stopping target rendered as the width the user
+            asked for: two ticks at point ± target. When the interval
+            fits between them, the run had permission to stop. */}
+        {precisionTarget != null && (
+          <>
+            <div
+              className="absolute top-0 h-full w-px bg-warn"
+              style={{ left: `${Math.max(0, point - precisionTarget) * 100}%` }}
+            />
+            <div
+              className="absolute top-0 h-full w-px bg-warn"
+              style={{ left: `${Math.min(1, point + precisionTarget) * 100}%` }}
+            />
+          </>
+        )}
       </div>
+      {precisionTarget != null && (
+        <div className="text-[10px] text-mute">
+          {stoppedEarly ? (
+            <span className="text-accent">
+              ⏹ stopped at {shots} of {shotsRequested} shots — target ±
+              {ppTarget}pp reached
+            </span>
+          ) : (
+            <span>
+              target ±{ppTarget}pp (tick marks) — ran all {shots} shots
+            </span>
+          )}
+        </div>
+      )}
       {entries.length > 0 && (
         <div className="space-y-0.5">
           {entries.map(([bits, count]) => (

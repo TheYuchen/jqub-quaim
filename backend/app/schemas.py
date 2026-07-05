@@ -76,6 +76,13 @@ class RunRequest(BaseModel):
     # replay mode: every stochastic step derives its per-node seed from
     # this value and the run becomes exactly reproducible.
     seed: int | None = Field(default=None, ge=0, lt=2**31)
+    # Anytime evidence / optional stopping: target 95%-CI half-width
+    # for sampled-fidelity steps, in absolute fidelity units (0.02 =
+    # "stop at +/-2pp"). None = run every requested shot. Bounded to
+    # (0, 0.5]: a half-width of 0.5 is the vacuous full-scale interval
+    # and anything above it can never bind. This is part of the run's
+    # provenance — replays must re-send it to reproduce an early stop.
+    precision_target: float | None = Field(default=None, gt=0, le=0.5)
 
 
 

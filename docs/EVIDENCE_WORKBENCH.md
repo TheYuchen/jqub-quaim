@@ -153,6 +153,78 @@ test_gate_diff 14, test_workflow_helpers 11, test_seed_coverage 8).
     "Clear demo data" on Multiverse + History. Tour slide 1 tagline
     reframed to the evidence story.
 
+## Shipped, sixth push (Wave I — anytime evidence steering)
+
+19. **Batched sampled fidelity with a replay-stable seed schedule** —
+    sampled fidelity always executes as B = min(8, max(2, shots//128))
+    batches (2048 → 8×256); batch i's Aer seed =
+    sha256(f"{node_seed}:batch:{i}")[:4] % 2^31 (same construction as
+    per-node seeds), so the first k draws are identical no matter
+    where any previous run stopped — optional stopping cannot corrupt
+    replays by construction. Wilson CI recomputed over ALL shots after
+    every batch; qlib carries a deliberate duplicate of the app-layer
+    Wilson fn (layering: qlib never imports app.*) pinned equal by a
+    unit test. `meta.seed_scheme = "batch-sha256-v1"` marks payloads
+    from the new schedule. BREAKING for pre-Wave-I archives: a single
+    2048-shot draw with the node seed is a different random variable
+    than 8 seeded 256-shot draws — the bundled demo archive was
+    re-recorded against the live Space (scripts/rerecord_demo_archive
+    .py preserves run_ids/lineage/created_at, swaps responses).
+20. **SSE progress protocol** — during a sampled step the stream
+    interleaves `{"step_progress": {node_id, batch_i, n_batches,
+    shots_done, successes, point, ci95}}` events between StepResults
+    (batch_i is 1-based = batches completed). Executor mechanics: a
+    plain callback can't make a generator yield, so in streaming mode
+    ONLY (`emit_progress=True`) the fidelity dispatch runs on a worker
+    thread whose `ctx["_progress_cb"]` feeds a queue that the executor
+    drains and yields live; eager run_pipeline never sees progress.
+    `_progress_cb`/`_precision_target` are injected around dispatch
+    and popped like node_seed — never in cached ctx snapshots.
+21. **Server-honoured optional stopping** — RunRequest gains
+    `precision_target: float|None ∈ (0, 0.5]` (95%-CI half-width,
+    absolute fidelity units; half-width = (hi−lo)/2 because Wilson is
+    asymmetric near 0/1). The batching loop stops once the target is
+    met, but never before 2 batches (a 1-batch "CI" is fake
+    precision) and never flags a stop that only lands on the final
+    batch. Honoured in BOTH endpoints (it's a stopping rule, not a
+    rendering concern). distribution gains shots_requested /
+    stopped_early / precision_target / n_batches / trace (the full
+    cumulative per-batch CI trajectory — the funnel is provenance,
+    not an animation). `distribution.shots` = shots actually
+    EXECUTED, so every downstream CI comparison stays honest
+    automatically. Precomputed-cache bypass when a target is set;
+    pinned step-cache salt includes the target (same seed + different
+    target = different numbers).
+22. **Live narrowing UI + evidence funnel** — toolbar select
+    "target: off|±5pp|±2pp|±1pp" (marker `precision-target`) next to
+    the replicate selector, visible under a pinned seed because the
+    target is part of what gets replayed. While a run streams,
+    `liveProgress` (zustand) holds the latest frame per node and the
+    QNode face renders a live-narrowing 0-1-scale CI band (CSS
+    left/width transition = narrowing reads as motion) with a
+    shots/batch counter stated in shots, not percent-done — "done" is
+    the user's call. The fidelity card's UncertaintyBlock renders the
+    **evidence funnel** (marker/class `evidence-funnel`): one thin
+    line per batch on the same fixed 0-1 scale, oldest at top and
+    most transparent (linear opacity ramp 0.14→0.55), narrowing into
+    the main interval bar — the signature visual of the wave; it
+    renders identically for live, archived and replayed runs because
+    it reads the persisted trace. Target renders as two warn-colored
+    ticks at point±target; early stop shows "⏹ stopped at N of M
+    shots — target ±Xpp reached" plus a ⏹-chip with the shot count on
+    the node face.
+23. **Provenance of stopping** — RunRecord persists precision_target
+    + stopped_early; restore/replay writes the target back into the
+    toolbar (a replay without it would run all shots and reproduce
+    nothing); history rows show a ⏹ marker for early-stopped runs
+    (fewer shots — the wider CI already encodes that honestly).
+
+Unit lane now 77 green (+ test_anytime_evidence 20: twin-Wilson pin,
+batch-seed/plan determinism, accumulation==totals, early-stop trace is
+a bit-exact PREFIX of the full run's trace, min-2-batches guard,
+1/√n narrowing, stream-vs-eager bit-equality, pipeline-level
+early-stop replay).
+
 ## Not done yet (ordered backlog)
 
 * **Phase 3.5 leftovers** — pick-which-fidelity-node in comparison,
@@ -192,12 +264,12 @@ core but individually assemble known vocabulary. Two more waves carry
 genuinely unnamed ideas; both DEEPEN the existing narrative
 (stochastic+costly evidence) rather than widening it:
 
-* **Wave I — Anytime evidence steering** (in progress): sampled steps
-  stream shot batches; CIs narrow LIVE on node faces and cards; a
-  target-precision affordance ("stop at ±2pp") makes optional
-  stopping a visual interaction. Sequential-analysis steering has no
-  prior art in VIS. Pinned replay must stay bit-exact via per-batch
-  seeds derived from node_seed.
+* **Wave I — Anytime evidence steering** (SHIPPED — see items 19-23):
+  sampled steps stream shot batches; CIs narrow LIVE on node faces
+  and cards; a target-precision affordance ("stop at ±2pp") makes
+  optional stopping a visual interaction. Sequential-analysis
+  steering has no prior art in VIS. Pinned replay stays bit-exact via
+  per-batch seeds derived from node_seed.
 * **Wave J — Uncertainty-in-provenance** (next session): lineage nodes
   ARE distributions; encode evidence mass (node weight) and its
   split/accumulation across forks. Minimal honest version only — no
@@ -205,6 +277,6 @@ genuinely unnamed ideas; both DEEPEN the existing narrative
 * Wave K (paper discussion, not build): difference-of-differences
   ("did more shots help bell more than vqc?") as future work.
 
-Audit bar for every wave: tsc+build+57 tests, live seeded regression,
+Audit bar for every wave: tsc+build+77 tests, live seeded regression,
 pinned-replay bit-exactness, fresh-visitor first paint, encoding
 rationale comments, this doc updated.

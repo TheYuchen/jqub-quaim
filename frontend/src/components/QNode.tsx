@@ -54,6 +54,10 @@ export function QNode({ id, data, selected }: NodeProps) {
   // run only changes once per Run click.
   const run = useApp((s) => s.run);
   const step = run?.steps.find((s) => s.node_id === id);
+  // Anytime evidence: while a run streams, sampled steps report each
+  // shot batch here BEFORE their StepResult exists — the node face
+  // renders a live-narrowing CI from these frames.
+  const liveProgress = useApp((s) => s.liveProgress?.[id]);
   const stepDurationS =
     step && step.status === "ok"
       ? step.finished_at - step.started_at
@@ -285,6 +289,9 @@ export function QNode({ id, data, selected }: NodeProps) {
           </div>
         )
       )}
+      {!step && liveProgress && (
+        <LiveEvidenceStrip progress={liveProgress} />
+      )}
       {step && step.status === "ok" && (
         <RunResultStrip
           kind={d.kind}
@@ -306,6 +313,53 @@ export function QNode({ id, data, selected }: NodeProps) {
       {hasOutput && (
         <Handle type="source" position={Position.Right} isConnectable={true} />
       )}
+    </div>
+  );
+}
+
+/** Live evidence strip: rendered while a sampled step is still
+ *  accumulating shot batches (i.e. before its StepResult exists).
+ *  Same 0-1 fixed-scale encoding as the post-run micro CI bar so the
+ *  live band morphs seamlessly into the final one; the CSS
+ *  left/width transition is what makes the narrowing READ as motion
+ *  instead of flicker. The counter states the evidence honestly in
+ *  shots, not percent-done — the whole point of anytime steering is
+ *  that "done" is the user's call, not the progress bar's. */
+function LiveEvidenceStrip({
+  progress,
+}: {
+  progress: import("../lib/api").StepProgress;
+}) {
+  const [lo, hi] = progress.ci95;
+  return (
+    <div className="mt-2 pt-1.5 border-t border-edge/40">
+      <div className="flex items-baseline justify-between gap-2 text-[9px] text-mute">
+        <span className="font-mono text-accent">
+          {(progress.point * 100).toFixed(1)}%
+        </span>
+        <span className="font-mono">
+          {progress.shots_done} shots · batch {progress.batch_i}/
+          {progress.n_batches}
+        </span>
+      </div>
+      <div
+        className="relative h-[3px] rounded-full bg-surfaceAlt overflow-hidden mt-1"
+        title={`Evidence so far: ${(progress.point * 100).toFixed(1)}% · 95% CI ${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}% after ${progress.shots_done} shots`}
+        role="img"
+        aria-label={`live uncertainty after ${progress.shots_done} shots: point ${(progress.point * 100).toFixed(1)} percent, interval ${(lo * 100).toFixed(1)} to ${(hi * 100).toFixed(1)} percent`}
+      >
+        <div
+          className="absolute inset-y-0 bg-accent/25 transition-[left,width] duration-300 ease-out"
+          style={{
+            left: `${lo * 100}%`,
+            width: `${Math.max(1, (hi - lo) * 100)}%`,
+          }}
+        />
+        <div
+          className="absolute inset-y-0 w-[2px] bg-accent transition-[left] duration-300 ease-out"
+          style={{ left: `calc(${progress.point * 100}% - 1px)` }}
+        />
+      </div>
     </div>
   );
 }
@@ -343,7 +397,15 @@ function RunResultStrip({
   // any panel. Only steps that emit a binomial distribution payload
   // (sampled fidelity today, plugins tomorrow) render it.
   const dist = step.distribution as
-    | { kind?: string; point?: number; ci95?: [number, number] }
+    | {
+        kind?: string;
+        point?: number;
+        ci95?: [number, number];
+        shots?: number;
+        shots_requested?: number;
+        stopped_early?: boolean;
+        precision_target?: number;
+      }
     | null
     | undefined;
   const ci =
@@ -375,6 +437,14 @@ function RunResultStrip({
         <div className="flex-1 text-[10px] text-ok/80">✓ ran</div>
       )}
       <div className="flex items-center gap-1 shrink-0">
+        {dist?.stopped_early && (
+          <span
+            className="text-[9px] px-1 py-0.5 rounded border border-accent/50 text-accent font-mono"
+            title={`Optional stopping: target ±${((dist.precision_target ?? 0) * 100).toFixed(0)}pp reached after ${dist.shots} of ${dist.shots_requested} shots — the remaining shots were not paid for.`}
+          >
+            ⏹ {dist.shots}
+          </span>
+        )}
         <RunStatusChips step={step} variant="tile" />
         {durationS !== null && (
           <span
@@ -408,7 +478,7 @@ function RunResultStrip({
           ).toFixed(1)} percent`}
         >
           <div
-            className="absolute inset-y-0 bg-accent/25"
+            className="absolute inset-y-0 bg-accent/25 transition-[left,width] duration-300 ease-out"
             style={{
               left: `${ci[0] * 100}%`,
               width: `${Math.max(1, (ci[1] - ci[0]) * 100)}%`,

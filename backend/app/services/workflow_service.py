@@ -20,8 +20,10 @@ import hashlib
 import io
 import json
 import logging
+import queue
 import random
 import re
+import threading
 import time
 from collections import OrderedDict
 from typing import Callable, Generator
@@ -902,10 +904,17 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
             backend = ctx.get("backend")
             shots = int(ctx.get("shots", 1024))
             node_seed = ctx.get("node_seed")
+            # Anytime-evidence channel: the executor injects
+            # ``_progress_cb`` (streaming mode only) and
+            # ``_precision_target`` (both modes) around this dispatch;
+            # like node_seed they are popped right after, so cached
+            # ctx snapshots never carry them.
             fid, meta = sampledFidelityEstimator(
                 ctx["circuit"], backend, shots,
                 unbound_param_policy=unbound_policy,
                 seed=node_seed,
+                progress_cb=ctx.get("_progress_cb"),
+                precision_target=ctx.get("_precision_target"),
             )
         else:
             fid, meta = simpleFidelityEstimator(
@@ -941,6 +950,12 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
         shots_n = int(meta.get("shots", 0)) or 1
         successes = int(meta.get("observed_zero_counts", 0))
         lo, hi = wilson_interval(successes, shots_n)
+        # ``shots`` is the count actually EXECUTED (may be below the
+        # request under an early stop) — the CI is computed over these,
+        # so downstream comparisons stay honest automatically. The
+        # cumulative per-batch trace ships with the record: the
+        # evidence funnel is provenance, not a transient animation.
+        trace = meta.pop("batch_trace", [])  # keep raw summary compact
         distribution = {
             "kind": "binomial",
             "shots": shots_n,
@@ -949,7 +964,14 @@ def _handle_fidelity(node: FlowNode, ctx: dict, _settings: Settings) -> StepResu
             "ci95": [lo, hi],
             "counts_top": meta.get("counts_top", {}),
             "distinct_outcomes": meta.get("distinct_outcomes"),
+            "shots_requested": int(meta.get("shots_requested", shots_n)),
+            "n_batches": meta.get("n_batches_done"),
+            "n_batches_planned": meta.get("n_batches_planned"),
+            "stopped_early": bool(meta.get("stopped_early", False)),
+            "trace": trace,
         }
+        if meta.get("precision_target") is not None:
+            distribution["precision_target"] = float(meta["precision_target"])
         seed_used = meta.get("seed")
 
     step = _make_step(
@@ -1247,7 +1269,9 @@ def _execute_pipeline(
     user_id: str | None,
     root_seed: int | None = None,
     seed_pinned: bool = False,
-) -> Generator[StepResult, None, None]:
+    precision_target: float | None = None,
+    emit_progress: bool = False,
+) -> Generator["StepResult | dict", None, None]:
     """Single execution loop for a pipeline graph.
 
     Both :func:`run_pipeline` (eager list) and
@@ -1267,7 +1291,16 @@ def _execute_pipeline(
       * stops on ``status == 'error'`` so downstream steps don't run
         on inconsistent ctx,
       * caches only ``ok`` / ``skipped`` results — error results are
-        often transient and shouldn't pin the prefix.
+        often transient and shouldn't pin the prefix,
+      * anytime evidence: when ``emit_progress`` is set (streaming
+        route only) sampled-fidelity nodes run on a worker thread and
+        this generator interleaves ``{"step_progress": {...}}`` dicts
+        between StepResults, live, as each shot batch lands. The
+        eager :func:`run_pipeline` path never sees these dicts.
+        ``precision_target`` (CI half-width, absolute fidelity units)
+        is honoured in BOTH modes — it is a server-side stopping rule,
+        not a rendering concern — so replaying an early-stopped run
+        through either endpoint reproduces its stopping point.
     """
     ctx: dict = {"circuit": circuit}
     ordered = topological_order(nodes, edges)
@@ -1277,6 +1310,12 @@ def _execute_pipeline(
     nodes_so_far: list[FlowNode] = []
     cache_disabled = False
     cache_salt = f"seed:{root_seed}" if seed_pinned else ""
+    # A pinned run with a precision target executes fewer shots than
+    # the same seed without one — the cached numbers differ, so the
+    # target is part of the pinned cache identity. (Fresh runs never
+    # cache stochastic steps, so their namespace needs no salt.)
+    if seed_pinned and precision_target is not None:
+        cache_salt += f":pt:{precision_target}"
 
     for node in ordered:
         nodes_so_far.append(node)
@@ -1305,6 +1344,8 @@ def _execute_pipeline(
         # cached ctx snapshots.
         if root_seed is not None:
             ctx["node_seed"] = derive_node_seed(root_seed, node.id)
+        if precision_target is not None:
+            ctx["_precision_target"] = float(precision_target)
         # Snapshot the circuit before dispatch so the executor (not the
         # handlers) can report what the step did to it — the uniform
         # transformation vocabulary must not depend on each handler
@@ -1326,8 +1367,53 @@ def _execute_pipeline(
                 "pre-dispatch circuit copy failed for node %s "
                 "(gate diff will be omitted)", node.id,
             )
-        result = _dispatch_one_node(node, ctx, circuit, settings, user_id)
+        # Anytime evidence: a sampled-fidelity node under a streaming
+        # consumer reports per-batch progress. A plain callback cannot
+        # make a generator yield, so the handler runs on a worker
+        # thread whose callback feeds a queue; this generator drains
+        # the queue and yields each progress dict the moment it lands
+        # (NOT after the step finishes — liveness is the whole point).
+        # Only this node type gets a thread; everything else keeps the
+        # zero-overhead synchronous path.
+        wants_progress = (
+            emit_progress
+            and node.type == "fidelity"
+            and str(node.data.get("method", "statevector")) == "sampled"
+        )
+        if wants_progress:
+            progress_q: queue.Queue = queue.Queue()
+            _q_done = object()  # sentinel: worker finished
+            ctx["_progress_cb"] = progress_q.put
+            holder: dict = {}
+
+            def _worker(node=node):
+                try:
+                    holder["result"] = _dispatch_one_node(
+                        node, ctx, circuit, settings, user_id,
+                    )
+                except BaseException as exc:  # surfaced after drain
+                    holder["exc"] = exc
+                finally:
+                    progress_q.put(_q_done)
+
+            worker = threading.Thread(
+                target=_worker, name=f"fidelity-progress-{node.id}", daemon=True,
+            )
+            worker.start()
+            while True:
+                item = progress_q.get()
+                if item is _q_done:
+                    break
+                yield {"step_progress": {"node_id": node.id, **item}}
+            worker.join()
+            ctx.pop("_progress_cb", None)
+            if "exc" in holder:
+                raise holder["exc"]
+            result = holder["result"]
+        else:
+            result = _dispatch_one_node(node, ctx, circuit, settings, user_id)
         ctx.pop("node_seed", None)
+        ctx.pop("_precision_target", None)
 
         # Stamp the post-step circuit shape onto successful results so
         # the canvas can draw data-flow labels on outgoing edges.
@@ -1386,13 +1472,23 @@ def run_pipeline(
     user_id: str | None = None,
     root_seed: int | None = None,
     seed_pinned: bool = False,
+    precision_target: float | None = None,
 ) -> list[StepResult]:
-    """Eager wrapper: run the pipeline and collect StepResults."""
-    return list(_execute_pipeline(
-        circuit=circuit, nodes=nodes, edges=edges,
-        settings=settings, user_id=user_id,
-        root_seed=root_seed, seed_pinned=seed_pinned,
-    ))
+    """Eager wrapper: run the pipeline and collect StepResults.
+
+    ``emit_progress`` stays off: with progress dicts impossible, the
+    isinstance filter is belt-and-braces for the declared list type.
+    """
+    return [
+        s
+        for s in _execute_pipeline(
+            circuit=circuit, nodes=nodes, edges=edges,
+            settings=settings, user_id=user_id,
+            root_seed=root_seed, seed_pinned=seed_pinned,
+            precision_target=precision_target,
+        )
+        if isinstance(s, StepResult)
+    ]
 
 
 def run_pipeline_stream(
@@ -1404,11 +1500,14 @@ def run_pipeline_stream(
     user_id: str | None = None,
     root_seed: int | None = None,
     seed_pinned: bool = False,
-) -> Generator[StepResult, None, None]:
+    precision_target: float | None = None,
+) -> Generator["StepResult | dict", None, None]:
     """Streaming wrapper for the SSE route. Yields each StepResult as
-    soon as it completes so the UI can show progressive output."""
+    soon as it completes, plus ``{"step_progress": {...}}`` dicts
+    while a sampled-fidelity node accumulates shot batches."""
     yield from _execute_pipeline(
         circuit=circuit, nodes=nodes, edges=edges,
         settings=settings, user_id=user_id,
         root_seed=root_seed, seed_pinned=seed_pinned,
+        precision_target=precision_target, emit_progress=True,
     )

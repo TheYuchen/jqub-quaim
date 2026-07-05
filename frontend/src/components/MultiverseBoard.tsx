@@ -346,6 +346,7 @@ export function MultiverseBoard() {
       sampleKey: src.sample_key,
       pinSeed: null,
       sourceRunId: src.run_id,
+      precisionTarget: src.precision_target ?? null,
     });
     setWorkspaceMode("compose");
   };

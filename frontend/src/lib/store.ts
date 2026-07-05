@@ -9,6 +9,7 @@ import type {
   PluginManifest,
   RunResponse,
   SessionUser,
+  StepProgress,
 } from "./api";
 import type { NodeKind } from "./nodeCatalog";
 import type { SharePayload } from "./share";
@@ -68,6 +69,21 @@ interface AppState {
   setPinnedSeed: (v: number | null) => void;
   replicateCount: number;
   setReplicateCount: (n: number) => void;
+  /**
+   * Anytime evidence steering. precisionTarget is the optional-
+   * stopping rule sent as RunRequest.precision_target (null = run
+   * every shot); it is part of the run's provenance, so restore /
+   * replay writes the archived run's value back here. liveProgress
+   * holds the latest per-batch progress frame per node while a run
+   * streams (null between runs) — the canvas node faces render their
+   * live-narrowing CI from it; the post-run evidence funnel instead
+   * reads the full trace persisted in the step's distribution.
+   */
+  precisionTarget: number | null;
+  setPrecisionTarget: (v: number | null) => void;
+  liveProgress: Record<string, StepProgress> | null;
+  updateLiveProgress: (p: StepProgress) => void;
+  clearLiveProgress: () => void;
   lastConfigHash: string | null;
   setLastConfigHash: (h: string | null) => void;
 
@@ -84,6 +100,11 @@ interface AppState {
     sampleKey: string | null;
     pinSeed: number | null;
     sourceRunId: string;
+    /** Archived run's optional-stopping target. Restored alongside
+     *  the graph — without it a pinned replay of an early-stopped
+     *  run would run all shots and reproduce nothing. undefined =
+     *  record predates Wave I (treated as null). */
+    precisionTarget?: number | null;
   } | null;
   requestRestore: (r: NonNullable<AppState["pendingRestore"]>) => void;
   clearRestore: () => void;
@@ -209,6 +230,14 @@ export const useApp = create<AppState>((set) => ({
   setPinnedSeed: (v) => set({ pinnedSeed: v }),
   replicateCount: 1,
   setReplicateCount: (n) => set({ replicateCount: n }),
+  precisionTarget: null,
+  setPrecisionTarget: (v) => set({ precisionTarget: v }),
+  liveProgress: null,
+  updateLiveProgress: (p) =>
+    set((s) => ({
+      liveProgress: { ...(s.liveProgress ?? {}), [p.node_id]: p },
+    })),
+  clearLiveProgress: () => set({ liveProgress: null }),
   lastConfigHash: null,
   setLastConfigHash: (h) => set({ lastConfigHash: h }),
   pendingRestore: null,

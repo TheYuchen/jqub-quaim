@@ -77,7 +77,14 @@ def run_workflow(req: RunRequest, request: Request) -> RunResponse:
     # Seed-pinned runs bypass the precomputed cache: those responses
     # were generated without the caller's seed and would misreport the
     # provenance of any stochastic step.
-    if not req.use_live_ibm and not _uses_plugins(req.nodes) and not seed_pinned:
+    # A precision target changes how many shots actually run, so a
+    # precomputed full-shots response would misreport the request.
+    if (
+        not req.use_live_ibm
+        and not _uses_plugins(req.nodes)
+        and not seed_pinned
+        and req.precision_target is None
+    ):
         key = compute_cache_key(qc, req.nodes, req.edges, use_live_ibm=False)
         cached = load_cached_response(key, circuit_id=req.circuit_id)
         if cached is not None:
@@ -99,6 +106,7 @@ def run_workflow(req: RunRequest, request: Request) -> RunResponse:
             user_id=effective_user_id,
             root_seed=root_seed,
             seed_pinned=seed_pinned,
+            precision_target=req.precision_target,
         )
     except ValueError as exc:
         # topological_order raises ValueError for cycles / bad graphs.
@@ -166,7 +174,12 @@ def run_workflow_stream(req: RunRequest, request: Request):
 
     # Cache hit → emit all steps at once and close. Plugins bypass the
     # precomputed cache (their behavior is user-specific).
-    if not req.use_live_ibm and not _uses_plugins(req.nodes) and not seed_pinned:
+    if (
+        not req.use_live_ibm
+        and not _uses_plugins(req.nodes)
+        and not seed_pinned
+        and req.precision_target is None  # cached = full shots, wrong under a target
+    ):
         key = compute_cache_key(qc, req.nodes, req.edges, use_live_ibm=False)
         cached = load_cached_response(key, circuit_id=req.circuit_id)
         if cached is not None:
@@ -196,12 +209,21 @@ def run_workflow_stream(req: RunRequest, request: Request):
 
     def step_stream():
         yield _meta_event(cached=False)
-        for step in run_pipeline_stream(
+        # The executor interleaves two event shapes: plain dicts are
+        # anytime-evidence progress frames ({"step_progress": {...}},
+        # emitted per shot batch of a sampled-fidelity node), Pydantic
+        # models are completed StepResults. The client tells them
+        # apart by the step_progress key.
+        for item in run_pipeline_stream(
             circuit=qc, nodes=req.nodes, edges=req.edges,
             settings=settings, user_id=effective_user_id,
             root_seed=root_seed, seed_pinned=seed_pinned,
+            precision_target=req.precision_target,
         ):
-            yield f"data: {step.model_dump_json()}\n\n"
+            if isinstance(item, dict):
+                yield f"data: {json.dumps(item)}\n\n"
+            else:
+                yield f"data: {item.model_dump_json()}\n\n"
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(step_stream(), media_type="text/event-stream")

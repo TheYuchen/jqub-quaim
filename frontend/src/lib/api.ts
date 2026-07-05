@@ -60,6 +60,21 @@ export interface CircuitShape {
   num_parameters: number;
 }
 
+/** Anytime-evidence progress frame, streamed by the run-stream SSE
+ *  endpoint after every completed shot batch of a sampled-fidelity
+ *  step. `batch_i` is 1-based (= batches completed); `ci95` is the
+ *  Wilson interval over ALL shots so far, so a sequence of these
+ *  frames IS the live-narrowing evidence funnel. */
+export interface StepProgress {
+  node_id: string;
+  batch_i: number;
+  n_batches: number;
+  shots_done: number;
+  successes: number;
+  point: number;
+  ci95: [number, number];
+}
+
 export interface StepResult {
   node_id: string;
   node_type: string;
@@ -146,6 +161,12 @@ export interface RunRequest {
    *  Omit for a fresh draw — the server reports the drawn seed back
    *  in RunResponse.root_seed either way. */
   seed?: number | null;
+  /** Optional stopping: target 95%-CI half-width for sampled-fidelity
+   *  steps, in absolute fidelity units (0.02 = "stop at ±2pp"). The
+   *  server stops paying for shots once the evidence is this precise
+   *  (min 2 batches). Part of the run's provenance — replaying an
+   *  early-stopped run re-sends it to reproduce the stopping point. */
+  precision_target?: number | null;
 }
 
 /** /api/auth/status — public capability probe. The frontend uses
@@ -340,6 +361,7 @@ export const api = {
     onStep: (step: StepResult, stepIndex: number) => void,
     onDone: (response: RunResponse) => void,
     onError: (err: Error) => void,
+    onProgress?: (progress: StepProgress) => void,
   ) => {
     try {
       const res = await authedFetch(`${BASE}/workflow/run-stream`, {
@@ -374,6 +396,11 @@ export const api = {
             // Run-level provenance envelope, sent as the first event.
             if (parsed.run_meta) {
               runMeta = parsed.run_meta as Partial<RunResponse>;
+              continue;
+            }
+            // Anytime-evidence frame: a shot batch landed mid-step.
+            if (parsed.step_progress) {
+              onProgress?.(parsed.step_progress as StepProgress);
               continue;
             }
             // Cache hit sends a full RunResponse object (has .steps array)

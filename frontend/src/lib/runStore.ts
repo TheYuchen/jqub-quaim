@@ -45,6 +45,15 @@ export interface RunRecord {
    *  archive (real seeded runs recorded against the live backend).
    *  Lets the UI label them honestly and clear them in one click. */
   demo?: boolean;
+  /** Optional-stopping target the run was executed with (absolute
+   *  fidelity units), or null/absent. Part of provenance: replay
+   *  must re-send it or an early-stopped run is not reproducible. */
+  precision_target?: number | null;
+  /** True when any sampled step stopped before its requested shots
+   *  because the precision target was reached. Early-stopped runs
+   *  carry fewer shots — their (wider) CI already encodes that; this
+   *  flag only drives the small ⏹ marker in history rows. */
+  stopped_early?: boolean;
   ok: boolean;
   /** Cheap display fields for the timeline (avoid loading the full
    *  response just to paint a list row). */
@@ -253,9 +262,18 @@ export function buildRunRecord(args: {
   circuitId: string;
   useLiveIbm: boolean;
   forkedFrom: string | null;
+  /** Optional-stopping target the request was sent with. */
+  precisionTarget?: number | null;
 }): RunRecord {
   const { response } = args;
   const headline = extractHeadline(response.steps);
+  // Server-authoritative early-stop flag: any sampled step whose
+  // distribution says it stopped before the requested shots.
+  const stoppedEarly = response.steps.some(
+    (s) =>
+      (s.distribution as { stopped_early?: boolean } | null | undefined)
+        ?.stopped_early === true,
+  );
   return {
     run_id:
       response.run_id ??
@@ -278,6 +296,8 @@ export function buildRunRecord(args: {
       args.useLiveIbm,
     ),
     forked_from: args.forkedFrom,
+    precision_target: args.precisionTarget ?? null,
+    stopped_early: stoppedEarly,
     ok: response.ok,
     headline_label: headline.label,
     headline_value: headline.value,

@@ -169,6 +169,8 @@ export function FlowCanvas() {
   const setPinnedSeed = useApp((s) => s.setPinnedSeed);
   const replicateCount = useApp((s) => s.replicateCount);
   const setReplicateCount = useApp((s) => s.setReplicateCount);
+  const precisionTarget = useApp((s) => s.precisionTarget);
+  const setPrecisionTarget = useApp((s) => s.setPrecisionTarget);
   const pendingRestore = useApp((s) => s.pendingRestore);
   const [notice, setNotice] = useState<Notice>(null);
   // cost-estimate: per-kind medians from this browser's run archive,
@@ -846,7 +848,13 @@ export function FlowCanvas() {
   // and an explicit "press Run" keeps the user in control.
   useEffect(() => {
     if (!pendingRestore) return;
-    const { graph, sampleKey: sk, pinSeed, sourceRunId } = pendingRestore;
+    const {
+      graph,
+      sampleKey: sk,
+      pinSeed,
+      sourceRunId,
+      precisionTarget: restoredTarget,
+    } = pendingRestore;
     useApp.getState().clearRestore();
 
     const plugins = useApp.getState().plugins;
@@ -873,6 +881,12 @@ export function FlowCanvas() {
     setRun(null);
     useApp.getState().setRestoredFrom(sourceRunId);
     if (pinSeed != null) setPinnedSeed(pinSeed);
+    // The optional-stopping target is part of the restored run's
+    // configuration in BOTH modes: a pinned replay of an early-stopped
+    // run must re-send it to reproduce the stopping point bit-exactly,
+    // and a fresh restore should re-run "the same experiment" —
+    // including when it stops. undefined (pre-Wave-I record) → null.
+    setPrecisionTarget(restoredTarget ?? null);
 
     if (sk) {
       api
@@ -923,6 +937,7 @@ export function FlowCanvas() {
     setRunning(true);
     setRun(null);
     setNotice(null);
+    useApp.getState().clearLiveProgress();
 
     const makeBody = () => ({
       circuit_id: circuit.circuit_id,
@@ -937,6 +952,9 @@ export function FlowCanvas() {
       // Pinned seed → exact replay of a specific draw. Absent → the
       // server draws fresh and reports the seed back either way.
       ...(pinnedSeed != null ? { seed: pinnedSeed } : {}),
+      // Optional stopping: server stops a sampled step's batching
+      // loop once the CI half-width reaches this (min 2 batches).
+      ...(precisionTarget != null ? { precision_target: precisionTarget } : {}),
     });
 
     // Promise wrapper around one SSE run so replicates can execute
@@ -958,6 +976,10 @@ export function FlowCanvas() {
           },
           (response) => resolve(response),
           (err) => reject(err),
+          // Live evidence: each shot batch updates the node face's
+          // narrowing CI bar. Kept in the store (not component state)
+          // because QNode renders far from this callback.
+          (progress) => useApp.getState().updateLiveProgress(progress),
         );
       });
 
@@ -974,6 +996,7 @@ export function FlowCanvas() {
           circuitId: circuit.circuit_id,
           useLiveIbm,
           forkedFrom: useApp.getState().restoredFrom,
+          precisionTarget: useApp.getState().precisionTarget,
         });
         await saveRun(record);
         useApp.getState().setLastConfigHash(record.config_hash);
@@ -1010,6 +1033,7 @@ export function FlowCanvas() {
       });
     } finally {
       setRunning(false);
+      useApp.getState().clearLiveProgress();
     }
   };
 
@@ -1142,6 +1166,29 @@ export function FlowCanvas() {
               <option value={20}>×20</option>
             </select>
           )}
+          {/* Anytime-evidence target: optional stopping for sampled
+              steps. Unlike the replicate selector it stays visible
+              under a pinned seed — the target is part of what gets
+              replayed (an early-stopped run needs it to reproduce
+              its stopping point). pp = percentage points of fidelity. */}
+          <select
+            data-marker="precision-target"
+            value={precisionTarget ?? ""}
+            onChange={(e) =>
+              setPrecisionTarget(
+                e.target.value === "" ? null : Number(e.target.value),
+              )
+            }
+            disabled={running}
+            className="btn hidden md:inline-flex !px-1.5 cursor-pointer disabled:opacity-40"
+            title="Optional stopping: stream shots in batches and stop as soon as the fidelity CI half-width reaches this target (min 2 batches). Off = run every requested shot."
+            aria-label="Precision target"
+          >
+            <option value="">target: off</option>
+            <option value={0.05}>±5pp</option>
+            <option value={0.02}>±2pp</option>
+            <option value={0.01}>±1pp</option>
+          </select>
           {/* cost-estimate chip: what will pressing Run cost, judged
               from this browser's own archived step timings. Sits next
               to Run so the price tag is read together with the
