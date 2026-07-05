@@ -92,6 +92,25 @@ vqc_2q_small showed P-2; interval-overlap callout fires).
 Backend test lane: 49 green (test_provenance_phase0 24,
 test_gate_diff 14, test_workflow_helpers 11).
 
+## Shipped, third push (waves E-F, commits 324791f → 4bf1a9d)
+
+13. **Circuit ribbon canvas** — the pipeline itself is now the
+    visualization: custom React Flow edges render the circuit as a
+    tapering ribbon (width = clamp(1.5·√gates, 3, 18)px per end, √ so
+    4× gates reads as 2× width), green/amber downstream tint when a
+    step shrank/grew the circuit; backend edges stay dashed (noise
+    profile, not circuit flow). Node faces: full-width delta-strip
+    glyph + micro CI bar for sampled fidelity. Dismissible canvas
+    legend.
+14. **Multiverse board** — Compose|Multiverse workspace toggle; every
+    configuration as a small-multiple card: family-colored pipeline
+    strip (topological), dots marking stages that differ from the
+    baseline (most-populous config), outcome dot-strip with mean,
+    Δmean vs baseline in pp with "(n small)" honesty suffix, Open
+    (restore) and A/B (into compare) actions. This is the analyst's
+    decision surface and the paper's second hero figure (multiverse
+    analysis narrative anchor).
+
 ## Not done yet (ordered backlog)
 
 * **Phase 3.5 leftovers** — pick-which-fidelity-node in comparison,
