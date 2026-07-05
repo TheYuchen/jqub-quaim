@@ -11,6 +11,7 @@ import {
   useReactFlow,
   type Connection,
   type Edge,
+  type EdgeTypes,
   type Node,
   type NodeTypes,
   type OnConnect,
@@ -55,6 +56,7 @@ import {
 } from "../lib/share";
 import { buildRunRecord, saveRun } from "../lib/runStore";
 import { QNode, type QNodeData } from "./QNode";
+import { RibbonEdge } from "./RibbonEdge";
 import { PresetPicker } from "./PresetPicker";
 import { ShareButton } from "./ShareButton";
 import { EmptyCanvas } from "./EmptyCanvas";
@@ -78,6 +80,13 @@ type Notice = {
 type RFNode = Node<QNodeData>;
 
 const nodeTypes: NodeTypes = { qnode: QNode as unknown as NodeTypes[string] };
+
+/** Custom edge registry. "ribbon" is the post-run circuit ribbon —
+ *  see RibbonEdge.tsx for the encoding rationale. Hoisted to module
+ *  scope so React Flow sees a stable identity across renders. */
+const edgeTypes: EdgeTypes = {
+  ribbon: RibbonEdge as unknown as EdgeTypes[string],
+};
 
 /**
  * Build the initial (nodes, edges) shown on the canvas.
@@ -466,6 +475,48 @@ export function FlowCanvas() {
         ? `${shape.num_qubits} qubits · depth ${shape.depth} · ${shape.size} ops`
         : undefined;
       let next = edge;
+
+      // ---- Circuit ribbon upgrade (post-run) -----------------------
+      // Circuit-FLOW edges become tapered ribbons once the run tells
+      // us the circuit's shape at both ends (band thickness ∝ √gates;
+      // see RibbonEdge.tsx). Two exclusions keep the encoding honest:
+      //  * edges OUT of a backend node are auxiliary — they carry a
+      //    noise profile, not a circuit — so they keep the thin
+      //    (dashed, "noise profile") default rendering;
+      //  * the splice-drop target keeps the default type so the
+      //    dashed accent highlight reads the same pre- and post-run.
+      // Before any run, `shape` is null and every edge falls through
+      // to the classic thin bezier — both states look intentional.
+      const srcNode = nodes.find((n) => n.id === edge.source);
+      const srcFamily = srcNode
+        ? resolveNodeSpec(srcNode.data.kind, preflightPlugins)?.family
+        : undefined;
+      const isAuxiliary = srcFamily === "backend";
+      if (!isTarget && !isAuxiliary && shape) {
+        const tgtStep = stepByNodeId.get(edge.target);
+        const tgtShape = tgtStep?.circuit_shape ?? null;
+        const tf = tgtStep?.transformation as
+          | { delta?: { size?: number } }
+          | null
+          | undefined;
+        const deltaSize =
+          typeof tf?.delta?.size === "number" ? tf.delta.size : 0;
+        return {
+          ...next,
+          type: "ribbon",
+          // RibbonEdge renders its own on-ribbon label from data —
+          // clearing the RF label avoids any double rendering.
+          label: undefined,
+          data: {
+            ...(next.data ?? {}),
+            srcSize: shape.size,
+            tgtSize: tgtShape ? tgtShape.size : null,
+            deltaSize,
+            flowLabel: label,
+          },
+        } as Edge;
+      }
+
       if (label) {
         next = {
           ...next,
@@ -500,7 +551,7 @@ export function FlowCanvas() {
       }
       return next;
     });
-  }, [edges, dropTargetEdgeId, stepByNodeId]);
+  }, [edges, dropTargetEdgeId, stepByNodeId, nodes, preflightPlugins]);
 
   // ---- Touch drag bridge (mobile drag-to-insert) ---------------------
   //
@@ -1057,6 +1108,7 @@ export function FlowCanvas() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           fitViewOptions={{ padding: 0.25 }}
           minZoom={0.4}
@@ -1088,6 +1140,7 @@ export function FlowCanvas() {
           />
         </ReactFlow>
         {nodes.length === 0 && <EmptyCanvas />}
+        {run && nodes.length > 0 && <RibbonLegend />}
         {notice && (
           <CanvasToast notice={notice} onDismiss={() => setNotice(null)} />
         )}
@@ -1308,3 +1361,94 @@ function colorForKind(kind: NodeKind): string {
   return map[kind] ?? "#94a3b8";
 }
 
+
+const LEGEND_LS_KEY = "quaim-ribbon-legend-dismissed";
+
+/** Canvas encoding key — a small dismissible chip anchored to the
+ *  bottom-left of the canvas (right of the React Flow zoom controls).
+ *  Three lines, one per post-run encoding, each drawn with a mini
+ *  replica of the real mark so the key teaches by resemblance rather
+ *  than by prose. Dismissal persists in localStorage: figure-makers
+ *  keep it for screenshots, daily users clear it once and never see
+ *  it again. */
+function RibbonLegend() {
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LEGEND_LS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  if (dismissed) return null;
+  return (
+    <div
+      className="absolute left-16 z-10 panel-alt px-2.5 py-2 text-[10px] leading-relaxed text-mute shadow-md max-w-[250px] space-y-1"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
+      role="note"
+      aria-label="Canvas encoding key"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            <svg width="26" height="10" viewBox="0 0 26 10" aria-hidden className="shrink-0">
+              <polygon
+                points="0,0 26,3 26,7 0,10"
+                fill="rgb(var(--color-accent))"
+                fillOpacity="0.35"
+              />
+            </svg>
+            <span>
+              <span className="text-ink">ribbon width</span> = circuit size (√gates)
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <svg width="26" height="10" viewBox="0 0 26 10" aria-hidden className="shrink-0">
+              <polygon
+                points="0,1 26,3.5 26,6.5 0,9"
+                fill="rgb(var(--color-accent))"
+                fillOpacity="0.3"
+              />
+              <polygon
+                points="13,2.2 26,3.5 26,6.5 13,7.8"
+                fill="rgb(var(--color-ok))"
+                fillOpacity="0.45"
+              />
+            </svg>
+            <span>
+              <span className="text-ok">green</span> taper = step shrank it ·{" "}
+              <span className="text-warn">amber</span> = grew
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <svg width="26" height="10" viewBox="0 0 26 10" aria-hidden className="shrink-0">
+              <line x1="13" y1="0.5" x2="13" y2="9.5" stroke="rgb(var(--color-mute))" strokeWidth="1" opacity="0.5" />
+              <rect x="5" y="1" width="8" height="1.6" fill="rgb(var(--color-ok))" />
+              <rect x="7" y="3.4" width="6" height="1.6" fill="rgb(var(--color-ok))" />
+              <rect x="13" y="5.8" width="4" height="1.6" fill="rgb(var(--color-warn))" />
+              <rect x="12.5" y="8.2" width="1" height="1.6" fill="rgb(var(--color-mute))" opacity="0.6" />
+            </svg>
+            <span>
+              <span className="text-ink">strip</span> = Δ depth/gates/params/qubits
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label="Dismiss canvas key"
+          title="Dismiss (remembered on this device)"
+          className="shrink-0 text-mute hover:text-ink transition-colors"
+          onClick={() => {
+            setDismissed(true);
+            try {
+              localStorage.setItem(LEGEND_LS_KEY, "1");
+            } catch {
+              /* private mode etc. — chip just reappears next visit */
+            }
+          }}
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+}

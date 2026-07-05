@@ -167,10 +167,18 @@ export function SignatureGlyph({
   t,
   size = "tile",
   className = "",
+  stretch = false,
 }: {
   t: TransformationPayload;
   size?: "tile" | "card";
   className?: string;
+  /** Fill the parent's width (preserveAspectRatio="none"). Only the
+   *  horizontal axis stretches, and every bar scales by the same
+   *  factor around the centered zero axis — the relative-magnitude
+   *  encoding is invariant under this transform, so a stretched
+   *  strip stays comparable with an unstretched one. Used on canvas
+   *  node faces where the glyph anchors the full tile width. */
+  stretch?: boolean;
 }) {
   const g = GEOM[size];
   const aria = `delta-strip: ${CHANNELS.map(
@@ -179,8 +187,9 @@ export function SignatureGlyph({
   return (
     <svg
       viewBox={`0 0 ${g.w} ${g.h}`}
-      width={g.w}
+      width={stretch ? "100%" : g.w}
       height={g.h}
+      preserveAspectRatio={stretch ? "none" : "xMidYMid meet"}
       className={`delta-strip ${className}`}
       role="img"
       aria-label={aria}
@@ -268,12 +277,21 @@ export function SignatureGlyph({
  *  — an unchanged circuit needs no ink on the canvas (the constant-
  *  silhouette rule applies WITHIN a strip; whether to show a strip
  *  at all is the node's call, and canvas real estate is scarce). */
-export function SignatureTile({ step }: { step: StepResult }) {
+export function SignatureTile({
+  step,
+  stretch = false,
+}: {
+  step: StepResult;
+  stretch?: boolean;
+}) {
   const t = transformationOf(step);
   if (!t || !t.changed) return null;
   return (
-    <div className="mt-1 leading-none" title={sigTooltip(t)}>
-      <SignatureGlyph t={t} size="tile" />
+    <div
+      className={`mt-1 leading-none ${stretch ? "w-full" : ""}`}
+      title={sigTooltip(t)}
+    >
+      <SignatureGlyph t={t} size="tile" stretch={stretch} />
     </div>
   );
 }

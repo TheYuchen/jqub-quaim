@@ -337,9 +337,25 @@ function RunResultStrip({
       : durationS < 1
         ? `${Math.round(durationS * 1000)}ms`
         : `${durationS.toFixed(durationS < 10 ? 2 : 1)}s`;
+  // Micro CI bar: the same 0-1-scale encoding as the results card's
+  // uncertainty block (interval band + point tick), shrunk to 3px so
+  // a stochastic node face answers "how sure are we" without opening
+  // any panel. Only steps that emit a binomial distribution payload
+  // (sampled fidelity today, plugins tomorrow) render it.
+  const dist = step.distribution as
+    | { kind?: string; point?: number; ci95?: [number, number] }
+    | null
+    | undefined;
+  const ci =
+    dist?.kind === "binomial" && Array.isArray(dist.ci95) ? dist.ci95 : null;
+  const rawPoint =
+    typeof dist?.point === "number"
+      ? dist.point
+      : Number((step.summary as Record<string, unknown>)["fidelity"]);
+  const ciPoint = ci && Number.isFinite(rawPoint) ? rawPoint : null;
   return (
     <div className="mt-2 pt-1.5 border-t border-edge/40">
-      <SignatureTile step={step} />
+      <SignatureTile step={step} stretch />
       <div className="flex items-baseline justify-between gap-2">
       {headline ? (
         <div className="min-w-0 flex-1">
@@ -378,6 +394,32 @@ function RunResultStrip({
         )}
       </div>
       </div>
+      {ci && ciPoint !== null && (
+        <div
+          className="relative h-[3px] rounded-full bg-surfaceAlt overflow-hidden mt-1.5"
+          title={`Sampled estimate ${(ciPoint * 100).toFixed(1)}% · 95% CI ${(
+            ci[0] * 100
+          ).toFixed(1)}–${(ci[1] * 100).toFixed(1)}% (fixed 0–100% scale)`}
+          role="img"
+          aria-label={`uncertainty: point ${(ciPoint * 100).toFixed(
+            1,
+          )} percent, 95 percent interval ${(ci[0] * 100).toFixed(1)} to ${(
+            ci[1] * 100
+          ).toFixed(1)} percent`}
+        >
+          <div
+            className="absolute inset-y-0 bg-accent/25"
+            style={{
+              left: `${ci[0] * 100}%`,
+              width: `${Math.max(1, (ci[1] - ci[0]) * 100)}%`,
+            }}
+          />
+          <div
+            className="absolute inset-y-0 w-[2px] bg-accent"
+            style={{ left: `calc(${ciPoint * 100}% - 1px)` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
