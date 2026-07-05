@@ -22,6 +22,7 @@ import {
 import { StepBody } from "./results/cards";
 import { PluginFigures } from "./PluginFigures";
 import { RunStatusChips } from "./RunStatusChips";
+import { RunHistory } from "./RunHistory";
 
 export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   const run = useApp((s) => s.run);
@@ -32,6 +33,20 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
       <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink truncate">Results</h3>
         <div className="flex items-center gap-1.5 shrink-0">
+          {run?.seed_mode && (
+            <span
+              className={`chip ${run.seed_mode === "pinned" ? "!border-accent/40 !text-accent" : ""}`}
+              title={
+                run.seed_mode === "pinned"
+                  ? `Replayed with pinned root seed ${run.root_seed} — stochastic steps reproduce exactly.`
+                  : run.root_seed != null
+                    ? `Fresh draw. Recorded root seed ${run.root_seed} — replay it any time from the run history below.`
+                    : "Served from the precomputed cache — no seed was drawn for this response."
+              }
+            >
+              {run.seed_mode === "pinned" ? `seed ${run.root_seed}` : "fresh"}
+            </span>
+          )}
           {run?.from_cache && (
             <span
               className="chip !border-accent/40 !text-accent"
@@ -59,6 +74,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+        <RunHistory />
         {!run && !running && <EmptyHint />}
         {running && <RunningHint />}
         {run && run.steps.map((s) => <StepCard key={s.node_id} step={s} />)}

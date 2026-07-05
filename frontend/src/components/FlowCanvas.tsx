@@ -53,6 +53,7 @@ import {
   readHashPayload,
   type SharePayload,
 } from "../lib/share";
+import { buildRunRecord, saveRun } from "../lib/runStore";
 import { QNode, type QNodeData } from "./QNode";
 import { PresetPicker } from "./PresetPicker";
 import { ShareButton } from "./ShareButton";
@@ -148,6 +149,11 @@ export function FlowCanvas() {
   const clearPendingBlocks = useApp((s) => s.clearPendingBlocks);
   const pendingQuickStart = useApp((s) => s.pendingQuickStart);
   const clearQuickStart = useApp((s) => s.clearQuickStart);
+  const pinnedSeed = useApp((s) => s.pinnedSeed);
+  const setPinnedSeed = useApp((s) => s.setPinnedSeed);
+  const replicateCount = useApp((s) => s.replicateCount);
+  const setReplicateCount = useApp((s) => s.setReplicateCount);
+  const pendingRestore = useApp((s) => s.pendingRestore);
   const [notice, setNotice] = useState<Notice>(null);
   // Non-danger toasts auto-fade; success is quick, warnings linger a bit
   // longer so the user has time to read every bullet. Runner errors stay
@@ -688,6 +694,72 @@ export function FlowCanvas() {
     });
   };
 
+  // ---- Provenance restore bridge -------------------------------------
+  // The timeline panel pushes an archived run into the store; we
+  // rebuild the canvas from its SharePayload (same shape the share
+  // links use), reload the sample circuit if we know it, and pin the
+  // run's seed when the user asked for an exact replay. We do NOT
+  // auto-run: racing a run against React state settling is fragile,
+  // and an explicit "press Run" keeps the user in control.
+  useEffect(() => {
+    if (!pendingRestore) return;
+    const { graph, sampleKey: sk, pinSeed, sourceRunId } = pendingRestore;
+    useApp.getState().clearRestore();
+
+    const plugins = useApp.getState().plugins;
+    const restoredNodes: RFNode[] = graph.n.map((pn) => ({
+      id: pn.i,
+      type: "qnode",
+      position: { x: pn.x, y: pn.y },
+      data: {
+        kind: pn.k,
+        params: {
+          ...((resolveNodeSpec(pn.k, plugins)?.defaultData as Record<string, unknown>) ?? {}),
+          ...(pn.p ?? {}),
+        },
+      },
+    }));
+    const restoredEdges: Edge[] = graph.e.map((pe, i) => ({
+      id: `re${i}`,
+      source: pe.s,
+      target: pe.t,
+      animated: true,
+    }));
+    setNodes(restoredNodes);
+    setEdges(restoredEdges);
+    setRun(null);
+    useApp.getState().setRestoredFrom(sourceRunId);
+    if (pinSeed != null) setPinnedSeed(pinSeed);
+
+    if (sk) {
+      api
+        .loadSample(sk)
+        .then((ci) => {
+          useApp.getState().setCircuit(ci);
+          useApp.getState().setSampleKey(sk);
+          setNotice({
+            text:
+              pinSeed != null
+                ? "Run restored with its seed pinned — press Run to replay the exact draw."
+                : "Run restored — press Run to re-execute (fresh draw).",
+            tone: "ok",
+          });
+        })
+        .catch(() =>
+          setNotice({
+            text: "Graph restored, but the sample circuit failed to load — pick it manually on the left.",
+            tone: "warn",
+          }),
+        );
+    } else {
+      setNotice({
+        text: "Graph restored. This run used an uploaded circuit — re-upload it on the left to reproduce the numbers.",
+        tone: "warn",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRestore]);
+
   const runPipeline = async () => {
     if (!circuit) {
       // Open the left pane so the user can see where to pick a circuit.
@@ -708,7 +780,8 @@ export function FlowCanvas() {
     setRunning(true);
     setRun(null);
     setNotice(null);
-    const body = {
+
+    const makeBody = () => ({
       circuit_id: circuit.circuit_id,
       nodes: nodes.map((n) => ({
         id: n.id,
@@ -718,32 +791,83 @@ export function FlowCanvas() {
       edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
       use_live_ibm: useLiveIbm,
       user_id: getUserId(),
-    };
-    // Use the SSE streaming endpoint so the user sees each step
-    // appear in the results pane as it completes.
-    api.runStream(
-      body,
-      (step) => {
-        // Incrementally build the run response as steps arrive.
-        const prev = useApp.getState().run;
-        const steps = [...(prev?.steps ?? []), step];
-        setRun({
-          circuit_id: body.circuit_id,
-          ok: steps.every((s) => s.status !== "error"),
-          from_cache: false,
-          steps,
-          final_metrics: prev?.final_metrics ?? {},
+      // Pinned seed → exact replay of a specific draw. Absent → the
+      // server draws fresh and reports the seed back either way.
+      ...(pinnedSeed != null ? { seed: pinnedSeed } : {}),
+    });
+
+    // Promise wrapper around one SSE run so replicates can execute
+    // sequentially (kind to the shared HF CPU) with per-run archiving.
+    const runOnce = (): Promise<import("../lib/api").RunResponse> =>
+      new Promise((resolve, reject) => {
+        api.runStream(
+          makeBody(),
+          (step) => {
+            const prev = useApp.getState().run;
+            const steps = [...(prev?.steps ?? []), step];
+            setRun({
+              circuit_id: circuit.circuit_id,
+              ok: steps.every((s) => s.status !== "error"),
+              from_cache: false,
+              steps,
+              final_metrics: prev?.final_metrics ?? {},
+            });
+          },
+          (response) => resolve(response),
+          (err) => reject(err),
+        );
+      });
+
+    // Archive every completed run in the browser-side provenance
+    // store. Failure to archive must never break the run UX — the
+    // catch only logs.
+    const archive = async (response: import("../lib/api").RunResponse) => {
+      try {
+        const record = buildRunRecord({
+          response,
+          graph: buildSharePayload(nodes, edges, sampleKey),
+          sampleKey,
+          circuitName: circuit.name ?? null,
+          circuitId: circuit.circuit_id,
+          useLiveIbm,
+          forkedFrom: useApp.getState().restoredFrom,
         });
-      },
-      (response) => {
+        await saveRun(record);
+        useApp.getState().setLastConfigHash(record.config_hash);
+        useApp.getState().bumpHistoryVersion();
+      } catch (e) {
+        console.warn("provenance archive failed:", e);
+      }
+    };
+
+    // Replicates only make sense for fresh draws; under a pinned seed
+    // every repeat would return the identical numbers.
+    const count = pinnedSeed != null ? 1 : replicateCount;
+    try {
+      for (let i = 0; i < count; i++) {
+        if (count > 1) {
+          setNotice({ text: `Replicate ${i + 1}/${count}…`, tone: "ok" });
+          setRun(null); // each replicate rebuilds the step list
+        }
+        const response = await runOnce();
         setRun(response);
-        setRunning(false);
-      },
-      (err) => {
-        setNotice({ text: err.message, tone: "danger" });
-        setRunning(false);
-      },
-    );
+        await archive(response);
+        if (!response.ok) break; // don't burn replicates on a broken graph
+      }
+      if (count > 1) {
+        setNotice({
+          text: `Finished ${count} replicates — open a fidelity card to see the distribution build up.`,
+          tone: "ok",
+        });
+      }
+    } catch (err) {
+      setNotice({
+        text: err instanceof Error ? err.message : String(err),
+        tone: "danger",
+      });
+    } finally {
+      setRunning(false);
+    }
   };
 
   return (
@@ -835,6 +959,44 @@ export function FlowCanvas() {
             onClear={clearGraph}
           />
 
+          {/* Pinned-seed chip: visible whenever the next run will replay
+              a specific draw instead of sampling fresh. The × clears the
+              pin and returns to fresh sampling. */}
+          {pinnedSeed != null && (
+            <span
+              className="chip !border-accent/50 !text-accent hidden md:inline-flex items-center gap-1"
+              title={`Next run replays root seed ${pinnedSeed} exactly. Click × to return to fresh draws.`}
+            >
+              seed {pinnedSeed}
+              <button
+                type="button"
+                aria-label="Unpin seed"
+                className="hover:text-ink"
+                onClick={() => setPinnedSeed(null)}
+              >
+                ×
+              </button>
+            </span>
+          )}
+          {/* Replicate selector: run the same configuration N times with
+              fresh seeds and archive each draw — the raw material for
+              distribution views. Hidden while a seed is pinned (repeats
+              of a pinned draw are all identical). */}
+          {pinnedSeed == null && (
+            <select
+              value={replicateCount}
+              onChange={(e) => setReplicateCount(Number(e.target.value))}
+              disabled={running}
+              className="btn hidden md:inline-flex !px-1.5 cursor-pointer disabled:opacity-40"
+              title="How many times to run this configuration (fresh seed each time). Distributions build up in the fidelity card and the run history."
+              aria-label="Replicate count"
+            >
+              <option value={1}>×1</option>
+              <option value={5}>×5</option>
+              <option value={10}>×10</option>
+              <option value={20}>×20</option>
+            </select>
+          )}
           <button
             onClick={runPipeline}
             disabled={running || !circuit}

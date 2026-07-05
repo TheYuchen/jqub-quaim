@@ -5,7 +5,10 @@
 // knows what fields to pull out of the step's `summary` dict and how to
 // visualise them using the primitives from `./viz`.
 
+import { useEffect, useState } from "react";
 import type { StepResult } from "../../lib/api";
+import { useApp } from "../../lib/store";
+import { listRunsByConfig } from "../../lib/runStore";
 import {
   Caption,
   DepthCompare,
@@ -30,7 +33,7 @@ export function StepBody({ step }: { step: StepResult }) {
     case "qshot":
       return <QshotCard s={s} />;
     case "fidelity":
-      return <FidelityCard s={s} />;
+      return <FidelityCard s={s} step={step} />;
     case "output":
       return <OutputCard s={s} />;
     case "input_circuit":
@@ -313,11 +316,27 @@ function QshotCard({ s }: { s: Record<string, unknown> }) {
 }
 
 /** Fidelity — 0-1, higher is better. */
-function FidelityCard({ s }: { s: Record<string, unknown> }) {
+function FidelityCard({
+  s,
+  step,
+}: {
+  s: Record<string, unknown>;
+  step?: StepResult;
+}) {
   const f = numOr(s["fidelity"], NaN);
   const good = f >= 0.95;
   const mid = f >= 0.8 && f < 0.95;
   const tone = good ? "text-ok" : mid ? "text-warn" : "text-danger";
+  const dist = step?.distribution as
+    | {
+        kind?: string;
+        shots?: number;
+        successes?: number;
+        ci95?: [number, number];
+        counts_top?: Record<string, number>;
+      }
+    | null
+    | undefined;
 
   return (
     <div className="mt-2 space-y-2">
@@ -332,6 +351,11 @@ function FidelityCard({ s }: { s: Record<string, unknown> }) {
           <div className="flex-1">
             <div className="text-[10px] uppercase tracking-wider text-mute">
               estimated fidelity
+              {dist?.kind === "binomial" && (
+                <span className="ml-1 normal-case tracking-normal">
+                  (sampled — a draw, not a number)
+                </span>
+              )}
             </div>
             <div className={`font-mono text-lg ${tone}`}>
               {(f * 100).toFixed(2)}%
@@ -346,6 +370,136 @@ function FidelityCard({ s }: { s: Record<string, unknown> }) {
           </div>
         </div>
       )}
+      {dist?.kind === "binomial" && dist.ci95 && (
+        <UncertaintyBlock
+          point={f}
+          ci={dist.ci95}
+          shots={dist.shots ?? 0}
+          successes={dist.successes ?? 0}
+          countsTop={dist.counts_top ?? {}}
+          seedUsed={step?.seed_used ?? null}
+        />
+      )}
+      {dist?.kind === "binomial" && <ReplicateStrip currentPoint={f} />}
+    </div>
+  );
+}
+
+/** Within-run uncertainty: the sampled estimate is a binomial draw, so
+ *  show the Wilson interval on a 0-1 scale plus the raw histogram
+ *  material — never let a stochastic quantity masquerade as a scalar. */
+function UncertaintyBlock({
+  point,
+  ci,
+  shots,
+  successes,
+  countsTop,
+  seedUsed,
+}: {
+  point: number;
+  ci: [number, number];
+  shots: number;
+  successes: number;
+  countsTop: Record<string, number>;
+  seedUsed: number | null;
+}) {
+  const [lo, hi] = ci;
+  const entries = Object.entries(countsTop).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maxCount = entries.length > 0 ? entries[0][1] : 1;
+  return (
+    <div className="panel-alt p-2 space-y-2">
+      <div className="flex items-center justify-between text-[10px] text-mute">
+        <span>
+          95% CI (Wilson): {(lo * 100).toFixed(1)}–{(hi * 100).toFixed(1)}% ·{" "}
+          {successes}/{shots} shots in |0…0⟩
+        </span>
+        {seedUsed != null && (
+          <span className="font-mono" title="Simulator seed consumed by this draw — part of the run's provenance record.">
+            seed {seedUsed}
+          </span>
+        )}
+      </div>
+      {/* interval bar on a fixed 0-1 scale */}
+      <div className="relative h-2 rounded bg-surfaceAlt overflow-hidden" aria-hidden>
+        <div
+          className="absolute top-0 h-full bg-accent/25"
+          style={{ left: `${lo * 100}%`, width: `${Math.max(0.5, (hi - lo) * 100)}%` }}
+        />
+        <div
+          className="absolute top-0 h-full w-0.5 bg-accent"
+          style={{ left: `${point * 100}%` }}
+        />
+      </div>
+      {entries.length > 0 && (
+        <div className="space-y-0.5">
+          {entries.map(([bits, count]) => (
+            <div key={bits} className="flex items-center gap-1.5 text-[10px]">
+              <span className="font-mono text-mute w-16 truncate" title={`|${bits}⟩`}>
+                {bits}
+              </span>
+              <div className="flex-1 h-1.5 rounded bg-surfaceAlt overflow-hidden">
+                <div
+                  className="h-full bg-accent/60"
+                  style={{ width: `${(count / maxCount) * 100}%` }}
+                />
+              </div>
+              <span className="font-mono text-mute w-8 text-right">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Across-run distribution: every archived run of this same
+ *  configuration contributes one dot. This is the empirical answer to
+ *  "if I ran it again, what would I get?" — shot noise plus whatever
+ *  else varies run-to-run. */
+function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
+  const historyVersion = useApp((st) => st.historyVersion);
+  const configHash = useApp((st) => st.lastConfigHash);
+  const [points, setPoints] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (!configHash) return;
+    let cancelled = false;
+    listRunsByConfig(configHash)
+      .then((rs) => {
+        if (cancelled) return;
+        setPoints(
+          rs
+            .filter((r) => r.headline_label === "fidelity" && r.headline_value != null)
+            .map((r) => r.headline_value as number),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [configHash, historyVersion]);
+
+  if (points.length < 2) return null;
+  const mean = points.reduce((a, b) => a + b, 0) / points.length;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  return (
+    <div className="panel-alt p-2 space-y-1">
+      <div className="text-[10px] text-mute">
+        Across {points.length} archived runs of this configuration: mean{" "}
+        {(mean * 100).toFixed(2)}% · range {(min * 100).toFixed(1)}–
+        {(max * 100).toFixed(1)}%
+      </div>
+      <div className="relative h-4 rounded bg-surfaceAlt" aria-hidden>
+        {points.map((p, i) => (
+          <div
+            key={i}
+            className={`absolute top-1 w-1 h-2 rounded-sm ${p === currentPoint ? "bg-accent" : "bg-accent/40"}`}
+            style={{ left: `calc(${p * 100}% - 2px)` }}
+            title={`${(p * 100).toFixed(2)}%`}
+          />
+        ))}
+      </div>
     </div>
   );
 }

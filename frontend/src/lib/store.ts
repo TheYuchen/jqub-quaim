@@ -11,6 +11,7 @@ import type {
   SessionUser,
 } from "./api";
 import type { NodeKind } from "./nodeCatalog";
+import type { SharePayload } from "./share";
 
 const LS_USE_LIVE_IBM = "quda.useLiveIbm";
 
@@ -42,6 +43,42 @@ interface AppState {
 
   run: RunResponse | null;
   setRun: (r: RunResponse | null) => void;
+
+  /**
+   * Provenance bridge. historyVersion bumps after every archived run
+   * so IndexedDB readers (timeline, replicate distributions) refetch.
+   * pinnedSeed, when set, is sent as RunRequest.seed — the UI shows a
+   * chip next to Run so the user knows draws are frozen. lastConfigHash
+   * identifies the configuration of the most recent run so result
+   * cards can pull that configuration's replicate history.
+   */
+  historyVersion: number;
+  bumpHistoryVersion: () => void;
+  pinnedSeed: number | null;
+  setPinnedSeed: (v: number | null) => void;
+  replicateCount: number;
+  setReplicateCount: (n: number) => void;
+  lastConfigHash: string | null;
+  setLastConfigHash: (h: string | null) => void;
+
+  /**
+   * Restore bridge (same pattern as pendingQuickStart): the timeline
+   * panel pushes an archived run here; FlowCanvas watches it, rebuilds
+   * the canvas from the stored SharePayload, reloads the sample
+   * circuit, and optionally pins the run's seed for exact replay.
+   * restoredFrom threads the source run_id into the NEXT archived run
+   * as forked_from — that is what makes lineage reconstructable.
+   */
+  pendingRestore: {
+    graph: SharePayload;
+    sampleKey: string | null;
+    pinSeed: number | null;
+    sourceRunId: string;
+  } | null;
+  requestRestore: (r: NonNullable<AppState["pendingRestore"]>) => void;
+  clearRestore: () => void;
+  restoredFrom: string | null;
+  setRestoredFrom: (v: string | null) => void;
 
   health: HealthResponse | null;
   setHealth: (h: HealthResponse | null) => void;
@@ -144,6 +181,20 @@ export const useApp = create<AppState>((set) => ({
   setSampleKey: (k) => set({ sampleKey: k }),
   run: null,
   setRun: (r) => set({ run: r }),
+  historyVersion: 0,
+  bumpHistoryVersion: () =>
+    set((s) => ({ historyVersion: s.historyVersion + 1 })),
+  pinnedSeed: null,
+  setPinnedSeed: (v) => set({ pinnedSeed: v }),
+  replicateCount: 1,
+  setReplicateCount: (n) => set({ replicateCount: n }),
+  lastConfigHash: null,
+  setLastConfigHash: (h) => set({ lastConfigHash: h }),
+  pendingRestore: null,
+  requestRestore: (r) => set({ pendingRestore: r }),
+  clearRestore: () => set({ pendingRestore: null }),
+  restoredFrom: null,
+  setRestoredFrom: (v) => set({ restoredFrom: v }),
   health: null,
   setHealth: (h) => set({ health: h }),
   running: false,
