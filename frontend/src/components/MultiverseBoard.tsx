@@ -221,7 +221,13 @@ function PipelineStrip({
   plugins: PluginManifest[];
 }) {
   const order = useMemo(() => topoOrder(graph), [graph]);
-  const MAX = 14;
+  // Node cap sized to the card's floor, not to a typical pipeline: at
+  // the 240px card minimum (grid minmax) the content box is ~210px and
+  // 14 squares (4 + 14·8 + 13·9 = 233px) overflow it, silently
+  // clipping the strip's tail. 11 squares = 182px + the "+k" chip fits
+  // the floor; longer pipelines degrade to an explicit count instead
+  // of an invisible crop.
+  const MAX = 11;
   const shown = order.slice(0, MAX);
   const overflow = order.length - shown.length;
   const SZ = 8;

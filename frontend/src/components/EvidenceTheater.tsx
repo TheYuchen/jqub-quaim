@@ -296,6 +296,43 @@ function tickStep(span: number): number {
 const W = 1000;
 const M = { l: 66, r: 208, t: 40, b: 66 };
 
+/** Vertical label dodging for the right-margin readouts.
+ *
+ *  `blocks` are text blocks anchored at data-driven baselines
+ *  (`anchor` = first-line baseline y, `h` = block height in px).
+ *  Sort by anchor, then a top→bottom pass pushes each block below the
+ *  previous one (tops at least max(12, upper.h + 2) apart) and a
+ *  bottom→top pass pulls the pile back inside [lo, hi]. Pure and
+ *  order-preserving: returns the adjusted anchor for each input index.
+ */
+function dodgeMarginLabels(
+  blocks: Array<{ anchor: number; h: number }>,
+  lo: number,
+  hi: number,
+): number[] {
+  const order = blocks
+    .map((b, i) => ({ top: b.anchor, h: b.h, i }))
+    .sort((a, b) => a.top - b.top);
+  let minTop = lo;
+  for (const b of order) {
+    b.top = Math.max(b.top, minTop);
+    minTop = b.top + Math.max(12, b.h + 2);
+  }
+  if (order.length > 0) {
+    const lastB = order[order.length - 1];
+    lastB.top = Math.min(lastB.top, hi - lastB.h);
+    for (let k = order.length - 2; k >= 0; k--) {
+      order[k].top = Math.min(
+        order[k].top,
+        order[k + 1].top - Math.max(12, order[k].h + 2),
+      );
+    }
+  }
+  const out = new Array<number>(blocks.length).fill(0);
+  for (const b of order) out[b.i] = b.top;
+  return out;
+}
+
 function Panel({
   s,
   pool,
@@ -354,6 +391,43 @@ function Panel({
     s.stoppedEarly && s.shotsExecuted != null
       ? s.shotsRequested - s.shotsExecuted
       : 0;
+
+  // Right-margin readout placement. Three text blocks share
+  // x = W - M.r + 10: the final/so-far readout (2 lines), the amber
+  // "target ±" tag (1 line) and the green archive-pool tag (2 lines).
+  // Their anchors are data-driven ys; in the MULTI-NODE small-multiple
+  // layout (plotH ≈ 144 px) two of them routinely land within a line
+  // height of each other and overprint. Run the dodging pass there —
+  // it subsumes the single ad-hoc pool-vs-final nudge below. The
+  // single-panel layout keeps its original anchors untouched: the
+  // recorded F0 teaser/filmstrip exports are bit-exact SVGs and must
+  // not shift under a layout-affecting change.
+  let finalLabelY =
+    y(last.point) -
+    (pool && Math.abs(y(pool.point) - y(last.point)) < 30 ? 24 : 0) +
+    3;
+  let targetLabelY =
+    s.precisionTarget != null
+      ? Math.max(
+          M.t + 8,
+          Math.min(axisY - 4, y(last.point + s.precisionTarget) + 3),
+        )
+      : 0;
+  let poolLabelY = pool ? y(pool.point) + 3 : 0;
+  if (height < 300) {
+    const blocks: Array<{ anchor: number; h: number }> = [
+      // natural (un-nudged) anchor — the dodge replaces the ad-hoc rule
+      { anchor: y(last.point) + 3, h: 26 },
+    ];
+    if (s.precisionTarget != null)
+      blocks.push({ anchor: targetLabelY, h: 10 });
+    if (pool) blocks.push({ anchor: poolLabelY, h: 24 });
+    const dodged = dodgeMarginLabels(blocks, M.t + 8, axisY - 2);
+    finalLabelY = dodged[0];
+    let bi = 1;
+    if (s.precisionTarget != null) targetLabelY = dodged[bi++];
+    if (pool) poolLabelY = dodged[bi];
+  }
   // Which side of the stop line the "⏹ stopped here" label sits on.
   // The label is ~330px at fontSize 11; a stop late in the budget
   // (e.g. batch 7 of 8 → stopX ≈ 700) used to run the text past the
@@ -398,7 +472,7 @@ function Panel({
           />
           <line x1={M.l} x2={M.l + plotW} y1={y(pool.ci95[1])} y2={y(pool.ci95[1])} stroke="rgb(var(--color-accent4))" strokeWidth={1} strokeDasharray="2 4" opacity={0.55} />
           <line x1={M.l} x2={M.l + plotW} y1={y(pool.ci95[0])} y2={y(pool.ci95[0])} stroke="rgb(var(--color-accent4))" strokeWidth={1} strokeDasharray="2 4" opacity={0.55} />
-          <text x={W - M.r + 10} y={y(pool.point) + 3} fontSize={10} fill="rgb(var(--color-accent4))">
+          <text x={W - M.r + 10} y={poolLabelY} fontSize={10} fill="rgb(var(--color-accent4))">
             <tspan x={W - M.r + 10}>archive: pooled ±{fmtPp(pool.halfWidth, 1)}</tspan>
             <tspan x={W - M.r + 10} dy={12}>
               over {fmtShots(pool.shots)} shots from {poolRuns} run{poolRuns === 1 ? "" : "s"}
@@ -454,7 +528,7 @@ function Panel({
             .map((v, i) => (
               <line key={i} x1={M.l} x2={M.l + plotW} y1={y(v)} y2={y(v)} stroke="rgb(var(--color-warn))" strokeWidth={1.2} strokeDasharray="7 4" opacity={0.9} />
             ))}
-          <text x={W - M.r + 10} y={Math.max(M.t + 8, Math.min(axisY - 4, y(last.point + s.precisionTarget) + 3))} fontSize={10} fill="rgb(var(--color-warn))">
+          <text x={W - M.r + 10} y={targetLabelY} fontSize={10} fill="rgb(var(--color-warn))">
             target ±{fmtPp(s.precisionTarget, 1)}
             <title>{GLOSSARY.precisionTarget}</title>
           </text>
@@ -513,7 +587,7 @@ function Panel({
       ))}
 
       {/* final-interval readout in the right margin */}
-      <text x={W - M.r + 10} y={y(last.point) - (pool && Math.abs(y(pool.point) - y(last.point)) < 30 ? 24 : 0) + 3} fontSize={11} fontWeight={600} fill="rgb(var(--color-accent))">
+      <text x={W - M.r + 10} y={finalLabelY} fontSize={11} fontWeight={600} fill="rgb(var(--color-accent))">
         <tspan x={W - M.r + 10}>{s.done ? "final" : "so far"}: {fmtPct(last.point, 2)} ±{fmtPp(lastHalf, 2)}</tspan>
         <tspan x={W - M.r + 10} dy={13} fontWeight={400} fill="rgb(var(--color-mute))">
           {s.successes != null ? `${fmtShots(s.successes)}/${fmtShots(s.shotsExecuted ?? last.shots)} ideal` : ""}
