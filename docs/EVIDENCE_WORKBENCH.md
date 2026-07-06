@@ -169,7 +169,19 @@ test_gate_diff 14, test_workflow_helpers 11, test_seed_coverage 8).
     2048-shot draw with the node seed is a different random variable
     than 8 seeded 256-shot draws — the bundled demo archive was
     re-recorded against the live Space (scripts/rerecord_demo_archive
-    .py preserves run_ids/lineage/created_at, swaps responses).
+    .py preserves run_ids/lineage/created_at, swaps responses;
+    RESUMABLE — walks records, caching each via the pinned step cache,
+    exits on a per-record timeout so the sandbox's ~40 s process cap
+    can't truncate a long batch). Migration status at this commit:
+    14/17 done (all bell_state 512+2048, the same-seed replay pair);
+    the 3 vqc_2q_small records (QuCAD → sampled) still carry the old
+    single-draw numbers — their sampled step lacks `trace`, so the
+    loader simply omits the funnel and keeps the CI bar (verified
+    graceful). Finish them with the script when the Space is idle:
+    QuCAD's per-request noise-model build outlives a 40 s client
+    window, so it needs an uninterrupted long-lived request. This is
+    demo scaffolding, not a feature dependency — the live-run
+    assertions below hold on the deployed build regardless.
 20. **SSE progress protocol** — during a sampled step the stream
     interleaves `{"step_progress": {node_id, batch_i, n_batches,
     shots_done, successes, point, ci95}}` events between StepResults
@@ -224,6 +236,19 @@ batch-seed/plan determinism, accumulation==totals, early-stop trace is
 a bit-exact PREFIX of the full run's trace, min-2-batches guard,
 1/√n narrowing, stream-vs-eager bit-equality, pipeline-level
 early-stop replay).
+
+Live regression (deployed build, bell_state on FakeFez): a streamed
+2048-shot run with no target delivered 8 step_progress frames arriving
+BEFORE the fidelity StepResult (widths 0.122→0.086→0.070→… narrowing
+monotonically across batches, ~14 s apart while sampling), final
+distribution.shots == 2048, trace length 8; the replayed record's
+per-batch (shots_done, successes) matched the live frames bit-for-bit
+[(256,125),(512,255),(768,375),…]. A precision_target=0.05 run stopped
+at 512/2048 shots (2/8 batches, half-width 0.0430 ≤ 0.05, point
+0.4648); its pinned replay AND an independent recomputation under a
+0.048 target both reproduced point 0.4648 / 238 successes / 512 shots
+and the identical batch trace — optional stopping is bit-exactly
+replayable.
 
 ## Not done yet (ordered backlog)
 

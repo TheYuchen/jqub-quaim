@@ -18,6 +18,15 @@ Replaced: steps, ok, final_metrics, app_version. Same-seed replay
 pairs keep their defining property automatically — same seed, same
 batched draws.
 
+RESUMABLE by design: every record is seed-pinned, so the server's
+pinned step cache makes a re-request of an already-computed record
+instant. The script walks records in order, updating the archive file
+and a state file after each success; on a per-record timeout it exits
+(the fired request keeps computing server-side) and the next
+invocation picks up where it left off — run it repeatedly until it
+prints ALL DONE. This shape exists because the dev sandbox caps any
+one process at ~40 s.
+
 Usage: python3 scripts/rerecord_demo_archive.py [base_url]
 (default base_url: https://jqub21-quaim.hf.space)
 """
@@ -37,30 +46,36 @@ ARCHIVE = (
 )
 
 
-def _post(path: str, payload: dict | None = None, timeout: float = 240) -> dict:
+def _post(path: str, payload: dict | None = None, timeout: float = 240):
     req = urllib.request.Request(
         f"{BASE}{path}",
         data=json.dumps(payload).encode() if payload is not None else b"",
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read())
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
+STATE = Path("/tmp/rerecord_state.json")
 
 
 def main() -> None:
     entries = json.loads(ARCHIVE.read_text())
     t_start = time.time()
+    start = json.loads(STATE.read_text())["done"] if STATE.exists() else 0
     # One circuit handle per sample key is enough — the server store
     # is content-addressed per upload, and runs only need a valid id.
     circuit_ids: dict[str, str] = {}
     for idx, rec in enumerate(entries):
+        if idx < start:
+            continue
         resp = rec["response"]
         root_seed = resp["root_seed"]
         assert root_seed is not None, f"record {idx} has no root seed"
         sk = rec["sampleKey"]
         if sk not in circuit_ids:
-            circuit_ids[sk] = _post(f"/api/circuits/samples/{sk}")["circuit_id"]
+            with _post(f"/api/circuits/samples/{sk}", timeout=30) as r:
+                circuit_ids[sk] = json.loads(r.read())["circuit_id"]
         body = {
             "circuit_id": circuit_ids[sk],
             "nodes": [
@@ -73,13 +88,24 @@ def main() -> None:
             "use_live_ibm": False,
             "seed": int(root_seed),
         }
-        new = _post("/api/workflow/run", body)
+        try:
+            with _post("/api/workflow/run", body, timeout=42) as r:
+                new = json.loads(r.read())
+        except Exception as exc:  # fired; server keeps computing + caches
+            print(
+                f"[{idx + 1}/{len(entries)}] {sk} pending "
+                f"({type(exc).__name__}) — re-run the script to resume",
+                flush=True,
+            )
+            return
         assert new["ok"], f"record {idx} re-ran with errors: {new['steps']}"
         assert new["root_seed"] == root_seed and new["seed_mode"] == "pinned"
         resp["steps"] = new["steps"]
         resp["ok"] = new["ok"]
         resp["final_metrics"] = new["final_metrics"]
         resp["app_version"] = new["app_version"]
+        ARCHIVE.write_text(json.dumps(entries, separators=(",", ":")))
+        STATE.write_text(json.dumps({"done": idx + 1}))
         # run_id / circuit_id deliberately NOT taken from `new` — see
         # module docstring (lineage edges reference the old run_ids).
         print(
@@ -87,8 +113,7 @@ def main() -> None:
             f"ok={new['ok']} ({time.time() - t_start:.1f}s elapsed)",
             flush=True,
         )
-    ARCHIVE.write_text(json.dumps(entries, separators=(",", ":")))
-    print(f"wrote {ARCHIVE} ({ARCHIVE.stat().st_size} bytes)")
+    print(f"ALL DONE — wrote {ARCHIVE} ({ARCHIVE.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":
