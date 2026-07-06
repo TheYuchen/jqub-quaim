@@ -476,7 +476,7 @@ function UncertaintyBlock({
           className="evidence-funnel space-y-px"
           role="img"
           aria-label={`evidence funnel: ${trace.length} shot batches, interval narrowing from ${((trace[0].ci95[1] - trace[0].ci95[0]) * 100).toFixed(1)} to ${((hi - lo) * 100).toFixed(1)} percentage points wide`}
-          title={`Each line = the 95% CI after one more batch of shots (top = first batch). ${trace.length} batches; width ${((trace[0].ci95[1] - trace[0].ci95[0]) * 100).toFixed(1)}pp → ${((hi - lo) * 100).toFixed(1)}pp.`}
+          title={`Each line = the 95% CI after one more batch of shots (top = first batch). ${trace.length} batches; width ${((trace[0].ci95[1] - trace[0].ci95[0]) * 100).toFixed(1)}pp → ${((hi - lo) * 100).toFixed(1)}pp. Same funnel motif as the History lineage: here shot batches accumulate inside ONE run; there whole runs accumulate across a replicate group.`}
         >
           {trace.map((t, i) => (
             <div key={t.shots_done} className="relative h-[3px]" aria-hidden>

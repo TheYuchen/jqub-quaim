@@ -416,7 +416,10 @@ export function MultiverseBoard() {
         <WorkspaceToggle />
         <div className="text-xs text-mute truncate">
           <span className="text-ink font-medium">Multiverse</span>
-          <TipIcon className="ml-1" hint={gloss("configuration")} />
+          <TipIcon
+            className="ml-1"
+            hint={`${gloss("configuration")} Card key: squares = pipeline stages · dot above = settings differ from baseline · strip dots = one per replicate (0-100%) · filled band = pooled 95% interval.`}
+          />
           {runs != null && (
             <>
               {" "}

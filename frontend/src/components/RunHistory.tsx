@@ -654,7 +654,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                       >
                         <title>
                           {`pooled ±${(newest.hw * 100).toFixed(1)}pp after ${newest.nRuns} runs / ${newest.shots} shots
-cumulative Wilson CI half-width of this configuration's pooled counts, widest (oldest) row scaled to ${FUNNEL_MAX_PX}px — the funnel narrowing upward is certainty accumulating across replicates`}
+cumulative Wilson CI half-width of this configuration's pooled counts, widest (oldest) row scaled to ${FUNNEL_MAX_PX}px — the funnel narrowing upward is certainty accumulating across replicate runs (same motif as the fidelity card's funnel, where shot batches accumulate inside one run)`}
                         </title>
                       </polygon>
                     </g>

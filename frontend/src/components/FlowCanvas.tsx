@@ -1244,7 +1244,7 @@ export function FlowCanvas() {
               onChange={(e) => setReplicateCount(Number(e.target.value))}
               disabled={running}
               className="btn hidden md:inline-flex !px-1.5 cursor-pointer disabled:opacity-40"
-              title={`${GLOSSARY.replicate} Distributions build up in the fidelity card and the run history.`}
+              title={`${GLOSSARY.replicate} Distributions build up in the fidelity card and the run history. Fast after run 1: the unchanged deterministic prefix is served from cache, so replicates 2..N only re-run the stochastic steps.`}
               aria-label="Replicate count"
             >
               <option value={1}>×1</option>
@@ -1268,7 +1268,7 @@ export function FlowCanvas() {
             }
             disabled={running}
             className="btn hidden md:inline-flex !px-1.5 cursor-pointer disabled:opacity-40"
-            title={`${GLOSSARY.precisionTarget} Off = run every requested measurement.`}
+            title={`${GLOSSARY.precisionTarget} Off = run every requested measurement. The target is archived with the run and restored on replay, so an early stop reproduces exactly.`}
             aria-label="Precision target"
           >
             <option value="">target: off</option>

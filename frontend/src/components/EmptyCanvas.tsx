@@ -12,7 +12,9 @@ export function EmptyCanvas() {
         <div className="text-ink font-medium mb-1">Canvas is empty</div>
         <div className="text-sm text-mute mb-3">
           Drag blocks from the strip above, or pick a preset from{" "}
-          <span className="kbd">Load preset</span>.
+          <span className="kbd">Load preset</span> — then hit{" "}
+          <span className="kbd">Run pipeline</span> and evidence collects
+          in the right-hand pane.
         </div>
         <div className="flex flex-wrap gap-1 justify-center">
           {NODE_CATALOG.slice(0, 6).map((n) => (

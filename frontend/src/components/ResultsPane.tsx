@@ -149,17 +149,20 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
       >
         <TabButton
           label="Current run"
+          title="One card per pipeline step of the run on the canvas — what each step did, with uncertainty where the result is sampled"
           active={tab === "current"}
           onClick={() => setTab("current")}
         />
         <TabButton
           label="History"
+          title="Every archived run in this browser, drawn as a lineage — restore, replay (exact numbers), delete, or tick two to compare"
           active={tab === "history"}
           onClick={() => setTab("history")}
           badge={archived > 0 ? archived : null}
         />
         <TabButton
           label="Compare"
+          title="Two selected runs side by side: configuration diff, fidelity as 95% intervals, step-aligned signatures"
           active={tab === "compare"}
           onClick={() => setTab("compare")}
           badge={compareIds.length > 0 ? compareIds.length : null}
@@ -192,11 +195,13 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
 
 function TabButton({
   label,
+  title,
   active,
   onClick,
   badge = null,
 }: {
   label: string;
+  title?: string;
   active: boolean;
   onClick: () => void;
   badge?: number | null;
@@ -206,6 +211,7 @@ function TabButton({
       type="button"
       role="tab"
       aria-selected={active}
+      title={title}
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors border ${
         active
