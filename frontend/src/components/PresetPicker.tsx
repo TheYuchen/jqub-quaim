@@ -32,7 +32,7 @@ export function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
         // toolbar, so anchoring `left-0` pushed the popover past the right
         // viewport edge. Pin it with `fixed right-3 top-14` instead so it
         // always stays inside the viewport — same pattern PapersPopover
-        // and DevelopersPopover use. The header is z-20, and a fixed
+        // and DevelopersPopover use. The header is z-40, and a fixed
         // child with `z-30` stacks cleanly above React Flow.
         //
         // Desktop (≥sm): `absolute right-0 top-full` anchors it to the

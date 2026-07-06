@@ -1098,8 +1098,19 @@ export function FlowCanvas() {
           when overflow-x is auto, which would clip the dropdowns
           (PresetPicker, MoreMenu) that anchor below this row. On
           mobile the Run button drops out (md:flex) and the FAB
-          replaces it, so the remaining icon-only items fit easily. */}
-      <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4">
+          replaces it, so the remaining icon-only items fit easily.
+
+          flex-wrap + min-h-12 (not a fixed h-12): the action cluster's
+          visibility is keyed to VIEWPORT breakpoints (md:/lg:) but this
+          row lives in a RESIZABLE center column — at a 1280-1440px
+          window with default side panes the column is only ~550-700px
+          wide while lg: still shows every label, and with the optional
+          chips present (pinned seed / cost estimate) the row used to
+          overflow and clip the Run button off the right edge. Wrapping
+          keeps every control reachable at any pane width; when one
+          line fits (the common wide case) min-h-12 renders pixel-
+          identical to the old fixed row. */}
+      <div className="min-h-12 shrink-0 border-b border-edge px-3 sm:px-4 py-1 flex flex-wrap items-center justify-between gap-x-2 sm:gap-x-4 gap-y-1">
         {/* Status counter. Full form on ≥sm. On <sm we swap in an icon
             pair (Box = "blocks", Link2 = "links") so the compact counter
             is still self-explanatory — a bare "5·4" turned out to be
@@ -1121,7 +1132,12 @@ export function FlowCanvas() {
             <span className="tabular-nums">{edges.length}</span>
           </span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* min-w-0 (NOT shrink-0) is what lets flex-wrap actually engage:
+            a shrink-0 cluster would keep its one-line preferred width and
+            overflow the row instead of wrapping its buttons. justify-end
+            keeps continuation lines right-aligned, so Run stays in the
+            bottom-right corner of the toolbar where the eye expects it. */}
+        <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 gap-y-1 min-w-0">
           <PresetPicker onPick={loadPreset} />
 
           {/* ≥ md: individual action buttons. Labels show at ≥ lg only —
@@ -1496,7 +1512,11 @@ function TouchDragPreview({
  * Absolute-positioned toast pinned to the bottom-center of the canvas.
  * Handles Auto-connect summaries, Auto-connect warnings (multi-line via
  * `notice.detail`), and runner errors. Sits above React Flow's controls
- * (z-30) and caps at a readable width regardless of canvas size.
+ * AND above the center-column overlays (Multiverse z-20, Theater z-30):
+ * the theater auto-opens on streaming runs, and a run error surfaced
+ * here must not be occluded by it — hence z-40 (mobile drawers, fixed
+ * z-40/50 later in the DOM, still cover it). Caps at a readable width
+ * regardless of canvas size.
  */
 function CanvasToast({
   notice,
@@ -1535,7 +1555,7 @@ function CanvasToast({
       style={{
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 4.5rem)",
       }}
-      className={`absolute left-1/2 -translate-x-1/2 z-30 w-[min(36rem,calc(100%-2rem))] rounded-lg border ${palette.border} ${palette.bg} bg-surface/95 backdrop-blur-sm shadow-xl px-4 py-3 flex items-start gap-3 md:!bottom-4`}
+      className={`absolute left-1/2 -translate-x-1/2 z-40 w-[min(36rem,calc(100%-2rem))] rounded-lg border ${palette.border} ${palette.bg} bg-surface/95 backdrop-blur-sm shadow-xl px-4 py-3 flex items-start gap-3 md:!bottom-4`}
     >
       <div className="shrink-0 mt-0.5">{palette.icon}</div>
       <div className="flex-1 min-w-0 text-sm text-ink">

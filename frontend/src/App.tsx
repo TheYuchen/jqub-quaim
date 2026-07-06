@@ -362,7 +362,7 @@ export default function App() {
               }
               onDoubleClick={() => setRightW(RIGHT_DEFAULT)}
               onDragChange={setIsResizing}
-              ariaLabel="Resize results pane"
+              ariaLabel="Resize evidence pane"
             />
           )}
           <aside

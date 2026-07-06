@@ -64,7 +64,14 @@ export function TopBar({
         paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
         paddingRight: "max(0.75rem, env(safe-area-inset-right))",
       }}
-      className="relative z-20 h-14 shrink-0 border-b border-edge sm:px-5 flex items-center justify-between gap-2 sm:gap-4 bg-canvas"
+      // z-40: the ThemeSwitcher dropdown is a CHILD of this header, so its
+      // own z-index can never escape the header's stacking context. The
+      // center-column overlays (Multiverse z-20, Evidence Theater z-30)
+      // come later in the DOM and used to paint OVER the dropdown where
+      // it hangs below the bar; z-40 keeps header dropdowns clickable
+      // while any overlay is up. Mobile drawers (fixed z-40/z-50, later
+      // in the DOM) still cover the header as before.
+      className="relative z-40 h-14 shrink-0 border-b border-edge sm:px-5 flex items-center justify-between gap-2 sm:gap-4 bg-canvas"
     >
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
         {mobile && onOpenLeftDrawer && (
@@ -121,8 +128,8 @@ export function TopBar({
           <button
             type="button"
             onClick={onOpenRightDrawer}
-            aria-label="Open results"
-            title="Results"
+            aria-label="Open evidence"
+            title="Evidence"
             className="w-9 h-9 rounded-md border border-edge bg-surface/60 text-mute hover:text-ink hover:border-accent/40 flex items-center justify-center shrink-0"
           >
             <PanelRight className="w-4 h-4" />
