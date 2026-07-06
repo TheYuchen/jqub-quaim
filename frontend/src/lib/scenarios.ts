@@ -55,9 +55,11 @@ const QUCAD_GRAPH = chain([
 ]);
 
 /** Sampled-fidelity pipeline with a big shot budget — the F3 graph.
- *  4096 requested shots + a ±2pp target: the Wilson interval reaches
- *  the target after roughly 600–700 shots, so the run stops early and
- *  the evidence funnel shows both the narrowing AND the stop. */
+ *  4096 requested shots + a ±2pp target: bell_state's sampled point
+ *  sits near 0.45 (ideal |00⟩ probability is 0.5), so the Wilson
+ *  interval reaches ±2pp after roughly 2,300–2,500 shots — the run
+ *  stops early and the evidence funnel shows both the narrowing AND
+ *  the stop (verified against the live API with seed 424242). */
 const FUNNEL_GRAPH = chain([
   { k: "input_circuit" },
   { k: "fake_backend", p: { backend_name: "FakeFez", shots: 4096 } },
@@ -123,7 +125,7 @@ export const SCENARIOS: Record<string, Scenario> = {
   F3: {
     key: "F3",
     expect:
-      "Evidence funnel: sampled fidelity on bell_state, ±2pp target reached before 4096 shots → early stop.",
+      "Evidence funnel: sampled fidelity on bell_state, ±2pp target reached around ~2,400 of 4096 shots → early stop.",
     graph: FUNNEL_GRAPH,
     sampleKey: "bell_state",
     pinSeed: 424242,
