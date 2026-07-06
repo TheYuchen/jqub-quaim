@@ -1,38 +1,26 @@
 import { useApp } from "../lib/store";
-import {
-  Activity,
-  GraduationCap,
-  HelpCircle,
-  PanelLeft,
-  PanelRight,
-  Zap,
-} from "lucide-react";
+import { Activity, PanelLeft, PanelRight, Zap } from "lucide-react";
+import { APP_NAME, APP_TAGLINE } from "../lib/anon";
 import { ThemeSwitcher } from "./ThemeSwitcher";
-import { PapersPopover } from "./PapersPopover";
-import { DevelopersPopover } from "./DevelopersPopover";
-import { SupportPopover } from "./SupportPopover";
 import { TipIcon } from "./TipIcon";
-import { AuthButton } from "./AuthButton";
 
 /**
- * Top application bar.
- *
- * Desktop: renders the full status strip (qiskit/torch versions, live-IBM
- * toggle, theme switcher, tour button).
+ * Top application bar — deliberately minimal since Wave P (the system
+ * serves the paper, not a product): app name + tagline, the runtime
+ * environment chip (qiskit/torch versions), the live-calibration
+ * toggle when the server supports it, and the theme switcher. All
+ * product-era surfaces (tour, sign-in, lab/paper/developer links,
+ * funding popover) were removed — every remaining pixel serves a
+ * paper claim or figure.
  *
  * Mobile: the two side panes are swapped for drawers, so we surface two
- * edge buttons (PanelLeft / PanelRight) for toggling them. The version
- * chip is hidden (noisy on a 390px screen), the live-IBM toggle stays
- * since users may actually want to flip it, and the theme switcher +
- * tour button stay as compact icons.
+ * edge buttons (PanelLeft / PanelRight) for toggling them.
  */
 export function TopBar({
-  onOpenTour,
   mobile = false,
   onOpenLeftDrawer,
   onOpenRightDrawer,
 }: {
-  onOpenTour?: () => void;
   mobile?: boolean;
   onOpenLeftDrawer?: () => void;
   onOpenRightDrawer?: () => void;
@@ -48,33 +36,30 @@ export function TopBar({
     !!health?.live_ibm_allowed && !!health?.ibm_token_configured;
   const effectiveLive = serverCanGoLive && useLiveIbm;
 
-  // The "unavailable" branch is gone — we hide the chip entirely when
-  // the server can't go live. Only on / off-using-cache states need
-  // copy now.
   let chipLabel: string;
   let chipLabelShort: string;
   let chipClass: string;
   let chipTitle: string;
   if (effectiveLive) {
-    chipLabel = "live ibm: on";
-    chipLabelShort = "ibm: on";
+    chipLabel = "live calibration: on";
+    chipLabelShort = "live: on";
     chipClass =
       "!border-warn/50 !text-warn cursor-pointer hover:!border-warn hover:!text-warn";
     chipTitle =
-      "Live mode ON. QuBound will fetch fresh IBM Quantum Platform calibration on each run (+5-15s per run, counts against rate limits). Click to switch back to cache mode.";
+      "Live mode ON. Each run fetches today's fresh machine calibration (error rates) instead of the shipped snapshot (+5-15s per run, counts against rate limits). Click to switch back to the snapshot.";
   } else {
-    chipLabel = "live ibm: off (using cache)";
-    chipLabelShort = "ibm: cache";
+    chipLabel = "live calibration: off (snapshot)";
+    chipLabelShort = "live: off";
     chipClass =
       "!border-edge !text-mute cursor-pointer hover:!text-ink hover:!border-accent/40";
     chipTitle =
-      "Using the shipped 14-day IBM Fez calibration cache. This is fine for demos. Click to switch to live mode (fresh IBM calibration per run).";
+      "Using the shipped 14-day calibration snapshot (the machine's measured error rates). Deterministic and fine for reproduction. Click to fetch fresh calibration per run instead.";
   }
 
   return (
     <header
       // safe-area padding so the notch / Dynamic Island doesn't
-      // occlude the lab logo or auth chip on iPhones in landscape.
+      // occlude the header on iPhones in landscape.
       style={{
         paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
         paddingRight: "max(0.75rem, env(safe-area-inset-right))",
@@ -98,20 +83,16 @@ export function TopBar({
         </div>
         <div className="leading-tight min-w-0">
           <div className="text-ink font-semibold tracking-tight truncate">
-            QuDA Studio
+            {APP_NAME}
           </div>
           <div className="text-mute text-xs hidden sm:block truncate">
-            Quantum Design Automation Studio
+            {APP_TAGLINE}
           </div>
         </div>
-        {/* Status chips live in the left cluster — they describe the app's
-            runtime state (library versions + whether the live-IBM path is
-            hot) and belong next to the title, not mixed in with the
-            external-link / theme controls on the right. The version chip
-            is hidden on mobile to save room. The live-IBM toggle is
-            ONLY shown when the server actually supports live mode (token
-            + ALLOW_LIVE_IBM); without it the chip would just say
-            "ibm: n/a" forever, which adds noise without value. */}
+        {/* Status chips: runtime library versions + whether the live-
+            calibration path is hot. The version chip is hidden on
+            mobile to save room; the live toggle is only shown when the
+            server actually supports live mode. */}
         <div className="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0 ml-1 sm:ml-2">
           {!mobile && (
             <span className="chip">
@@ -135,45 +116,7 @@ export function TopBar({
         </div>
       </div>
       <div className="flex items-center gap-1 sm:gap-2 text-xs shrink-0">
-        {/* External-links group: JQub lab, papers, developer. Desktop
-            shows icon+label; mobile collapses to icon-only to keep the
-            header under ~390px. A subtle vertical divider (desktop only)
-            separates the links from the theme/tour controls that follow. */}
-        <a
-          href="https://jqub.ece.gmu.edu/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-ghost"
-          title="JQub Lab at George Mason University"
-          aria-label="JQub Lab"
-        >
-          <GraduationCap className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Lab</span>
-        </a>
-        <PapersPopover />
-        <DevelopersPopover />
-        <span
-          className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
-          aria-hidden="true"
-        />
         <ThemeSwitcher />
-        {onOpenTour && (
-          <button
-            onClick={onOpenTour}
-            className="btn-ghost"
-            title="Show the intro tour"
-            aria-label="Show the intro tour"
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Tour</span>
-          </button>
-        )}
-        <span
-          className="hidden sm:inline-block w-px h-5 bg-edge/60 mx-0.5"
-          aria-hidden="true"
-        />
-        <SupportPopover />
-        <AuthButton mobile={mobile} />
         {mobile && onOpenRightDrawer && (
           <button
             type="button"
@@ -189,4 +132,3 @@ export function TopBar({
     </header>
   );
 }
-

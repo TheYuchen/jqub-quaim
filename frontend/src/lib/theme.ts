@@ -9,6 +9,8 @@
  * user's choice across page loads.
  */
 
+import { ANON } from "./anon";
+
 export type ThemeKey = "light" | "dark" | "gmu";
 
 export interface ThemeSpec {
@@ -33,12 +35,21 @@ export const THEMES: ThemeSpec[] = [
     tagline: "Deep navy · electric cyan",
     swatch: ["#0b1020", "#4cc9f0"],
   },
-  {
-    key: "gmu",
-    label: "GMU Mason",
-    tagline: "Mason green · Mason gold",
-    swatch: ["#0a1812", "#FFC72C"],
-  },
+  // The university-branded theme identifies the group, so it is gated
+  // behind the double-anonymous flag. Spread-of-ternary on the
+  // build-time constant → the branded strings are dead-code-eliminated
+  // from a VITE_ANON=1 bundle entirely; the runtime flag hides the
+  // entry (and the stored preference falls back to light below).
+  ...(ANON
+    ? []
+    : ([
+        {
+          key: "gmu",
+          label: "GMU Mason",
+          tagline: "Mason green · Mason gold",
+          swatch: ["#0a1812", "#FFC72C"],
+        },
+      ] as ThemeSpec[])),
 ];
 
 export const THEME_BY_KEY: Record<ThemeKey, ThemeSpec> = Object.fromEntries(
@@ -53,6 +64,9 @@ export function loadStoredTheme(): ThemeKey {
   try {
     const raw = window.localStorage.getItem(LS_THEME);
     if (raw && (raw === "dark" || raw === "light" || raw === "gmu")) {
+      // Anonymous mode: a stored branded-theme preference falls back
+      // to light rather than rendering university colors.
+      if (raw === "gmu" && ANON) return DEFAULT_THEME;
       return raw;
     }
   } catch {

@@ -58,6 +58,7 @@ export function TipIcon({
   return (
     <span
       tabIndex={0}
+      data-export-strip
       className={`group/tip relative shrink-0 inline-flex items-center text-mute/70 hover:text-ink focus:text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/60 rounded-full cursor-help ${className}`}
       onClick={(e) => {
         e.preventDefault();

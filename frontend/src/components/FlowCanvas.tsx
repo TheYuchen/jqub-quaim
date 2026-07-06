@@ -55,6 +55,7 @@ import {
   type SharePayload,
 } from "../lib/share";
 import { buildRunRecord, listRuns, saveRun } from "../lib/runStore";
+import { GLOSSARY } from "../lib/glossary";
 import {
   estimatePipeline,
   formatSeconds,
@@ -68,6 +69,7 @@ import { WorkspaceToggle } from "./WorkspaceToggle";
 import { ShareButton } from "./ShareButton";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { MoreMenu } from "./MoreMenu";
+import { FigureExportButton } from "./FigureExportButton";
 
 /** One-shot feedback surfaced as a toast at the bottom of the canvas.
  *
@@ -336,6 +338,10 @@ export function FlowCanvas() {
     api
       .loadSample(key)
       .then((c) => {
+        // Drop a stale resolution: a scenario/restore load may have
+        // set a different circuit while this default fetch was in
+        // flight — clobbering it back would break scenario auto-runs.
+        if (useApp.getState().circuit) return;
         useApp.getState().setCircuit(c);
         useApp.getState().setSampleKey(key);
       })
@@ -854,6 +860,7 @@ export function FlowCanvas() {
       pinSeed,
       sourceRunId,
       precisionTarget: restoredTarget,
+      autoRunAfter,
     } = pendingRestore;
     useApp.getState().clearRestore();
 
@@ -894,6 +901,13 @@ export function FlowCanvas() {
         .then((ci) => {
           useApp.getState().setCircuit(ci);
           useApp.getState().setSampleKey(sk);
+          if (autoRunAfter) {
+            // Scenario boot: the graph is on the canvas and the right
+            // circuit is loaded — NOW it is safe to request the auto
+            // run (see the pendingAutoRun consumer below).
+            useApp.getState().requestAutoRun(sk);
+            return;
+          }
           setNotice({
             text:
               pinSeed != null
@@ -1037,6 +1051,31 @@ export function FlowCanvas() {
     }
   };
 
+  // ---- Scenario auto-run bridge ---------------------------------------
+  // Consumes store.pendingAutoRun (set by the restore consumer above
+  // when a scenario asked for autoRunAfter). Fires runPipeline exactly
+  // once, and only when the scenario's expected circuit is the one
+  // actually loaded — the boot-time default-circuit load resolves on
+  // its own schedule, and firing against the wrong circuit would
+  // produce a non-reproducible figure. The ref guards double-fire
+  // (StrictMode double-effects, rapid dep churn) even before the
+  // store flag clears.
+  const pendingAutoRun = useApp((s) => s.pendingAutoRun);
+  const autoRunFiredRef = useRef(false);
+  useEffect(() => {
+    if (!pendingAutoRun || running || autoRunFiredRef.current) return;
+    if (!circuit || nodes.length === 0) return;
+    if (
+      pendingAutoRun.sampleKey != null &&
+      sampleKey !== pendingAutoRun.sampleKey
+    )
+      return;
+    autoRunFiredRef.current = true;
+    useApp.getState().clearAutoRun();
+    void runPipeline();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runPipeline is stable-enough (reads live state via closures/store)
+  }, [pendingAutoRun, circuit, sampleKey, nodes, running]);
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* No overflow-x clip here: CSS spec forces overflow-y to auto
@@ -1104,6 +1143,15 @@ export function FlowCanvas() {
             <Code2 className="w-3.5 h-3.5" />
             <span className="hidden lg:inline">Export .py</span>
           </button>
+          {/* Paper-figure export of the whole canvas (hybrid path:
+              foreignObject SVG + hi-res PNG; provenance embedded). */}
+          <FigureExportButton
+            className="hidden md:inline-flex"
+            getTarget={() => wrapperRef.current}
+            name="canvas"
+            view="canvas"
+            getGraph={() => buildSharePayload(nodes, edges, sampleKey)}
+          />
           <button
             onClick={clearGraph}
             className="btn hidden md:inline-flex"
@@ -1157,7 +1205,7 @@ export function FlowCanvas() {
               onChange={(e) => setReplicateCount(Number(e.target.value))}
               disabled={running}
               className="btn hidden md:inline-flex !px-1.5 cursor-pointer disabled:opacity-40"
-              title="How many times to run this configuration (fresh seed each time). Distributions build up in the fidelity card and the run history."
+              title={`${GLOSSARY.replicate} Distributions build up in the fidelity card and the run history.`}
               aria-label="Replicate count"
             >
               <option value={1}>×1</option>
@@ -1181,7 +1229,7 @@ export function FlowCanvas() {
             }
             disabled={running}
             className="btn hidden md:inline-flex !px-1.5 cursor-pointer disabled:opacity-40"
-            title="Optional stopping: stream shots in batches and stop as soon as the fidelity CI half-width reaches this target (min 2 batches). Off = run every requested shot."
+            title={`${GLOSSARY.precisionTarget} Off = run every requested measurement.`}
             aria-label="Precision target"
           >
             <option value="">target: off</option>

@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import type { StepResult } from "../../lib/api";
 import { useApp } from "../../lib/store";
 import { listRunsByConfig } from "../../lib/runStore";
+import { GLOSSARY } from "../../lib/glossary";
 import {
   Caption,
   DepthCompare,
@@ -56,8 +57,9 @@ function QuBoundCard({ s }: { s: Record<string, unknown> }) {
     <div className="mt-2 space-y-2">
       <Caption>
         <span className="text-ink font-medium">What QuBound did:</span>{" "}
-        trained an LSTM on 14 days of chip calibration, then predicted how much
-        error today's noise would add to your circuit. Lower is better.
+        looked at the machine's last 14 days of measured error rates and
+        predicted how much error today's noise would add to your circuit
+        (a small learned model does the extrapolation). Lower is better.
       </Caption>
       {value !== undefined && (
         <div className="flex items-center gap-3">
@@ -105,9 +107,9 @@ function QuCADCard({ s }: { s: Record<string, unknown> }) {
     <div className="mt-2 space-y-2">
       <Caption>
         <span className="text-ink font-medium">What QuCAD did:</span>{" "}
-        sparsified the variational circuit, zeroing out parameters that hurt
-        fidelity under the chip's noise. Fewer parameters means fewer gates
-        to execute, which often means lower total error.
+        pruned the trainable circuit — deleted the parameters that hurt
+        accuracy under the machine's noise. Fewer parameters means fewer
+        operations to execute, which often means less total error.
       </Caption>
       {original > 0 && (
         <div className="grid grid-cols-3 gap-2">
@@ -150,8 +152,8 @@ function CompressVQCCard({ s }: { s: Record<string, unknown> }) {
     <div className="mt-2 space-y-2">
       <Caption>
         <span className="text-ink font-medium">What CompressVQC did:</span>{" "}
-        folded redundant parametric rotations using a QAOA-optimized lookup
-        table. A shorter circuit runs faster and picks up less decoherence.
+        merged redundant rotation operations via a precomputed lookup table.
+        A shorter circuit runs faster and accumulates less noise.
       </Caption>
       {before > 0 && <DepthCompare before={before} after={after} />}
       <div className="grid grid-cols-2 gap-2">
@@ -203,9 +205,9 @@ function QshotCard({ s }: { s: Record<string, unknown> }) {
     <div className="mt-2 space-y-2">
       <Caption>
         <span className="text-ink font-medium">What Qshot did:</span> predicted
-        how many measurement shots your circuit needs to reach{" "}
-        {(alpha * 100).toFixed(0)}% of its converged fidelity under the chosen
-        IBM calibration snapshot. Helps you size your measurement budget —
+        how many repeated measurements (shots) your circuit needs to reach{" "}
+        {(alpha * 100).toFixed(0)}% of its best achievable accuracy under the
+        chosen day's machine noise. Helps you size your measurement budget —
         the prediction assumes the bundled noise model, so real-hardware
         behaviour may drift.
       </Caption>
@@ -434,9 +436,9 @@ function UncertaintyBlock({
   return (
     <div className="panel-alt p-2 space-y-2">
       <div className="flex items-center justify-between text-[10px] text-mute">
-        <span>
-          95% CI (Wilson): {(lo * 100).toFixed(1)}–{(hi * 100).toFixed(1)}% ·{" "}
-          {successes}/{shots} shots in |0…0⟩
+        <span title={GLOSSARY.ci}>
+          95% interval: {(lo * 100).toFixed(1)}–{(hi * 100).toFixed(1)}% ·{" "}
+          {successes}/{shots} measurements hit the ideal outcome
         </span>
         {seedUsed != null && (
           <span className="font-mono" title="Simulator seed consumed by this draw — part of the run's provenance record.">

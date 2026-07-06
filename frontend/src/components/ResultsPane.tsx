@@ -4,7 +4,7 @@
 // keeps the pane's own scaffolding (header, empty/running states, final
 // metrics roll-up).
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/store";
 import type { StepResult } from "../lib/api";
 import {
@@ -27,6 +27,9 @@ import { RunHistory } from "./RunHistory";
 import { countRuns } from "../lib/runStore";
 import { SignatureCard } from "./TransformationSignature";
 import { CompareView } from "./CompareView";
+import { FigureExportButton } from "./FigureExportButton";
+import { TipIcon } from "./TipIcon";
+import { gloss } from "../lib/glossary";
 
 type EvidenceTab = "current" | "history" | "compare";
 
@@ -42,6 +45,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   // each mode gets the full pane height instead of fighting for
   // scroll space in one vertical stack.
   const [tab, setTab] = useState<EvidenceTab>("current");
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Archive size for the History badge. countRuns() is a bare
   // IndexedDB count (no record materialization), refreshed whenever a
@@ -69,6 +73,14 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
   useEffect(() => {
     if (running) setTab("current");
   }, [running]);
+  // Scenario bridge: a ?scenario= boot can pick the tab a figure needs
+  // (F4 history, F6 compare). Consumed once.
+  const pendingTab = useApp((s) => s.pendingEvidenceTab);
+  useEffect(() => {
+    if (!pendingTab) return;
+    setTab(pendingTab);
+    useApp.getState().setPendingEvidenceTab(null);
+  }, [pendingTab]);
   useEffect(() => {
     if (compareIds.length === 2) setTab("compare");
   }, [compareIds.length]);
@@ -78,6 +90,15 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
       <div className="h-12 shrink-0 border-b border-edge px-4 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink truncate">Evidence</h3>
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Paper-figure export of the active evidence tab (hybrid
+              path: cards/funnel/lineage/compare as shown). */}
+          {(run != null || tab !== "current") && (
+            <FigureExportButton
+              getTarget={() => contentRef.current}
+              name={`evidence-${tab}`}
+              view={`evidence-${tab}`}
+            />
+          )}
           {run?.seed_mode && (
             <span
               className={`chip ${run.seed_mode === "pinned" ? "!border-accent/40 !text-accent" : ""}`}
@@ -90,6 +111,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
               }
             >
               {run.seed_mode === "pinned" ? `seed ${run.root_seed}` : "fresh"}
+              <TipIcon hint={gloss("seed")} size={10} position="below" />
             </span>
           )}
           {run?.from_cache && (
@@ -143,7 +165,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
           badge={compareIds.length > 0 ? compareIds.length : null}
         />
       </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+      <div ref={contentRef} className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
         {tab === "current" && (
           <>
             {!run && !running && <EmptyHint />}
@@ -248,8 +270,8 @@ function EmptyHint() {
       <p className="mt-3 text-[11px]">
         Default pipelines on the built-in samples hit a precomputed cache and
         return instantly. A cold <span className="text-ink">QuBound</span>{" "}
-        (LSTM training) or <span className="text-ink">Qshot</span> (HDBSCAN
-        warmup + pilot measurements) run on the shared HF CPU can take
+        (model training) or <span className="text-ink">Qshot</span> (clustering
+        warmup + pilot measurements) run on the shared CPU can take
         1–3&nbsp;minutes; every other block finishes within seconds.
       </p>
       <p className="mt-2 text-[11px]">
@@ -270,9 +292,9 @@ function RunningHint() {
       </div>
       <div className="mt-2 text-[11px] leading-relaxed">
         Most runs finish within a few seconds. Cold{" "}
-        <span className="text-ink">QuBound</span> (LSTM training) or{" "}
-        <span className="text-ink">Qshot</span> (HDBSCAN warmup + pilot
-        measurements) runs can take 1–3&nbsp;minutes on HF's shared CPU —
+        <span className="text-ink">QuBound</span> (model training) or{" "}
+        <span className="text-ink">Qshot</span> (clustering warmup + pilot
+        measurements) runs can take 1–3&nbsp;minutes on the shared CPU —
         please don't close the tab.
       </div>
     </div>

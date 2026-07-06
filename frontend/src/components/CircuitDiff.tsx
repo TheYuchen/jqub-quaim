@@ -54,7 +54,16 @@ const CHIP: Record<GateDiffEntry["s"], { cls: string; title: string }> = {
   },
 };
 
-export default function CircuitDiff({ t }: { t: TransformationPayload }) {
+export default function CircuitDiff({
+  t,
+  defaultOpen = false,
+}: {
+  t: TransformationPayload;
+  /** Scenario F5 boots the diff expanded (initial state only — the
+   *  user can still toggle it; React never re-asserts the attribute
+   *  because the vdom value doesn't change). */
+  defaultOpen?: boolean;
+}) {
   const g = gateDiffOf(t);
   if (!g) return null;
   if (g.truncated) {
@@ -72,7 +81,11 @@ export default function CircuitDiff({ t }: { t: TransformationPayload }) {
   const nRemoved = g.n_removed ?? 0;
   const nAdded = g.n_added ?? 0;
   return (
-    <details className="gate-diff group" aria-label="gate-diff">
+    <details
+      className="gate-diff group"
+      aria-label="gate-diff"
+      open={defaultOpen || undefined}
+    >
       <summary className="cursor-pointer select-none text-[10px] text-mute hover:text-ink transition-colors">
         Gate-level diff · {nRemoved} removed · {nAdded} added
       </summary>

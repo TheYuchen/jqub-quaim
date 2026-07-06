@@ -61,6 +61,7 @@
 
 import type { StepResult } from "../lib/api";
 import CircuitDiff from "./CircuitDiff";
+import { useApp } from "../lib/store";
 
 export interface TransformationPayload {
   before: {
@@ -302,6 +303,8 @@ export function SignatureTile({
  *  explicit one-liner so the reader can tell "read the circuit, left
  *  it alone" from "no circuit in scope at all" (renders nothing). */
 export function SignatureCard({ step }: { step: StepResult }) {
+  // Scenario F5: gate diffs on QuCAD cards boot expanded.
+  const gateDiffDefaultOpen = useApp((s) => s.gateDiffDefaultOpen);
   const t = transformationOf(step);
   if (!t) return null;
   if (!t.changed) {
@@ -384,7 +387,10 @@ export function SignatureCard({ step }: { step: StepResult }) {
           })}
         </div>
       )}
-      <CircuitDiff t={t} />
+      <CircuitDiff
+        t={t}
+        defaultOpen={gateDiffDefaultOpen && step.node_type === "qucad"}
+      />
     </div>
   );
 }

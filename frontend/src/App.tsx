@@ -14,7 +14,7 @@ import { ResultsPane } from "./components/ResultsPane";
 import { MultiverseBoard } from "./components/MultiverseBoard";
 import { CircuitPicker } from "./components/CircuitPicker";
 import { MobileDrawer } from "./components/MobileDrawer";
-import { WelcomeTour, useFirstVisitTour } from "./components/WelcomeTour";
+import { activateScenario } from "./lib/scenarios";
 
 // Default + clamp bounds for the two side panels. The middle canvas flexes.
 const LEFT_DEFAULT = 320;
@@ -69,7 +69,6 @@ export default function App() {
   const running = useApp((s) => s.running);
   const workspaceMode = useApp((s) => s.workspaceMode);
   const [ready, setReady] = useState(false);
-  const [tourOpen, setTourOpen] = useFirstVisitTour();
   const isDesktop = useIsDesktop();
 
   // Desktop pane widths — unused on mobile (drawers take over there).
@@ -104,6 +103,16 @@ export default function App() {
     if (isDesktop) setLeftCollapsed(false);
     else setLeftDrawerOpen(true);
   }, [hintExpandLeftPane, isDesktop]);
+
+  // Same bridge for the right (Evidence) pane — scenario boots use it
+  // to make sure the funnel / lineage / comparison the figure needs is
+  // actually on screen.
+  const hintExpandRightPane = useApp((s) => s.hintExpandRightPane);
+  useEffect(() => {
+    if (hintExpandRightPane === 0) return;
+    if (isDesktop) setRightCollapsed(false);
+    else setRightDrawerOpen(true);
+  }, [hintExpandRightPane, isDesktop]);
 
   // True while a PaneResizer drag is in flight. We use it to suppress the
   // CSS `transition-[width]` during dragging: setRightW / setLeftW fire on
@@ -201,9 +210,6 @@ export default function App() {
   }, [isDesktop, leftCollapsed, rightCollapsed, leftW, rightW]);
 
   const setPlugins = useApp((s) => s.setPlugins);
-  const setSession = useApp((s) => s.setSession);
-  const setAuthStatus = useApp((s) => s.setAuthStatus);
-  const session = useApp((s) => s.session);
   useEffect(() => {
     api
       .health()
@@ -212,20 +218,10 @@ export default function App() {
         setReady(true);
       })
       .catch(() => setReady(true));
-    // Capability probe — does this deployment have OAuth wired up?
-    api
-      .authStatus()
-      .then(setAuthStatus)
-      .catch(() => setAuthStatus(null));
-    // Current session (may be null when no cookie present).
-    api
-      .authMe()
-      .then(setSession)
-      .catch(() => setSession(null));
 
-    // Fetch the current namespace's plugin manifests. We re-run this
-    // whenever the session changes (login → reloads plugins under the
-    // hf_<username> namespace; logout → reloads under the anon UUID).
+    // Fetch this browser's plugin manifests (the plugin protocol is a
+    // paper claim — the execution path stays fully functional even
+    // though the upload UI was removed in Wave P; uploads go via API).
     const refreshPlugins = () => {
       api
         .listPlugins(getUserId())
@@ -235,103 +231,28 @@ export default function App() {
         });
     };
     refreshPlugins();
-    // Multi-tab sync. Tab A upload/delete bumps pluginsRev → Tab B
-    // refetches its plugin list. Tab A login/logout bumps sessionRev
-    // → Tab B refetches /me so the avatar reflects reality.
-    const refreshSession = () => {
-      api
-        .authMe()
-        .then(setSession)
-        .catch(() => setSession(null));
-    };
+    // Multi-tab sync: an upload/delete in tab A bumps pluginsRev →
+    // tab B refetches its plugin list.
     const onStorage = (e: StorageEvent) => {
       if (e.key === "quda.pluginsRev") refreshPlugins();
-      if (e.key === "quda.sessionRev") refreshSession();
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [setHealth, setPlugins, setSession, setAuthStatus]);
+  }, [setHealth, setPlugins]);
 
-  // Whenever the session changes (post-login redirect or post-logout)
-  // refetch the plugin list — the namespace just changed under us.
+  // Boot sequencing: (1) first visit seeds the browser's empty run
+  // archive with the bundled demo evidence (real seeded runs; see
+  // lib/demoArchive.ts) and lands on the Multiverse board; (2) a
+  // ?scenario=Fn URL (Wave P figure states) takes over the whole UI
+  // state afterwards — scenario wins over the demo-import landing.
   useEffect(() => {
-    api
-      .listPlugins(getUserId())
-      .then(setPlugins)
-      .catch(() => {
-        /* ignore */
-      });
-  }, [session?.username, setPlugins]);
-
-  // Session-expiry detection. Without this the avatar dropdown would
-  // claim "signed in" while the server has long since started serving
-  // the anon namespace. We arm a timer for the cookie's expires_at and
-  // clear the local session state when it fires. We also probe /me
-  // every 5 minutes so a server-side invalidation propagates fast.
-  useEffect(() => {
-    if (!session) return;
-    const msUntil = session.expires_at * 1000 - Date.now();
-    if (msUntil <= 0) {
-      setSession(null);
-      return;
-    }
-    const expiryTimer = window.setTimeout(() => {
-      setSession(null);
-    }, msUntil);
-    const probeTimer = window.setInterval(() => {
-      api
-        .authMe()
-        .then((u) => {
-          if (!u) setSession(null);
-        })
-        .catch(() => {
-          /* network blip — leave the session alone */
-        });
-    }, 5 * 60 * 1000);
-    return () => {
-      window.clearTimeout(expiryTimer);
-      window.clearInterval(probeTimer);
-    };
-  }, [session?.expires_at, setSession, session]);
-
-  // Surface an auth error if the OAuth callback redirected with
-  // ?auth_error=... — strip it from the URL afterwards so a reload
-  // doesn't re-trigger the alert.
-  const [authErr, setAuthErr] = useState<string | null>(null);
-  // First visit: seed the browser's empty run archive with the bundled
-  // demo evidence (real seeded runs; see lib/demoArchive.ts) and land
-  // on the Multiverse board, so the evidence views are populated in
-  // the first paint instead of empty-stating. Returning visitors (a
-  // decided flag or any archived runs of their own) are untouched.
-  useEffect(() => {
-    void ensureDemoArchive().then((imported) => {
+    const scenarioKey = new URLSearchParams(window.location.search).get(
+      "scenario",
+    );
+    void ensureDemoArchive().then(async (imported) => {
+      if (scenarioKey && (await activateScenario(scenarioKey))) return;
       if (imported) useApp.getState().setWorkspaceMode("multiverse");
     });
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const err = params.get("auth_error");
-    if (err) {
-      setAuthErr(err);
-      params.delete("auth_error");
-      params.delete("logged_in");
-      const newQs = params.toString();
-      window.history.replaceState(
-        {},
-        "",
-        window.location.pathname + (newQs ? "?" + newQs : ""),
-      );
-    } else if (params.has("logged_in")) {
-      params.delete("logged_in");
-      const newQs = params.toString();
-      window.history.replaceState(
-        {},
-        "",
-        window.location.pathname + (newQs ? "?" + newQs : ""),
-      );
-    }
   }, []);
 
   const leftWidth = leftCollapsed ? COLLAPSED_W : leftW;
@@ -347,27 +268,10 @@ export default function App() {
       style={{ height: "100dvh", minHeight: "100dvh" }}
     >
       <TopBar
-        onOpenTour={() => setTourOpen(true)}
         mobile={!isDesktop}
         onOpenLeftDrawer={() => setLeftDrawerOpen(true)}
         onOpenRightDrawer={() => setRightDrawerOpen(true)}
       />
-      {authErr && (
-        <div
-          role="alert"
-          className="px-4 py-2 text-xs text-warn bg-warn/10 border-b border-warn/30 flex items-center justify-between"
-        >
-          <span>Sign-in didn't complete: {authErr}</span>
-          <button
-            type="button"
-            onClick={() => setAuthErr(null)}
-            className="text-warn hover:text-ink px-2"
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
       {isDesktop ? (
         /* =====================  Desktop  ===================== */
         <div className="flex-1 flex min-h-0">
@@ -504,10 +408,9 @@ export default function App() {
       )}
       {!ready && (
         <div className="absolute inset-0 bg-canvas/80 flex items-center justify-center backdrop-blur">
-          <div className="text-mute text-sm">Connecting to quantum backend…</div>
+          <div className="text-mute text-sm">Connecting to compute backend…</div>
         </div>
       )}
-      <WelcomeTour open={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }

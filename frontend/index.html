@@ -20,10 +20,17 @@
     <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="QuDA Studio" />
+    <!-- %APP_TITLE% is substituted by the vite plugin in vite.config.ts:
+         the app name under VITE_ANON=1 builds is the neutral codename,
+         so the served HTML never carries an identifying title. -->
+    <meta name="apple-mobile-web-app-title" content="%APP_TITLE%" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>QuDA Studio</title>
+    <title>%APP_TITLE%</title>
+    <meta
+      name="description"
+      content="Visual workbench for composing, running, and comparing stochastic computational experiments with full provenance."
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -33,13 +40,16 @@
   </head>
   <body class="bg-canvas text-ink font-sans antialiased">
     <!-- Apply stored theme before first paint so returning users who
-         picked Dark or GMU don't see a flash of the light default. The
-         light theme IS the :root default, so it needs no attribute. -->
+         picked a non-default theme don't see a flash of the light
+         default (the light theme IS the :root default, so it needs no
+         attribute). %THEME_KEYS% is substituted in vite.config.ts —
+         anonymous builds drop the university-branded theme key. -->
     <script>
       (function () {
         try {
+          var allowed = %THEME_KEYS%;
           var t = localStorage.getItem("quda.theme");
-          if (t === "dark" || t === "gmu") {
+          if (allowed.indexOf(t) !== -1) {
             document.documentElement.dataset.theme = t;
           }
         } catch (_) { /* ignore */ }

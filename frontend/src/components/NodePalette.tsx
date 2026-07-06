@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, FileText, Search, Upload, X } from "lucide-react";
+import { ChevronDown, FileText, Search, X } from "lucide-react";
 import { api } from "../lib/api";
 import {
   NODE_CATALOG,
@@ -9,9 +9,9 @@ import {
   type PluginNodeSpec,
 } from "../lib/nodeCatalog";
 import { useApp } from "../lib/store";
+import { ANON } from "../lib/anon";
 import { bumpPluginsRev, getUserId } from "../lib/userId";
 import { BlockPicker } from "./BlockPicker";
-import { UploadPluginModal } from "./UploadPluginModal";
 
 /**
  * Categorised block catalog above the canvas.
@@ -53,7 +53,6 @@ export function NodePalette({
 } = {}) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(true);
-  const [uploadOpen, setUploadOpen] = useState(false);
   // null = show all families; a family key = show only that family.
   const [activeFamily, setActiveFamily] = useState<NodeSpec["family"] | null>(null);
 
@@ -124,16 +123,10 @@ export function NodePalette({
       <div className="px-3 pt-2 pb-1 flex items-center gap-2">
         {/* Multi-select dropdown picker */}
         <BlockPicker canvasKinds={canvasKinds} />
-        <button
-          type="button"
-          onClick={() => setUploadOpen(true)}
-          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border border-edge text-mute hover:border-accent/40 hover:text-ink transition-colors whitespace-nowrap"
-          title="Upload your own plugin block (.zip)"
-          aria-label="Upload plugin"
-        >
-          <Upload className="w-3 h-3" />
-          <span className="hidden lg:inline">Upload</span>
-        </button>
+        {/* Plugin upload UI removed in Wave P (de-product). The plugin
+            protocol itself is a paper claim and stays fully exercised
+            via the backend API; uploaded plugins still appear here and
+            still execute. */}
         {/* Search */}
         <div className="relative flex-1 max-w-[200px]">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-mute pointer-events-none" />
@@ -243,7 +236,6 @@ export function NodePalette({
           </div>
         )}
       </div>
-      <UploadPluginModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </div>
   );
 }
@@ -380,7 +372,7 @@ function PaletteTile({
       {/* Top-right corner badge: paper link, delete button, or nothing.
           These are interactive children; stopPropagation keeps the
           parent button from also firing. */}
-      {spec.paper && !isPlugin && (
+      {spec.paper && !isPlugin && !ANON && (
         <a
           href={spec.paper.url}
           target="_blank"

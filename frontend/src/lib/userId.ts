@@ -12,8 +12,6 @@
 // In other words: the frontend always sends the anon UUID. The server
 // decides which namespace to operate on (session > query).
 
-import { useApp } from "./store";
-
 const LS_KEY = "quda.userId";
 
 /** Read the current anonymous user id, or mint one on first visit.
@@ -41,30 +39,12 @@ export function getUserId(): string {
   return fresh;
 }
 
-/** Convenience: the namespace label the server is currently treating
- *  the caller as. Returns "hf_<username>" when signed in, the anon
- *  UUID otherwise. Used only for display (e.g. tooltips); the actual
- *  authoritative resolution happens on the server. */
-export function displayUserId(): string {
-  const session = useApp.getState().session;
-  if (session?.username) return `hf_${session.username}`;
-  return getUserId();
-}
-
 /** Bump a localStorage counter so other tabs' `storage` listeners fire.
  *  Plugin lists themselves live in Zustand (in-memory per tab); this
  *  counter is the only thing that crosses the localStorage boundary
  *  for cross-tab sync. */
 export function bumpPluginsRev(): void {
   bumpRev("quda.pluginsRev");
-}
-
-/** Same idea, but for session changes (login / logout). Without this
- *  Tab B's avatar stays in the wrong state for up to 5 min after
- *  Tab A signs in or out (we still poll /me on that cadence as a
- *  belt). */
-export function bumpSessionRev(): void {
-  bumpRev("quda.sessionRev");
 }
 
 function bumpRev(key: string): void {

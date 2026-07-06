@@ -16,6 +16,7 @@ import {
 import { NodeParamEditor } from "./NodeParamEditor";
 import { RunStatusChips } from "./RunStatusChips";
 import { SignatureTile } from "./TransformationSignature";
+import { ANON } from "../lib/anon";
 import { TipIcon } from "./TipIcon";
 import { useApp } from "../lib/store";
 import { FAMILY_HINTS } from "../lib/familyHints";
@@ -141,7 +142,7 @@ export function QNode({ id, data, selected }: NodeProps) {
       >
         <X className="w-3 h-3" strokeWidth={2.5} />
       </button>
-      {spec.paper && (
+      {spec.paper && !ANON && (
         <a
           href={spec.paper.url}
           target="_blank"

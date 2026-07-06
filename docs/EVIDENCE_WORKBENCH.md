@@ -306,35 +306,82 @@ Audit bar for every wave: tsc+build+77 tests, live seeded regression,
 pinned-replay bit-exactness, fresh-visitor first paint, encoding
 rationale comments, this doc updated.
 
-## Wave P — paper-first reorientation (USER DIRECTIVE 2026-07-05, next session)
+## Wave P — paper-first reorientation (SHIPPED 2026-07-05)
 
 The system now serves the PAPER, not a product. Figures come from
-here. Reviewers are vis people, not quantum people. Execute:
+here. Reviewers are vis people, not quantum people. Status per item:
 
-1. **De-product**: remove product legacy — welcome tour, sign-in/HF
-   OAuth UI, Support/NSF popover, Lab/Papers/Developers header links,
-   plugin upload marketing surfaces (keep the plugin protocol itself:
-   it's a claim), marketing copy. Keep share links (reviewers use
-   them). Mobile polish deprioritized.
-2. **Figure export mode**: one-click paper styling for any view
-   (canvas/multiverse/funnel/lineage/gate-diff/compare): white bg,
-   enlarged fonts, colorblind-safe check, SVG (vector) export via DOM
-   serialization + PNG fallback. Figures must not need Photoshop.
-3. **Scenario loader**: scripted, seed-reproducible states for each
-   planned figure (F1 ribbon mid-pipeline, F2 multiverse board, F3
-   funnel + target stop, F4 lineage with fork/replay, F5 gate diff on
-   QuCAD, F6 interval comparison). One URL/command each — regenerate
-   any figure at any time bit-exactly.
-4. **Non-quantum-reader pass**: plain-language tooltip/glossary for
-   every quantum term; prefer task language (evidence, transformation,
-   composition, replicate) over jargon in ALL UI copy; the demo must
-   be followable by a vis reviewer with zero quantum background.
-5. **Double-anonymous mode** (VIS is double-blind): env-flag that
-   strips ALL identifying branding (GMU, JQub, names, lab links,
-   NSF) for the review deployment; verify no identifying string in
-   the served bundle. Consider a second anonymous Space for
-   submission.
-6. Re-audit every view against: "does this pixel serve a paper claim
-   or figure?" Remove what doesn't.
+1. **De-product — shipped.** Removed: WelcomeTour + tour/ slides,
+   AuthButton/session UI (all auth effects stripped from App.tsx;
+   backend HF OAuth routes remain but no frontend surface renders
+   login), SupportPopover (NSF), PapersPopover, DevelopersPopover,
+   Lab header link, UploadPluginModal + its palette trigger. The
+   plugin protocol itself stays a live claim: manifests are still
+   fetched, plugin blocks still render and execute — uploads happen
+   via the API (`POST /api/plugins`), which is how the paper
+   exercises the protocol anyway. Kept: theme switcher, share links,
+   Export .py. Header is now name + tagline + qiskit/torch chip +
+   live-calibration toggle + theme. index.html title/meta and the
+   PWA manifest are neutral (no lab branding in any mode).
+2. **Figure export mode — shipped** (`lib/figureExport.ts`,
+   `components/FigureExportButton.tsx`; camera buttons on the canvas
+   toolbar, the Multiverse board header, and the Evidence pane
+   header). Two serialization paths: TRUE-SVG when the target is an
+   `<svg>` (lineage gutter, strips, glyphs, ribbon layer); HYBRID for
+   HTML-heavy composites (canvas / board / evidence pane) —
+   foreignObject SVG (vector text; some renderers can't rasterize
+   foreignObject, hence…) PLUS a 2.5× PNG rendered through canvas as
+   the always-works fallback. Paper transform on a cloned subtree
+   with all computed styles inlined: forced white/light theme, fonts
+   ×1.25, interactive chrome stripped (buttons, inputs, RF
+   controls/minimap/attribution, tooltips, toasts, TipIcons).
+   **Provenance-backed figures (the novelty twist):** every SVG
+   embeds a `<metadata id="provenance">` JSON — app version, export
+   ISO time, run_ids + root_seeds + config_hashes of every run
+   visible in the view, and the canvas SharePayload — and a
+   `.provenance.json` sidecar ships alongside for the PNG. A figure
+   in the paper is therefore bit-exactly regenerable from the file
+   itself: rebuild the graph from the payload, pin the recorded
+   seed, replay.
+3. **Scenario loader — shipped** (`lib/scenarios.ts`; boot hook in
+   App.tsx). `?scenario=F1..F6`: F1 ribbon canvas post-run (QuCAD on
+   vqc_2q_small, seed 336157917, auto-run), F2 multiverse board over
+   the bundled archive, F3 evidence funnel with ±2pp optional stop
+   (bell_state, 4096 shots, seed 424242, auto-run, early stop
+   ~650 shots), F4 lineage with the archived fork+replay, F5 QuCAD
+   card with the gate diff booted open (auto-run), F6 interval
+   comparison of the two most-replicated archive configurations.
+   Auto-run is sequenced through pendingRestore.autoRunAfter → the
+   store's pendingAutoRun, consumed by FlowCanvas only when the
+   scenario's expected circuit is loaded (ref-guarded against
+   double-fire). Archive-backed scenarios force-import the bundled
+   demo archive when its records are absent (idempotent).
+4. **Non-quantum-reader pass — shipped.** `lib/glossary.ts` is the
+   single source of plain-language gloss strings (shots, fidelity,
+   backend, seed, intervals, replicate, configuration, …); node
+   catalog descriptions/hints, results-card captions, toolbar
+   titles, the Evidence seed chip and the Multiverse header now use
+   task language with TipIcon glosses where a domain term must stay.
+5. **Double-anonymous mode — shipped** (`lib/anon.ts`). Build-time
+   `VITE_ANON=1` (the submission path) statically folds identifying
+   strings OUT of the bundle: app name → "EvidenceQ", neutral
+   tagline/title/manifest (vite plugin rewrites index.html + the PWA
+   manifest), paper/bibtex metadata dead-code-eliminated from the
+   node catalog, GMU theme dropped. Runtime fallback `?anon=1`
+   (persisted in localStorage, `?anon=0` clears) hides the same
+   surfaces on a normal build for review purposes. Audit result on
+   the VITE_ANON=1 dist: zero user-visible identifying strings; the
+   only case-insensitive grep hits are internal storage keys
+   ("quda.*", IndexedDB "quda-provenance") and CSS/localStorage
+   theme-key comparisons — never rendered, and renaming them would
+   orphan returning users' persisted state. NOTE: the regular
+   Space's URL is itself identifying — the submission deploys a
+   FRESH anonymous Space built with VITE_ANON=1; the flag removes
+   in-app identifiers only.
+6. Re-audit of every view against "does this pixel serve a paper
+   claim or figure?" — the removals above are the outcome; remaining
+   surfaces (canvas+ribbons, multiverse, funnel, lineage, compare,
+   share/export) each back a claim.
 
-Also finish: rerecord_demo_archive.py for the 3 vqc records; Wave J.
+Still open from before Wave P: rerecord_demo_archive.py for the 3
+vqc records; Wave J (uncertainty-in-provenance).

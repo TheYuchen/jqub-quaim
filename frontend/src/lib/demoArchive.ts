@@ -79,10 +79,23 @@ function markDecided(): void {
  * Returns true iff records were imported this call — the caller uses
  * that to land the visitor on the Multiverse board.
  */
-export async function ensureDemoArchive(): Promise<boolean> {
-  if (isDecided()) return false;
+export async function ensureDemoArchive(
+  opts: {
+    /** Scenario boots (?scenario=F2/F4/F6) pass true: those figures
+     *  are rendered FROM the bundled archive, so it must be present
+     *  even if this browser had previously cleared demo data. Still
+     *  idempotent — if demo-flagged records already exist we never
+     *  import twice. */
+    force?: boolean;
+  } = {},
+): Promise<boolean> {
+  const { force = false } = opts;
+  if (!force && isDecided()) return false;
   try {
-    if ((await countRuns()) > 0) {
+    if (force) {
+      const existing = await listRuns(1000);
+      if (existing.some((r) => r.demo)) return false;
+    } else if ((await countRuns()) > 0) {
       // Existing evidence (e.g. pre-flag build): never mix demo runs
       // into a real archive.
       markDecided();

@@ -14,6 +14,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import { NOISE_SNAPSHOTS } from "./qshotSnapshots";
+import { GLOSSARY } from "./glossary";
 
 export type NodeKind =
   | "input_circuit"
@@ -97,7 +98,8 @@ export const NODE_CATALOG: NodeSpec[] = [
     label: "Input circuit",
     family: "source",
     tagline: "your quantum program",
-    description: "Parameterized QuantumCircuit (uploaded .qpy or a demo sample).",
+    description:
+      "The program under test — a quantum circuit, possibly with trainable parameters (uploaded .qpy or a built-in sample).",
     icon: Atom,
     accent: "text-accent",
     accentRing: "border-accent/50",
@@ -137,7 +139,7 @@ export const NODE_CATALOG: NodeSpec[] = [
         min: 1,
         max: 65536,
         step: 1,
-        hint: "Number of times the circuit is run and measured. Picked up from ctx by downstream blocks that actually sample (e.g. Fidelity in `sampled` mode). 1024 is the Qiskit default; bigger means lower shot noise but proportionally slower runs.",
+        hint: `${GLOSSARY.shots} Used by downstream blocks that actually sample (e.g. Fidelity in "sampled" mode); 1024 is the common default.`,
       },
     ],
   },
@@ -159,7 +161,7 @@ export const NODE_CATALOG: NodeSpec[] = [
         min: 1,
         max: 65536,
         step: 1,
-        hint: "Measurement count used by downstream sampling blocks. Same units as Noisy simulator's shots; live mode falls back to Noisy simulator on this deployment.",
+        hint: `${GLOSSARY.shots} Same units as the Noisy simulator's shots; live mode falls back to the simulator on this deployment.`,
       },
     ],
   },
@@ -168,7 +170,8 @@ export const NODE_CATALOG: NodeSpec[] = [
     label: "QuCAD",
     family: "algorithm",
     tagline: "noise-aware pruning",
-    description: "ADMM-based noise-aware VQC sparsification (weights pushed to 0 under target noise).",
+    description:
+      "Noise-aware pruning: learns which trainable parameters to delete so the smaller circuit holds up better under the target machine's noise (ADMM optimizer).",
     icon: Waypoints,
     accent: "text-accent2",
     accentRing: "border-accent2/50",
@@ -208,27 +211,34 @@ export const NODE_CATALOG: NodeSpec[] = [
         hint: "Internal penalty weight for the ADMM solver; default is usually fine.",
       },
     ],
-    paper: {
-      url: "https://arxiv.org/abs/2304.04666",
-      title:
-        "Battle Against Fluctuating Quantum Noise: Compression-Aided Framework to Enable Robust Quantum Neural Network",
-      venue: "ICCAD 2023",
-      bibtex: `@inproceedings{qucad2023,
-  title     = {Battle Against Fluctuating Quantum Noise: Compression-Aided Framework to Enable Robust Quantum Neural Network},
-  author    = {Antony Maria, Jovin and Jiang, Weiwen},
-  booktitle = {2023 IEEE/ACM International Conference on Computer-Aided Design (ICCAD)},
-  year      = {2023},
-  eprint    = {2304.04666},
-  archivePrefix = {arXiv},
-}`,
-    },
+    // Paper metadata identifies the group's prior work — folded out of
+    // double-anonymous builds at compile time (see lib/anon.ts).
+    ...(import.meta.env.VITE_ANON === "1"
+      ? {}
+      : {
+          paper: {
+            url: "https://arxiv.org/abs/2304.04666",
+            title:
+              "Battle Against Fluctuating Quantum Noise: Compression-Aided Framework to Enable Robust Quantum Neural Network",
+            venue: "ICCAD 2023",
+            bibtex: `@inproceedings{qucad2023,
+        title     = {Battle Against Fluctuating Quantum Noise: Compression-Aided Framework to Enable Robust Quantum Neural Network},
+        author    = {Antony Maria, Jovin and Jiang, Weiwen},
+        booktitle = {2023 IEEE/ACM International Conference on Computer-Aided Design (ICCAD)},
+        year      = {2023},
+        eprint    = {2304.04666},
+        archivePrefix = {arXiv},
+      }`,
+          },
+        }),
   },
   {
     kind: "qubound",
     label: "QuBound",
     family: "algorithm",
     tagline: "predict today's error bound",
-    description: "LSTM over 14 days of calibration history; predicts today's error bound. Set a threshold to get a pass/fail decision.",
+    description:
+      "Predicts today's error bound from the machine's last 14 days of measured error rates (a small learned model). Set a threshold to get a pass/fail decision.",
     icon: LineChart,
     accent: "text-accent3",
     accentRing: "border-accent3/50",
@@ -245,43 +255,56 @@ export const NODE_CATALOG: NodeSpec[] = [
         hint: "Acceptable upper bound on predicted error. 0 disables the pass/fail decision and shows the predicted bound only. Typical values: 0.05 (strict) to 0.20 (lenient).",
       },
     ],
-    paper: {
-      url: "https://arxiv.org/abs/2507.17043",
-      title:
-        "Computational Performance Bounds Prediction in Quantum Computing with Unstable Noise",
-      venue: "IEEE TCAD 2025",
-      bibtex: `@article{qubound2025,
-  title   = {Computational Performance Bounds Prediction in Quantum Computing with Unstable Noise},
-  author  = {Antony Maria, Jovin and Jiang, Weiwen},
-  journal = {IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems},
-  year    = {2025},
-  eprint  = {2507.17043},
-  archivePrefix = {arXiv},
-}`,
-    },
+    // Paper metadata identifies the group's prior work — folded out of
+    // double-anonymous builds at compile time (see lib/anon.ts).
+    ...(import.meta.env.VITE_ANON === "1"
+      ? {}
+      : {
+          paper: {
+            url: "https://arxiv.org/abs/2507.17043",
+            title:
+              "Computational Performance Bounds Prediction in Quantum Computing with Unstable Noise",
+            venue: "IEEE TCAD 2025",
+            bibtex: `@article{qubound2025,
+        title   = {Computational Performance Bounds Prediction in Quantum Computing with Unstable Noise},
+        author  = {Antony Maria, Jovin and Jiang, Weiwen},
+        journal = {IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems},
+        year    = {2025},
+        eprint  = {2507.17043},
+        archivePrefix = {arXiv},
+      }`,
+          },
+        }),
   },
   {
     kind: "compvqc",
     label: "CompressVQC",
     family: "algorithm",
     tagline: "fold redundant gates",
-    description: "QAOA-optimized lookup table that folds redundant parametric gates.",
+    description:
+      "Circuit compression: merges redundant rotation operations via a precomputed lookup table, so the same computation uses fewer operations.",
     icon: Shrink,
     accent: "text-accent4",
     accentRing: "border-accent4/50",
-    paper: {
-      url: "https://arxiv.org/abs/2207.01578",
-      title: "Quantum Neural Network Compression",
-      venue: "ICCAD 2022",
-      bibtex: `@inproceedings{compressvqc2022,
-  title     = {Quantum Neural Network Compression},
-  author    = {Hu, Zhirui and Dong, Peiyan and Wang, Zhepeng and Lin, Youzuo and Wang, Yanzhi and Jiang, Weiwen},
-  booktitle = {2022 IEEE/ACM International Conference on Computer-Aided Design (ICCAD)},
-  year      = {2022},
-  eprint    = {2207.01578},
-  archivePrefix = {arXiv},
-}`,
-    },
+    // Paper metadata identifies the group's prior work — folded out of
+    // double-anonymous builds at compile time (see lib/anon.ts).
+    ...(import.meta.env.VITE_ANON === "1"
+      ? {}
+      : {
+          paper: {
+            url: "https://arxiv.org/abs/2207.01578",
+            title: "Quantum Neural Network Compression",
+            venue: "ICCAD 2022",
+            bibtex: `@inproceedings{compressvqc2022,
+        title     = {Quantum Neural Network Compression},
+        author    = {Hu, Zhirui and Dong, Peiyan and Wang, Zhepeng and Lin, Youzuo and Wang, Yanzhi and Jiang, Weiwen},
+        booktitle = {2022 IEEE/ACM International Conference on Computer-Aided Design (ICCAD)},
+        year      = {2022},
+        eprint    = {2207.01578},
+        archivePrefix = {arXiv},
+      }`,
+          },
+        }),
   },
   {
     kind: "qshot",
@@ -289,7 +312,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     family: "algorithm",
     tagline: "recommend shot count",
     description:
-      "Noise-aware shot-count recommender. Predicts the smallest shot count that meets a target fidelity bound (with statistical confidence, z=1.645) on a chosen IBM calibration snapshot. Self-contained — no upstream backend required.",
+      "Recommends how many repeated measurements (shots) are needed to meet a target accuracy, with statistical confidence, on a chosen day's machine noise. Self-contained — no upstream backend required.",
     icon: Target,
     accent: "text-warn",
     accentRing: "border-warn/40",
@@ -332,8 +355,9 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "fidelity",
     label: "Fidelity",
     family: "metric",
-    tagline: "noiseless vs sampled",
-    description: "Estimates the |0…0⟩-state fidelity. Two methods: noiseless statevector (fast, ignores backend noise) or sampled shots from the noisy backend (uses backend's shots, has shot noise).",
+    tagline: "how close to ideal?",
+    description:
+      "Scores how close the noisy result is to the ideal one (0–1, higher is better). Two methods: exact noise-free calculation, or sampled measurements from the noisy machine (carries measurement uncertainty).",
     icon: Gauge,
     accent: "text-ok",
     accentRing: "border-ok/40",
@@ -366,7 +390,8 @@ export const NODE_CATALOG: NodeSpec[] = [
     label: "Output",
     family: "sink",
     tagline: "final metrics & diagram",
-    description: "Final circuit, transpiled gate counts, and aggregated metrics.",
+    description:
+      "Final circuit, its operation counts after compiling for the target machine, and the aggregated metrics.",
     icon: PackageCheck,
     accent: "text-ink",
     accentRing: "border-mute/40",

@@ -25,7 +25,7 @@
 //     "(n small)" below 3 replicates on either side — a difference
 //     built on one draw is not evidence, and the UI says so.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GitCompare, RotateCcw, Workflow } from "lucide-react";
 import { useApp } from "../lib/store";
 import { listRuns, type RunRecord } from "../lib/runStore";
@@ -35,6 +35,9 @@ import type { PluginManifest } from "../lib/api";
 import { hashHue, hueCss } from "../lib/hues";
 import { WorkspaceToggle } from "./WorkspaceToggle";
 import { DemoArchiveBanner } from "./DemoArchiveBanner";
+import { FigureExportButton } from "./FigureExportButton";
+import { TipIcon } from "./TipIcon";
+import { gloss } from "../lib/glossary";
 
 // --- grouping model ---------------------------------------------------------
 
@@ -320,6 +323,7 @@ export function MultiverseBoard() {
   const compareIds = useApp((s) => s.compareIds);
   const toggleCompare = useApp((s) => s.toggleCompare);
 
+  const boardRef = useRef<HTMLDivElement>(null);
   const [runs, setRuns] = useState<RunRecord[] | null>(null);
   useEffect(() => {
     let alive = true;
@@ -353,6 +357,7 @@ export function MultiverseBoard() {
 
   return (
     <div
+      ref={boardRef}
       className="multiverse-board flex-1 flex flex-col min-h-0 bg-canvas"
       aria-label="Multiverse board: all configurations as small multiples"
     >
@@ -363,6 +368,7 @@ export function MultiverseBoard() {
         <WorkspaceToggle />
         <div className="text-xs text-mute truncate">
           <span className="text-ink font-medium">Multiverse</span>
+          <TipIcon className="ml-1" hint={gloss("configuration")} />
           {runs != null && (
             <>
               {" "}
@@ -378,6 +384,13 @@ export function MultiverseBoard() {
           <span className="text-edge">·</span>
           <span>strip = one dot per replicate (0–100%)</span>
         </div>
+        {/* Paper-figure export of the whole board (hybrid path). */}
+        <FigureExportButton
+          className="ml-2 lg:ml-0 shrink-0"
+          getTarget={() => boardRef.current}
+          name="multiverse"
+          view="multiverse"
+        />
       </div>
 
       {runs != null && runs.some((r) => r.demo) && <DemoArchiveBanner />}

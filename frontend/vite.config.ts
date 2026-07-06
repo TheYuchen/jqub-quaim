@@ -1,10 +1,58 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+// Double-anonymous builds (`VITE_ANON=1 npm run build`) must not serve
+// identifying strings in ANY static asset, not just the JS bundle. The
+// JS side is handled by src/lib/anon.ts (build-time constant folding);
+// this plugin covers index.html (title placeholders) and the PWA
+// manifest (rewritten post-build).
+const anonBuild = process.env.VITE_ANON === "1";
+const APP_TITLE = anonBuild ? "EvidenceQ" : "QuDA Studio";
+
+function anonStaticAssets(): Plugin {
+  return {
+    name: "anon-static-assets",
+    transformIndexHtml(html) {
+      return html
+        .replaceAll("%APP_TITLE%", APP_TITLE)
+        .replaceAll(
+          "%THEME_KEYS%",
+          anonBuild ? '["dark"]' : '["dark", "gmu"]',
+        );
+    },
+    writeBundle(options) {
+      if (!anonBuild) return;
+      const dir = options.dir ?? resolve(__dirname, "dist");
+      writeFileSync(
+        resolve(dir, "manifest.webmanifest"),
+        JSON.stringify(
+          {
+            name: APP_TITLE,
+            short_name: APP_TITLE,
+            description:
+              "Visual workbench for composing, running, and comparing stochastic computational experiments with full provenance.",
+            start_url: "/",
+            display: "standalone",
+            background_color: "#f6f7fb",
+            theme_color: "#f6f7fb",
+            icons: [
+              { src: "/favicon.svg", sizes: "any", type: "image/svg+xml" },
+            ],
+          },
+          null,
+          2,
+        ),
+      );
+    },
+  };
+}
 
 // During `npm run dev` we proxy /api to the local FastAPI uvicorn.
 // In production the backend serves frontend/dist directly so no proxy is needed.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), anonStaticAssets()],
   server: {
     port: 5173,
     proxy: {

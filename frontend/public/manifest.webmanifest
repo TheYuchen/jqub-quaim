@@ -1,7 +1,7 @@
 {
   "name": "QuDA Studio",
   "short_name": "QuDA",
-  "description": "Quantum Design Automation Studio — drag-and-drop pipelines over JQub-lab research algorithms.",
+  "description": "Visual workbench for composing, running, and comparing quantum-pipeline experiments with full provenance.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b0d12",

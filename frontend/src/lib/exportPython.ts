@@ -18,6 +18,7 @@
  */
 
 import type { Node, Edge } from "@xyflow/react";
+import { APP_NAME } from "./anon";
 import type { QNodeData } from "../components/QNode";
 import type { NodeKind } from "./nodeCatalog";
 
@@ -348,8 +349,12 @@ export function generatePythonScript(
   // Header — provenance stamp ties the file to the exact archived run
   // it was exported from (reviewer-traceable: number -> run_id -> seed).
   lines.push(`"""`);
-  lines.push(`Pipeline exported from QuDA Studio`);
-  lines.push(`https://jqub21-quaim.hf.space/`);
+  lines.push(`Pipeline exported from ${APP_NAME}`);
+  // Current origin, not a hardcoded URL: correct on any deployment and
+  // never leaks the primary Space's identity from an anonymous one.
+  lines.push(
+    typeof window !== "undefined" ? `${window.location.origin}/` : ``,
+  );
   if (provenance) {
     lines.push(``);
     lines.push(`Provenance of the run this pipeline was exported from:`);
@@ -381,7 +386,7 @@ export function generatePythonScript(
 
   if (needsSeedHelper) {
     lines.push(``);
-    lines.push(`# Per-node seed, matching QuDA Studio's backend derivation exactly:`);
+    lines.push(`# Per-node seed, matching ${APP_NAME}'s backend derivation exactly:`);
     lines.push(`# sha256(f"{root}:{node_id}") -> first 4 bytes -> 31-bit int.`);
     lines.push(`# Order-independent: editing unrelated nodes never changes this`);
     lines.push(`# node's draw under the same root seed.`);
@@ -390,7 +395,7 @@ export function generatePythonScript(
     lines.push(`    return int.from_bytes(digest[:4], "big") % (2**31)`);
     lines.push(``);
     lines.push(``);
-    lines.push(`ROOT_SEED = ${rootSeed}  # recorded by QuDA Studio for this run`);
+    lines.push(`ROOT_SEED = ${rootSeed}  # recorded by ${APP_NAME} for this run`);
     lines.push(``);
   }
 

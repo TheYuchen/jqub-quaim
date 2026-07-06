@@ -3,12 +3,10 @@
 
 import { create } from "zustand";
 import type {
-  AuthStatus,
   CircuitInfo,
   HealthResponse,
   PluginManifest,
   RunResponse,
-  SessionUser,
   StepProgress,
 } from "./api";
 import type { NodeKind } from "./nodeCatalog";
@@ -99,12 +97,20 @@ interface AppState {
     graph: SharePayload;
     sampleKey: string | null;
     pinSeed: number | null;
-    sourceRunId: string;
+    /** run_id the restore descends from (threads into the next run's
+     *  forked_from). null for scenario boots — a scripted figure state
+     *  is not a fork of any archived run. */
+    sourceRunId: string | null;
     /** Archived run's optional-stopping target. Restored alongside
      *  the graph — without it a pinned replay of an early-stopped
      *  run would run all shots and reproduce nothing. undefined =
      *  record predates Wave I (treated as null). */
     precisionTarget?: number | null;
+    /** Scenario boots: request an automatic run AFTER the sample
+     *  circuit finishes loading (sequenced inside FlowCanvas's
+     *  restore consumer, so it can't race the boot-time default-
+     *  circuit load). */
+    autoRunAfter?: boolean;
   } | null;
   requestRestore: (r: NonNullable<AppState["pendingRestore"]>) => void;
   clearRestore: () => void;
@@ -197,21 +203,33 @@ interface AppState {
   ) => void;
 
   /**
-   * OAuth + persistence capability of this deployment. Probed once at
-   * boot via /api/auth/status. When `oauth_enabled` is false (e.g.
-   * local dev without HF_OAUTH metadata), the TopBar hides the Login
-   * button entirely.
+   * Scenario bridge (Wave P): a scenario boot (?scenario=Fn) can ask
+   * FlowCanvas to run the pipeline automatically once the restored
+   * graph AND its sample circuit are both in place. `sampleKey` is the
+   * circuit the scenario expects — the consumer must not fire while the
+   * boot-time default circuit is still loaded (restore's sample load is
+   * async and races the default bell_state auto-load).
    */
-  authStatus: AuthStatus | null;
-  setAuthStatus: (s: AuthStatus | null) => void;
+  pendingAutoRun: { sampleKey: string | null } | null;
+  requestAutoRun: (sampleKey: string | null) => void;
+  clearAutoRun: () => void;
 
-  /**
-   * The current signed-in HF user, or null when running as guest.
-   * Drives the avatar/dropdown in TopBar and propagates to userId.ts
-   * so plugin requests use the hf_<username> namespace.
-   */
-  session: SessionUser | null;
-  setSession: (u: SessionUser | null) => void;
+  /** Scenario bridge: which Evidence tab ResultsPane should switch to.
+   *  Consumed (reset to null) by ResultsPane. */
+  pendingEvidenceTab: "current" | "history" | "compare" | null;
+  setPendingEvidenceTab: (
+    t: "current" | "history" | "compare" | null,
+  ) => void;
+
+  /** Counter twin of hintExpandLeftPane, for the Evidence pane. */
+  hintExpandRightPane: number;
+  bumpHintExpandRightPane: () => void;
+
+  /** Scenario F5: render gate-level circuit diffs expanded by default
+   *  on QuCAD cards (the <details> boots open). Not consumed/cleared —
+   *  deterministic for the whole scenario session. */
+  gateDiffDefaultOpen: boolean;
+  setGateDiffDefaultOpen: (v: boolean) => void;
 }
 
 export const useApp = create<AppState>((set) => ({
@@ -282,8 +300,14 @@ export const useApp = create<AppState>((set) => ({
   setTouchDrag: (v) => set({ touchDrag: v }),
   pendingTouchDrop: null,
   setPendingTouchDrop: (v) => set({ pendingTouchDrop: v }),
-  authStatus: null,
-  setAuthStatus: (s) => set({ authStatus: s }),
-  session: null,
-  setSession: (u) => set({ session: u }),
+  pendingAutoRun: null,
+  requestAutoRun: (sampleKey) => set({ pendingAutoRun: { sampleKey } }),
+  clearAutoRun: () => set({ pendingAutoRun: null }),
+  pendingEvidenceTab: null,
+  setPendingEvidenceTab: (t) => set({ pendingEvidenceTab: t }),
+  hintExpandRightPane: 0,
+  bumpHintExpandRightPane: () =>
+    set((s) => ({ hintExpandRightPane: s.hintExpandRightPane + 1 })),
+  gateDiffDefaultOpen: false,
+  setGateDiffDefaultOpen: (v) => set({ gateDiffDefaultOpen: v }),
 }));
