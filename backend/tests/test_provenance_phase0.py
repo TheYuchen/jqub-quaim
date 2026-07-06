@@ -118,6 +118,74 @@ class SeedSaltedPrefixTests(unittest.TestCase):
             ws._prefix_hash(b"qpy", self.NODES, salt="seed:2"),
         )
 
+    # C1 audit regression: node ids are part of seed identity, so a
+    # pinned (salted) prefix hash must change when a node is renamed —
+    # otherwise an id-renamed but structurally identical graph under
+    # the same pinned seed is served the OTHER graph's seeded numbers
+    # (cross-graph cache poisoning, demonstrated live pre-fix).
+    RENAMED = [FlowNode(id="m1", type="fake_backend", data={"name": "FakeFez"})]
+
+    def test_pinned_hash_includes_node_ids(self) -> None:
+        self.assertNotEqual(
+            ws._prefix_hash(b"qpy", self.NODES, salt="seed:42"),
+            ws._prefix_hash(b"qpy", self.RENAMED, salt="seed:42"),
+        )
+
+    def test_fresh_hash_ignores_node_ids(self) -> None:
+        # Prewarm compatibility: the unsalted namespace must stay
+        # id-free so precomputed entries keep matching id-renamed
+        # graphs (fresh runs never cache stochastic steps).
+        self.assertEqual(
+            ws._prefix_hash(b"qpy", self.NODES),
+            ws._prefix_hash(b"qpy", self.RENAMED),
+        )
+
+
+@unittest.skipUnless(HAVE_AER, "qiskit-aer not installed")
+class PinnedCacheIdentityPipelineTests(unittest.TestCase):
+    """Executor-level C1 regression: two id-renamed but structurally
+    identical graphs under the SAME pinned seed must not share step-
+    cache entries; each must consume its own id-derived seed."""
+
+    SEED = 111_222_333  # dedicated seed so other tests can't pre-warm us
+
+    @staticmethod
+    def _bell():
+        from qiskit import QuantumCircuit
+        # Fixed name: QPY serializes the circuit name, and the step
+        # cache keys on the QPY bytes — an auto-generated "circuit-N"
+        # name would defeat the cache-hit assertion below.
+        qc = QuantumCircuit(2, name="c1_bell")
+        qc.h(0)
+        qc.cx(0, 1)
+        return qc
+
+    def _run(self, node_id: str):
+        return ws.run_pipeline(
+            circuit=self._bell(),
+            nodes=[FlowNode(id=node_id, type="fidelity",
+                            data={"method": "sampled"})],
+            edges=[], settings=None,
+            root_seed=self.SEED, seed_pinned=True,
+        )[0]
+
+    def test_id_renamed_graph_gets_own_seed_not_cached_twin(self) -> None:
+        a = self._run("a1")
+        b = self._run("b1")
+        # B must actually execute (pre-fix it was a poisoned cache hit
+        # serving A's draw) and consume ITS OWN id-derived seed.
+        self.assertFalse(b.from_step_cache)
+        self.assertEqual(a.seed_used, ws.derive_node_seed(self.SEED, "a1"))
+        self.assertEqual(b.seed_used, ws.derive_node_seed(self.SEED, "b1"))
+        self.assertNotEqual(a.seed_used, b.seed_used)
+        # Replaying B pinned now hits B's OWN cache entry, bit-exact.
+        b2 = self._run("b1")
+        self.assertTrue(b2.from_step_cache)
+        assert b.distribution is not None and b2.distribution is not None
+        self.assertEqual(b.distribution["successes"],
+                         b2.distribution["successes"])
+        self.assertEqual(b.distribution["trace"], b2.distribution["trace"])
+
 
 class SchemaBackwardCompatTests(unittest.TestCase):
     """Old cached JSON responses (precomputed_runs/*.json) predate the

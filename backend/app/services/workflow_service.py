@@ -110,8 +110,22 @@ def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode], salt: str = "
     """Hash the pipeline prefix up to and including the last node in
     ``nodes_so_far``. Two runs with the same circuit + same node
     sequence (types and params) will produce the same prefix hash at
-    each step, enabling cache hits for unchanged prefixes."""
+    each step, enabling cache hits for unchanged prefixes.
+
+    Seed-pinned (salted) runs additionally fold each node's ID into
+    the per-node payload. WHY: under a pinned seed the per-node draw
+    is derived from ``sha256(root_seed:node_id)`` — node ids are part
+    of the seed identity. Two id-renamed but structurally identical
+    graphs under the same pinned seed produce DIFFERENT draws, so they
+    must never share cache entries (without this, run B was served
+    run A's seeded numbers — cross-graph cache poisoning). Fresh
+    (unsalted) runs stay id-free so the precomputed/prewarm namespace
+    is untouched and prefix reuse across id-renamed graphs keeps
+    working where it is sound (fresh runs never cache stochastic
+    steps).
+    """
     h = hashlib.sha256(circuit_qpy)
+    seeded = bool(salt)
     if salt:
         # Seed-pinned runs get their own cache namespace: a stochastic
         # step's cached result is only valid for the exact seed that
@@ -119,11 +133,10 @@ def _prefix_hash(circuit_qpy: bytes, nodes_so_far: list[FlowNode], salt: str = "
         # precomputed/prewarmed entries stay reachable.
         h.update(salt.encode())
     for n in nodes_so_far:
-        h.update(
-            json.dumps(
-                {"type": n.type, "data": n.data}, sort_keys=True, default=str,
-            ).encode()
-        )
+        payload: dict = {"type": n.type, "data": n.data}
+        if seeded:
+            payload["id"] = n.id  # node ids are part of seed identity
+        h.update(json.dumps(payload, sort_keys=True, default=str).encode())
     return h.hexdigest()[:16]
 
 
@@ -1335,10 +1348,12 @@ def _execute_pipeline(
             else:
                 ctx.update(cached_ctx)
                 _step_cache.move_to_end(prefix_key)  # LRU refresh
-                # The prefix hash ignores node ids, so the cached result
-                # may have been written by a graph with different ids —
-                # re-stamp the CURRENT node's id or the frontend cannot
-                # map this step back to its canvas node.
+                # In the fresh (unsalted) regime the prefix hash ignores
+                # node ids, so the cached result may have been written by
+                # a graph with different ids — re-stamp the CURRENT
+                # node's id or the frontend cannot map this step back to
+                # its canvas node. (Pinned entries always match ids —
+                # ids are hashed there — so the re-stamp is a no-op.)
                 yield cached_result.model_copy(
                     update={"from_step_cache": True, "node_id": node.id}
                 )
