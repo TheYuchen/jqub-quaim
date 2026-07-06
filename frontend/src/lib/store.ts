@@ -13,6 +13,35 @@ import type { NodeKind } from "./nodeCatalog";
 import type { SharePayload } from "./share";
 
 const LS_USE_LIVE_IBM = "quda.useLiveIbm";
+const LS_THEATER_AUTO_OPEN = "quda.theaterAutoOpen";
+
+/** Evidence-theater auto-open preference (default ON). Read lazily on
+ *  every progress frame instead of cached in the store so a toggle in
+ *  one tab is honoured by the next run without a reload. */
+export function theaterAutoOpenEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(LS_THEATER_AUTO_OPEN) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setTheaterAutoOpenEnabled(v: boolean): void {
+  try {
+    window.localStorage.setItem(LS_THEATER_AUTO_OPEN, v ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** One anytime-evidence progress frame plus its client arrival time.
+ *  `at` (Date.now()) is what the theater's cost axis is built from —
+ *  client-side arrival, not server compute time (see EvidenceTheater
+ *  for the caveat). */
+export interface TheaterFrame extends StepProgress {
+  at: number;
+}
 
 function loadUseLiveIbm(): boolean {
   if (typeof window === "undefined") return false;
@@ -82,6 +111,35 @@ interface AppState {
   liveProgress: Record<string, StepProgress> | null;
   updateLiveProgress: (p: StepProgress) => void;
   clearLiveProgress: () => void;
+
+  /**
+   * Evidence theater (the steering view). theaterOpen mounts the
+   * center-column overlay; it auto-opens on the FIRST progress frame
+   * of a run (i.e. the moment a sampled step starts streaming) unless
+   * the user disabled auto-open (localStorage, toggled inside the
+   * theater). theaterTraces retains EVERY progress frame per node —
+   * with client arrival timestamps — from run start until the NEXT
+   * run starts, so the theater can keep showing the full live trace
+   * (including its timing) after the step completes, when
+   * liveProgress has already been cleared. theaterRun records which
+   * run the traces belong to (config hash for the archive-pool band,
+   * run_id/root_seed from the stream's run_meta event, startedAt for
+   * "evidence archived before this run" cutoffs).
+   */
+  theaterOpen: boolean;
+  setTheaterOpen: (v: boolean) => void;
+  theaterTraces: Record<string, TheaterFrame[]>;
+  theaterRun: {
+    configHash: string | null;
+    startedAt: number;
+    runId: string | null;
+    rootSeed: number | null;
+  } | null;
+  beginTheaterRun: (configHash: string | null) => void;
+  setTheaterRunMeta: (m: {
+    runId?: string | null;
+    rootSeed?: number | null;
+  }) => void;
   lastConfigHash: string | null;
   setLastConfigHash: (h: string | null) => void;
 
@@ -244,10 +302,56 @@ export const useApp = create<AppState>((set) => ({
   setPrecisionTarget: (v) => set({ precisionTarget: v }),
   liveProgress: null,
   updateLiveProgress: (p) =>
-    set((s) => ({
-      liveProgress: { ...(s.liveProgress ?? {}), [p.node_id]: p },
-    })),
+    set((s) => {
+      const at = Date.now();
+      const prev = s.theaterTraces[p.node_id] ?? [];
+      const last = prev.length > 0 ? prev[prev.length - 1] : null;
+      // A batch index that fails to advance means a NEW run's first
+      // frame for this node (replicate loops reuse node ids without
+      // passing through beginTheaterRun) — restart that node's trace.
+      const frames =
+        last && p.batch_i <= last.batch_i
+          ? [{ ...p, at }]
+          : [...prev, { ...p, at }];
+      // Auto-open exactly once per run: on the very first frame of
+      // the run (theaterTraces was empty), unless the user opted out.
+      // After that first frame a dismissal sticks for the whole run.
+      const hadAny = Object.values(s.theaterTraces).some(
+        (f) => f.length > 0,
+      );
+      const autoOpen = !hadAny && !s.theaterOpen && theaterAutoOpenEnabled();
+      return {
+        liveProgress: { ...(s.liveProgress ?? {}), [p.node_id]: p },
+        theaterTraces: { ...s.theaterTraces, [p.node_id]: frames },
+        ...(autoOpen ? { theaterOpen: true } : {}),
+      };
+    }),
   clearLiveProgress: () => set({ liveProgress: null }),
+  theaterOpen: false,
+  setTheaterOpen: (v) => set({ theaterOpen: v }),
+  theaterTraces: {},
+  theaterRun: null,
+  beginTheaterRun: (configHash) =>
+    set({
+      theaterTraces: {},
+      liveProgress: null,
+      theaterRun: {
+        configHash,
+        startedAt: Date.now(),
+        runId: null,
+        rootSeed: null,
+      },
+    }),
+  setTheaterRunMeta: (m) =>
+    set((s) => ({
+      theaterRun: s.theaterRun
+        ? {
+            ...s.theaterRun,
+            ...(m.runId !== undefined ? { runId: m.runId } : {}),
+            ...(m.rootSeed !== undefined ? { rootSeed: m.rootSeed } : {}),
+          }
+        : s.theaterRun,
+    })),
   lastConfigHash: null,
   setLastConfigHash: (h) => set({ lastConfigHash: h }),
   pendingRestore: null,

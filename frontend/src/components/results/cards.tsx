@@ -446,11 +446,22 @@ function UncertaintyBlock({
           95% interval: {(lo * 100).toFixed(1)}–{(hi * 100).toFixed(1)}% ·{" "}
           {successes}/{shots} measurements hit the ideal outcome
         </span>
-        {seedUsed != null && (
-          <span className="font-mono" title="Simulator seed consumed by this draw — part of the run's provenance record.">
-            seed {seedUsed}
-          </span>
-        )}
+        <span className="flex items-center gap-2">
+          {seedUsed != null && (
+            <span className="font-mono" title="Simulator seed consumed by this draw — part of the run's provenance record.">
+              seed {seedUsed}
+            </span>
+          )}
+          <button
+            type="button"
+            data-marker="open-theater"
+            className="text-accent hover:underline"
+            onClick={() => useApp.getState().setTheaterOpen(true)}
+            title="Open the evidence theater — this funnel, large: per-batch intervals on a shots axis, stopping target, cost row."
+          >
+            open theater ↗
+          </button>
+        </span>
       </div>
       {/* Evidence funnel — the run's whole uncertainty trajectory, not
           just its endpoint. One thin line per shot batch, oldest at

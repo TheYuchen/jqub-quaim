@@ -12,6 +12,7 @@ import { NodePalette } from "./components/NodePalette";
 import { FlowCanvas } from "./components/FlowCanvas";
 import { ResultsPane } from "./components/ResultsPane";
 import { MultiverseBoard } from "./components/MultiverseBoard";
+import { EvidenceTheater } from "./components/EvidenceTheater";
 import { CircuitPicker } from "./components/CircuitPicker";
 import { MobileDrawer } from "./components/MobileDrawer";
 import { activateScenario } from "./lib/scenarios";
@@ -68,6 +69,7 @@ export default function App() {
   const setHealth = useApp((s) => s.setHealth);
   const running = useApp((s) => s.running);
   const workspaceMode = useApp((s) => s.workspaceMode);
+  const theaterOpen = useApp((s) => s.theaterOpen);
   const [ready, setReady] = useState(false);
   const isDesktop = useIsDesktop();
 
@@ -329,6 +331,16 @@ export default function App() {
                 <MultiverseBoard />
               </div>
             )}
+            {/* Evidence theater: the steering view, overlaid above BOTH
+                the canvas and the multiverse board (z-30 > z-20) —
+                auto-opens on the first progress frame of a streaming
+                sampled step; the canvas stays mounted underneath so the
+                run keeps streaming into it. */}
+            {theaterOpen && (
+              <div className="absolute inset-0 z-30 bg-canvas flex flex-col min-h-0">
+                <EvidenceTheater />
+              </div>
+            )}
           </main>
           {!rightCollapsed && (
             <PaneResizer
@@ -385,6 +397,16 @@ export default function App() {
             {workspaceMode === "multiverse" && (
               <div className="absolute inset-0 z-20 bg-canvas flex flex-col min-h-0">
                 <MultiverseBoard />
+              </div>
+            )}
+            {/* Evidence theater: the steering view, overlaid above BOTH
+                the canvas and the multiverse board (z-30 > z-20) —
+                auto-opens on the first progress frame of a streaming
+                sampled step; the canvas stays mounted underneath so the
+                run keeps streaming into it. */}
+            {theaterOpen && (
+              <div className="absolute inset-0 z-30 bg-canvas flex flex-col min-h-0">
+                <EvidenceTheater />
               </div>
             )}
           </main>

@@ -325,6 +325,10 @@ export const api = {
     onDone: (response: RunResponse) => void,
     onError: (err: Error) => void,
     onProgress?: (progress: StepProgress) => void,
+    /** Called as soon as the stream's opening run_meta event lands —
+     *  hands the run's identity (run_id / root_seed) to live views
+     *  (the evidence theater) BEFORE the run finishes. */
+    onMeta?: (meta: Partial<RunResponse>) => void,
   ) => {
     try {
       const res = await authedFetch(`${BASE}/workflow/run-stream`, {
@@ -359,6 +363,7 @@ export const api = {
             // Run-level provenance envelope, sent as the first event.
             if (parsed.run_meta) {
               runMeta = parsed.run_meta as Partial<RunResponse>;
+              onMeta?.(runMeta);
               continue;
             }
             // Anytime-evidence frame: a shot batch landed mid-step.

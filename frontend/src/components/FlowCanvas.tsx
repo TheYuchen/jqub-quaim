@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Box,
   Check,
+  Clapperboard,
   Code2,
   Link2,
   Loader2,
@@ -54,7 +55,12 @@ import {
   readHashPayload,
   type SharePayload,
 } from "../lib/share";
-import { buildRunRecord, listRuns, saveRun } from "../lib/runStore";
+import {
+  buildRunRecord,
+  computeConfigHash,
+  listRuns,
+  saveRun,
+} from "../lib/runStore";
 import { GLOSSARY } from "../lib/glossary";
 import {
   estimatePipeline,
@@ -934,7 +940,18 @@ export function FlowCanvas() {
     setRunning(true);
     setRun(null);
     setNotice(null);
-    useApp.getState().clearLiveProgress();
+    // Theater bookkeeping: drop the PREVIOUS run's retained traces
+    // (they are kept after a run ends so the theater can keep showing
+    // the last trace) and record the streaming run's configuration —
+    // the theater's context strip + archive-pool band key off it.
+    useApp.getState().beginTheaterRun(
+      computeConfigHash(
+        sampleKey,
+        circuit.name ?? null,
+        buildSharePayload(nodes, edges, sampleKey),
+        useLiveIbm,
+      ),
+    );
 
     const makeBody = () => ({
       circuit_id: circuit.circuit_id,
@@ -977,6 +994,14 @@ export function FlowCanvas() {
           // narrowing CI bar. Kept in the store (not component state)
           // because QNode renders far from this callback.
           (progress) => useApp.getState().updateLiveProgress(progress),
+          // Run identity (run_id / root_seed) arrives as the stream's
+          // first event — the theater shows the seed chip live, long
+          // before the RunResponse assembles.
+          (meta) =>
+            useApp.getState().setTheaterRunMeta({
+              runId: meta.run_id ?? null,
+              rootSeed: meta.root_seed ?? null,
+            }),
         );
       });
 
@@ -1014,6 +1039,14 @@ export function FlowCanvas() {
         }
         const response = await runOnce();
         setRun(response);
+        // Re-stamp the theater's run identity from the final response:
+        // a cache-served run can complete without a run_meta stream
+        // event, and the theater's context strip / archive-pool band
+        // key on this matching the displayed run's id.
+        useApp.getState().setTheaterRunMeta({
+          runId: response.run_id ?? null,
+          rootSeed: response.root_seed ?? null,
+        });
         await archive(response);
         if (!response.ok) break; // don't burn replicates on a broken graph
       }
@@ -1220,6 +1253,21 @@ export function FlowCanvas() {
             <option value={0.02}>±2pp</option>
             <option value={0.01}>±1pp</option>
           </select>
+          {/* Evidence theater reopen: the theater auto-opens when a
+              sampled step starts streaming (dismissable); this button
+              brings it back — also for archived/replayed runs, whose
+              persisted per-batch trace renders the same funnel. */}
+          <button
+            type="button"
+            data-marker="evidence-theater-open"
+            onClick={() => useApp.getState().setTheaterOpen(true)}
+            className="btn hidden md:inline-flex"
+            title="Evidence theater — a large live view of the 95% interval narrowing as shot batches stream in (opens by itself when a run streams; reopen it here)"
+            aria-label="Open evidence theater"
+          >
+            <Clapperboard className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">Theater</span>
+          </button>
           {/* cost-estimate chip: what will pressing Run cost, judged
               from this browser's own archived step timings. Sits next
               to Run so the price tag is read together with the

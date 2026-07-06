@@ -109,7 +109,7 @@ export async function collectProvenance(
     regenerate:
       "Rebuild the pipeline via '#s=' + base64url(graph) on any deployment; " +
       "pin a run's root_seed to replay its draws bit-exactly; " +
-      "?scenario=F1..F6 boots the paper's scripted figure states.",
+      "?scenario=F0..F6 boots the paper's scripted figure states.",
   };
 }
 

@@ -403,7 +403,8 @@ here. Reviewers are vis people, not quantum people. Status per item:
    itself: rebuild the graph from the payload, pin the recorded
    seed, replay.
 3. **Scenario loader — shipped** (`lib/scenarios.ts`; boot hook in
-   App.tsx). `?scenario=F1..F6`: F1 ribbon canvas post-run (QuCAD on
+   App.tsx). `?scenario=F0..F6` (F0 added with the Evidence Theater
+   wave, see its own section below): F1 ribbon canvas post-run (QuCAD on
    vqc_2q_small, seed 336157917, auto-run), F2 multiverse board over
    the bundled archive, F3 evidence funnel with ±2pp optional stop
    (bell_state, 4096 shots, seed 424242, auto-run, early stop
@@ -501,3 +502,94 @@ lineage, statistical honesty, anonymity, encoding disclosures) found
   auth client block in api.ts, the pendingQuickStart store bridge +
   FlowCanvas consumer (its TrySlide producer died in Wave P), and
   stale tour comments.
+
+## Evidence Theater (teaser view) — shipped 2026-07-05
+
+Diagnosis: anytime evidence steering (Wave I) is the system's most
+novel contribution, yet visually it was the SMALLEST element on
+screen — a thin funnel strip inside a side-panel card, a 3-px live
+band on a node face — while ordinary views owned the pixels. The
+theater makes steering the visual protagonist: a dedicated, large,
+self-explanatory view (`components/EvidenceTheater.tsx`, marker/class
+`evidence-theater`) that the paper's teaser figure and the demo video
+open with.
+
+Mechanics: overlay over the center column (same pattern as the
+Multiverse board, z-30 above its z-20 so it also works from the
+board), auto-opens on the FIRST `step_progress` frame of a run —
+i.e. the moment a sampled step starts streaming — dismissable, with a
+"don't auto-open" preference persisted in localStorage
+(`quda.theaterAutoOpen`, toggled inside the theater) and a toolbar
+Theater button (marker `evidence-theater-open`) plus an "open
+theater ↗" affordance on the fidelity card's uncertainty block to
+reopen it. The store retains per-node progress frames WITH client
+arrival timestamps (`theaterTraces`) from run start until the next
+run starts, so the theater keeps the full live trace (including
+timing) after the step completes; `theaterRun` records the streaming
+run's config hash (computed at Run-click) and its run_id/root_seed
+(delivered live by a new `onMeta` hook on `api.runStream`, fired on
+the stream's opening run_meta event).
+
+Encoding rationale (full version in the component's module comment):
+
+* **X = shots executed, 0 → shots_requested, linear.** Shots are the
+  costly resource; evidence bought reads as horizontal distance, and
+  an early stop leaves visibly unspent axis (lightly tinted region +
+  "N shots not spent") — the reward for steering stated in the cost
+  currency. Batch-index or log axes would hide exactly that.
+* **Y = fidelity estimate, auto-zoomed** to the first batch's point ±
+  3× its half-width (extended to cover every interval, the target
+  corridor and the archive band; clamped [0,1]). The cards' fixed 0-1
+  scale is right for cross-run comparison but wrong for the
+  protagonist view (a ±2pp target is ~4 px there). Anchoring the zoom
+  on the FIRST interval keeps the axis stable while frames stream.
+* **Funnel = per-batch Wilson CIs as vertical intervals** at their
+  cumulative-shots x (opacity ramping toward now), connected by a
+  shaded convergence envelope + a thin point-estimate path. Live runs
+  grow it frame by frame; archived/replayed runs render the identical
+  drawing instantly from the persisted `distribution.trace` — the
+  trace IS provenance, so the figure never depends on having watched
+  the run.
+* **Target corridor** = two dashed warn-colored lines at point ±
+  target with an early-stop vertical annotation ("⏹ stopped here —
+  target reached at N of M shots"); with no target set, a ghost line
+  of copy points at the toolbar affordance.
+* **Cost axis** = secondary tick row under the X axis with the
+  wall-clock gap between consecutive batch arrivals (CLIENT-side
+  Date.now() at SSE arrival — server compute + network jitter, honest
+  as a price tag, not a benchmark; first batch unlabeled because its
+  gap includes worker spin-up), plus "evidence spent: N shots · T s"
+  (total prefers the server's own step duration once the step
+  completes).
+* **Context strip** (inside the SVG so exports carry it): circuit
+  label, config-hash chip (archive hue), root-seed chip — live from
+  run_meta — and the pooled archive band: the Wilson interval this
+  exact configuration has ALREADY accumulated (runs archived before
+  this run started; pooling valid per lib/stats.ts; drawn only for
+  single-sampled-node runs because `runEvidence` pools a whole run's
+  counts). The streaming run visibly adds to a body of evidence.
+* **Color**: accent/blue solid = this run's evidence; warn/amber
+  dashed = the stopping rule; accent4/green filled band = archived
+  evidence. Every hue doubled by a mark-type difference (colorblind
+  safety). Multiple sampled nodes stack as ~250-px small multiples
+  (scroll past 3).
+
+The whole chart is ONE `<svg>` (context header included), so the
+figure-export camera on the theater takes the TRUE-SVG path: vector
+output with the provenance `<metadata>` embedded, correct under the
+forced-light paper transform. Export view key: `evidence-theater`.
+
+**F0 — the teaser scenario** (`?scenario=F0`): bell_state on FakeFez,
+4096 requested shots (8×512 batches), sampled fidelity, target ±2pp,
+seed pinned to **2026**, auto-run with the theater booted open (the
+explicit open matters: a pinned replay can be served from cache with
+no progress frames, in which case the theater renders from the
+persisted trace). Seed choice, probed live 2026-07-05: at bell's
+p≈0.47-0.50 the width trajectory is effectively seed-independent
+(±4.31 → ±1.93pp over batches 1→5) so every candidate stops at 2,560
+of 4,096 shots; candidates differed only in point-path jitter — seed
+7: 1.01pp max inter-batch jump, 42: 1.17pp, 99: 1.33pp, 31415: 2.93pp
+(jagged), 2026: **0.34pp** (path 0.4902, 0.4893, 0.4909, 0.4878,
+0.4844 — a clean symmetric convergence). Pinned result: 1240/2560
+ideal, point 0.484375, final half-width ±1.934pp ≤ ±2pp, 1,536 shots
+unspent. The F0 theater export is the intended teaser figure.
