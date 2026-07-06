@@ -155,6 +155,25 @@ export const SCENARIOS: Record<string, Scenario> = {
   // convergence rather than a random walk. Pinned result: 1240/2560
   // hit the ideal outcome, point 0.484375, final half-width ±1.934pp
   // ≤ the ±2pp target; 1,536 shots unspent.
+  //
+  // FILMSTRIP RECIPE (paper Fig: interaction sequence). The theater's
+  // trace scrubber ("batch k of B", visible once the run is replayed/
+  // archived, i.e. not streaming) renders the chart AS OF batch k, and
+  // the camera exports exactly that state with trace_position: k in
+  // the provenance. B counts EXECUTED batches (the persisted trace),
+  // so F0 scrubs over "batch k of 5" even though 8 were planned.
+  // All widths below verified against the live API (seed 2026,
+  // 2026-07-05). Suggested 3-panel strip:
+  //   1. boot ?scenario=F0, wait for the run to finish;
+  //   2. scrub to batch 2 → export  (wide interval ±3.06pp, corridor
+  //      not yet reached — "so far: 1,024 shots");
+  //   3. scrub to batch 4 → export  (funnel narrowing, ±2.16pp, still
+  //      outside the ±2pp corridor);
+  //   4. scrub to "final"  → export  (batch 5: ±1.93pp ≤ target, ⏹
+  //      early-stop annotation + 1,536 shots unspent hatch).
+  // Files land as evidence-theater_F0_batch2.svg / _batch4.svg /
+  // evidence-theater_F0.svg — each bit-reproducible from its own
+  // embedded provenance (scenario key + seed + trace_position).
   F0: {
     key: "F0",
     expect:
@@ -258,6 +277,14 @@ export const SCENARIOS: Record<string, Scenario> = {
 
 // -- activation --------------------------------------------------------------
 
+/** The scenario activated on this boot, if any — figure exports embed
+ *  it (provenance.scenario) and use it as the filename slug, so every
+ *  figure names the one-URL recipe that regenerates it. */
+let activeKey: string | null = null;
+export function activeScenarioKey(): string | null {
+  return activeKey;
+}
+
 /** Pick the latest successful run of each of the two most-replicated
  *  configurations — deterministic over the bundled archive. */
 async function pickTopTwoRunIds(): Promise<string[]> {
@@ -287,6 +314,7 @@ async function pickTopTwoRunIds(): Promise<string[]> {
 export async function activateScenario(rawKey: string): Promise<boolean> {
   const sc = SCENARIOS[rawKey.toUpperCase()];
   if (!sc) return false;
+  activeKey = sc.key;
   const app = useApp.getState();
 
   if (sc.needsArchive) await ensureDemoArchive({ force: true });

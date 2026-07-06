@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AlertCircle, Camera, Check, Loader2 } from "lucide-react";
 import type { SharePayload } from "../lib/share";
 import { exportFigure } from "../lib/figureExport";
@@ -6,15 +6,22 @@ import { exportFigure } from "../lib/figureExport";
 /**
  * Small camera button that exports its host view as a paper figure
  * (SVG + PNG + .provenance.json sidecar — see lib/figureExport.ts).
- * Placed on the canvas toolbar, the Multiverse board header, and the
- * Evidence pane header. The button itself never appears in exports
- * (figureExport strips all <button> elements from the clone).
+ * Placed on the canvas toolbar, the Multiverse board header, the
+ * Evidence pane header and the Evidence theater. The button itself
+ * never appears in exports (figureExport strips all <button>
+ * elements from the clone).
+ *
+ * Raster scale: a normal click exports the hybrid PNG at 2.5×;
+ * alt/⌥-click OR press-and-hold (≥550 ms) exports at 4× — the
+ * print-resolution option for large composite figures. (True-SVG
+ * targets are resolution-independent; scale is a no-op there.)
  */
 export function FigureExportButton({
   getTarget,
   name,
   view,
   getGraph,
+  getTracePosition,
   className = "",
   labelBreakpoint,
 }: {
@@ -27,14 +34,36 @@ export function FigureExportButton({
   /** Canvas graph to embed in the provenance, when the host knows it. */
   getGraph?: () => SharePayload | null;
   className?: string;
+  /** Evidence-theater trace scrubber position at click time (batch
+   *  k); embedded as provenance.trace_position + filename suffix. */
+  getTracePosition?: () => number | null;
   /** Show a text label at/above this breakpoint (icon-only otherwise). */
   labelBreakpoint?: "sm" | "md" | "lg";
 }) {
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">(
     "idle",
   );
+  // Long-press detection (the touch counterpart to alt-click for the
+  // 4× print-resolution raster).
+  const longPress = useRef(false);
+  const pressTimer = useRef<number | null>(null);
+  const pressStart = () => {
+    longPress.current = false;
+    if (pressTimer.current != null) window.clearTimeout(pressTimer.current);
+    pressTimer.current = window.setTimeout(() => {
+      longPress.current = true;
+    }, 550);
+  };
+  const pressEnd = () => {
+    if (pressTimer.current != null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
 
-  const onClick = async () => {
+  const onClick = async (e: React.MouseEvent) => {
+    const hires = e.altKey || longPress.current;
+    longPress.current = false;
     const target = getTarget();
     if (!target || state === "busy") return;
     setState("busy");
@@ -43,6 +72,8 @@ export function FigureExportButton({
         name,
         view,
         graph: getGraph ? getGraph() : null,
+        scale: hires ? 4 : 2.5,
+        tracePosition: getTracePosition ? getTracePosition() : null,
       });
       setState("done");
     } catch {
@@ -70,10 +101,13 @@ export function FigureExportButton({
   return (
     <button
       type="button"
-      onClick={() => void onClick()}
+      onClick={(e) => void onClick(e)}
+      onPointerDown={pressStart}
+      onPointerUp={pressEnd}
+      onPointerLeave={pressEnd}
       data-marker="figure-export"
       className={`btn ${className}`}
-      title="Export this view as a paper figure: SVG + PNG with embedded provenance (run ids, seeds, config hashes, graph) + a .provenance.json sidecar"
+      title="Export this view as a paper figure: SVG + PNG with embedded provenance (run ids, seeds, config hashes, graph) + a .provenance.json sidecar. Alt/⌥-click or press-and-hold for the 4× print-resolution PNG (default 2.5×)."
       aria-label="Export figure"
     >
       <Icon

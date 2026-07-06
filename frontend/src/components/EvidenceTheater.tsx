@@ -64,13 +64,24 @@
 //     channel.
 //   * Multiple sampled nodes stack as small multiples (~230px each,
 //     scroll past 3) — same vocabulary, one panel per node.
+//   * Trace scrubbing (filmstrip support): once the trace is fully
+//     known (replayed/archived runs — never while streaming), a
+//     "batch k of B" scrubber appears in the chrome and truncates
+//     every series to its first k batches. The chart then shows the
+//     run AS OF batch k — intervals 1..k, truncated envelope,
+//     "so far: N shots · point ±w" — and the ⏹ stop annotation only
+//     once the stop batch itself is reached. The derivation is pure
+//     (same persisted trace + same k ⇒ same SVG), so a figure export
+//     in a scrubbed state is bit-reproducible; it embeds
+//     trace_position: k in its provenance and suffixes filenames with
+//     _batchK. Filmstrip recipe for F0 in lib/scenarios.ts.
 //
 // The chart is ONE <svg> (context header included) so the figure
 // export takes the TRUE-SVG path: vector output with the provenance
 // <metadata> embedded, correct under the forced-light paper transform.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { StepResult } from "../lib/api";
 import {
   setTheaterAutoOpenEnabled,
@@ -119,6 +130,8 @@ interface Series {
   seedUsed: number | null;
   successes: number | null;
   shotsExecuted: number | null;
+  /** Series truncated to its first k batches by the trace scrubber. */
+  scrubbed?: boolean;
 }
 
 interface TraceDist {
@@ -204,6 +217,31 @@ function seriesFromLive(
     seedUsed: null,
     successes: last.successes,
     shotsExecuted: last.shots_done,
+  };
+}
+
+/** Truncate a fully-known (replayed/archived) series to its first k
+ *  batches: the chart then shows exactly what the live view showed at
+ *  batch k. done/stoppedEarly are cleared so the Panel renders the
+ *  mid-run vocabulary ("so far" readouts, no ⏹ stop annotation until
+ *  the stop batch is reached); successes is recovered from the batch
+ *  point (exact — the trace point IS successes/shots); server total
+ *  time is unknowable mid-run, so the cost line falls back to the
+ *  truncated client-arrival span when timing is trusted. */
+function scrubSeries(s: Series, k: number): Series {
+  const kk = Math.max(1, Math.min(k, s.frames.length));
+  if (kk >= s.frames.length) return s; // final state = the archived run
+  const frames = s.frames.slice(0, kk);
+  const last = frames[kk - 1];
+  return {
+    ...s,
+    frames,
+    scrubbed: true,
+    done: false,
+    stoppedEarly: false,
+    serverSeconds: null,
+    successes: Math.round(last.point * last.shots),
+    shotsExecuted: last.shots,
   };
 }
 
@@ -317,9 +355,11 @@ function Panel({
       ? s.shotsRequested - s.shotsExecuted
       : 0;
 
-  const titleBits = s.done
-    ? `${s.successes ?? "?"}/${fmtShots(s.shotsExecuted ?? 0)} hit the ideal outcome · point ${fmtPct(last.point, 2)} ± ${fmtPp(lastHalf, 2)}`
-    : `streaming — batch ${s.frames.length} of ${s.nBatches} · interval ± ${fmtPp(lastHalf, 2)} so far`;
+  const titleBits = s.scrubbed
+    ? `replay @ batch ${s.frames.length} of ${s.nBatches} — so far: ${fmtShots(last.shots)} shots · point ${fmtPct(last.point, 2)} ± ${fmtPp(lastHalf, 2)}`
+    : s.done
+      ? `${s.successes ?? "?"}/${fmtShots(s.shotsExecuted ?? 0)} hit the ideal outcome · point ${fmtPct(last.point, 2)} ± ${fmtPp(lastHalf, 2)}`
+      : `streaming — batch ${s.frames.length} of ${s.nBatches} · interval ± ${fmtPp(lastHalf, 2)} so far`;
 
   return (
     <g
@@ -558,6 +598,26 @@ export function EvidenceTheater() {
     return out;
   }, [run, running, theaterTraces, storeTarget, timesTrusted]);
 
+  // Trace scrubbing (filmstrip support). Only when the trace is fully
+  // known — every series done, nothing streaming — so the live-run
+  // path is untouched. null = final state.
+  const [scrub, setScrub] = useState<number | null>(null);
+  const canScrub =
+    !running && series.length > 0 && series.every((sr) => sr.done);
+  const maxB = series.reduce((m, sr) => Math.max(m, sr.frames.length), 0);
+  const cur = scrub == null ? maxB : Math.min(scrub, maxB);
+  useEffect(() => {
+    // A new run (or a restored one) gets a fresh, unscrubbed theater.
+    setScrub(null);
+  }, [run?.run_id, running]);
+  const shown = useMemo(
+    () =>
+      canScrub && scrub != null
+        ? series.map((sr) => scrubSeries(sr, scrub))
+        : series,
+    [series, scrub, canScrub],
+  );
+
   // Pooled archive evidence for this configuration, restricted to
   // runs archived BEFORE this run started (the band is "prior
   // evidence"; the new run's own record must not pool with itself).
@@ -639,6 +699,9 @@ export function EvidenceTheater() {
           getTarget={() => svgRef.current}
           name="evidence-theater"
           view="evidence-theater"
+          getTracePosition={() =>
+            canScrub && scrub != null && cur < maxB ? cur : null
+          }
         />
         <button
           type="button"
@@ -650,6 +713,73 @@ export function EvidenceTheater() {
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* trace scrubber — replayed/archived runs only (trace fully
+          known; the live-streaming path never shows this). Chrome, not
+          content: the export target is the <svg>, so the scrubber
+          itself can never leak into a figure. */}
+      {canScrub && maxB > 1 && (
+        <div
+          className="flex items-center gap-2 px-4 py-1.5 border-b border-edge shrink-0 text-[11px] text-mute"
+          data-marker="trace-scrub"
+        >
+          <span
+            title="Replay the archived per-batch trace: the chart renders the run AS OF the selected batch — exactly what the live view showed at that moment. A figure exported while scrubbed captures that state bit-exactly and records trace_position in its provenance (that's how the paper's filmstrip sequences are made)."
+            className="select-none"
+          >
+            trace replay
+          </span>
+          <button
+            type="button"
+            className="btn !px-1.5"
+            aria-label="Step back one batch"
+            disabled={cur <= 1}
+            onClick={() => setScrub(Math.max(1, cur - 1))}
+          >
+            <ChevronLeft className="w-3 h-3" />
+          </button>
+          <input
+            type="range"
+            min={1}
+            max={maxB}
+            step={1}
+            value={cur}
+            aria-label="Rendered batch index"
+            className="w-40 accent-[rgb(var(--color-accent))]"
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setScrub(v >= maxB ? null : v);
+            }}
+          />
+          <button
+            type="button"
+            className="btn !px-1.5"
+            aria-label="Step forward one batch"
+            disabled={cur >= maxB}
+            onClick={() => {
+              const v = cur + 1;
+              setScrub(v >= maxB ? null : v);
+            }}
+          >
+            <ChevronRight className="w-3 h-3" />
+          </button>
+          <span className="tabular-nums text-ink select-none">
+            batch {cur} of {maxB}
+          </span>
+          {scrub != null && cur < maxB ? (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setScrub(null)}
+              title="Jump back to the final (fully drawn) state"
+            >
+              final
+            </button>
+          ) : (
+            <span className="opacity-60 select-none">(final state)</span>
+          )}
+        </div>
+      )}
 
       {series.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-8">
@@ -705,11 +835,11 @@ export function EvidenceTheater() {
                 </text>
               )}
             </g>
-            {series.map((s, i) => (
+            {shown.map((s, i) => (
               <Panel
                 key={s.nodeId}
                 s={s}
-                pool={series.length === 1 && pool ? pool.p : null}
+                pool={shown.length === 1 && pool ? pool.p : null}
                 poolRuns={pool?.n ?? 0}
                 top={headH + i * panelH}
                 height={panelH}

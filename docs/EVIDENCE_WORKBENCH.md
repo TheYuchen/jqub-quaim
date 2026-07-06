@@ -593,3 +593,144 @@ of 4,096 shots; candidates differed only in point-path jitter — seed
 0.4844 — a clean symmetric convergence). Pinned result: 1240/2560
 ideal, point 0.484375, final half-width ±1.934pp ≤ ±2pp, 1,536 shots
 unspent. The F0 theater export is the intended teaser figure.
+
+## Wave Q — paper figure pipeline (SHIPPED 2026-07-05)
+
+IEEE VIS is double-anonymous and reviewers judge FIGURES first, the
+video second, a live demo rarely. This wave makes the export pipeline
+publication-grade: Illustrator-editable vector output, exact
+interaction SEQUENCES (filmstrips), and print-resolution rasters —
+all still provenance-backed and bit-reproducible.
+
+### Trace scrubbing in the Evidence Theater (filmstrips)
+
+Once a run's trace is fully known — replayed or archived, i.e. NOT
+streaming — the theater grows a scrubber row (marker `trace-scrub`):
+slider + ‹/› steppers + "batch k of B", where B counts EXECUTED
+batches (the persisted `distribution.trace`). Scrubbing to k renders
+the chart AS OF batch k: intervals 1..k only, envelope truncated, the
+panel title switches to "replay @ batch k of B — so far: N shots ·
+point ±w", the bottom line reads "evidence spent: N of M shots", and
+the ⏹ stop annotation appears only when the stop batch itself is
+reached (the target corridor stays visible throughout — the RULE is
+known from run start; live streaming draws it too). The live-run path
+is untouched: the scrubber never appears while `running`, and a new
+run resets the scrub. Multi-node small multiples clamp k per panel.
+
+The derivation is pure (`scrubSeries` slices the same persisted
+trace), so scrubbed figures are bit-reproducible: same trace + same k
+⇒ same SVG. (One honesty note: a run you just watched live retains
+its client-arrival wall-time row, truncated to batch k — that row is
+arrival-time dependent by design. Pinned replays served from the step
+cache carry no client timing, so the F0 recipe's panels are
+bit-identical across machines and sessions.) The camera in a scrubbed
+state exports exactly that state, embeds `trace_position: k` in the
+provenance JSON, and suffixes filenames with `_batchK`.
+
+**F0 filmstrip recipe** (also in lib/scenarios.ts next to F0; widths
+live-verified 2026-07-05, seed 2026): boot `?scenario=F0`, wait for
+the run to finish, then export three states —
+
+| panel | scrub | shows | exact numbers |
+|---|---|---|---|
+| 1 | batch 2 of 5 | wide interval, corridor unmet | 1,024 shots, point 0.4893, ±3.06pp |
+| 2 | batch 4 of 5 | funnel narrowing, still outside ±2pp | 2,048 shots, point 0.4878, ±2.16pp |
+| 3 | final | ⏹ stop + unspent budget | 2,560 of 4,096 shots, point 0.484375, ±1.93pp ≤ target |
+
+Files land as `evidence-theater_F0_batch2.svg`, `_batch4.svg`,
+`evidence-theater_F0.svg` — each regenerable from its own embedded
+provenance (scenario key + seed + trace_position).
+
+### Illustrator-grade true-SVG export
+
+Adobe Illustrator cannot resolve CSS custom properties, ignores
+`<style>` blocks with classes, and mishandles `currentColor`. The
+TRUE-SVG path (taken when the camera's target IS an `<svg>`) now
+produces AI-editable files:
+
+* **All presentation inlined as literal attributes.** The clone
+  walker (`cloneSvgForPaper` in lib/figureExport.ts) reads every
+  whitelisted property from the SOURCE element's `getComputedStyle`
+  (var()/currentColor already resolved by the browser, under the
+  forced light theme) and writes it as a presentation attribute.
+  Whitelist: fill, stroke, stroke-width, stroke-dasharray,
+  stroke-linecap, stroke-linejoin, opacity, fill-opacity,
+  stroke-opacity, font-family, font-size, font-weight, font-style,
+  text-anchor, dominant-baseline, letter-spacing, stop-color,
+  stop-opacity. Defaults are omitted (lean files) except `fill`,
+  always written on paintable elements so every element is
+  self-describing. class/style attributes are dropped; SVG `<title>`
+  tooltip elements (interactive chrome) are stripped.
+* **Real `<text>` with concrete font stacks.** All theater/lineage/
+  glyph SVG labels are genuine `<text>`/`<tspan>` (audited — no
+  foreignObject/HTML text in any SVG subtree). Computed families
+  (ui-sans-serif/system-ui) are mapped to "Helvetica, Arial,
+  sans-serif"; mono (hashes, seeds) to "Menlo, Consolas, 'Courier
+  New', monospace". Font sizes carry the ×1.25 paper bump (same
+  factor as the hybrid path).
+* **Sizing.** viewBox preserved + explicit width/height in pt
+  (1px = 0.75pt), computed FROM THE VIEWBOX, not the rendered
+  bounding rect — exports are independent of the browser window
+  (a filmstrip's panels are the same size regardless of when/where
+  they were captured). Standalone XML declaration prepended.
+* **Verification.** The decision logic is pure
+  (`lib/svgPaper.ts`) and unit-tested in plain node —
+  `node --experimental-strip-types scripts/check_svg_paper.test.ts`
+  — covering var()-resolution pass-through, px normalization, font
+  mapping, the fill="none" survival case, and the string finalizer.
+  `auditIllustratorSafety()` additionally greps every exported file
+  for `var(`, `currentColor`, `class="`, `<style` at export time and
+  console-warns on violations (never blocks the download); expected
+  count in exports: zero of each.
+
+The HYBRID (foreignObject) path is NOT Illustrator-editable by
+nature — AI won't rasterize foreignObject — which is exactly why the
+PNG ships alongside; the hybrid SVG also gets the XML header and
+class-stripping (styles are fully inlined cssText).
+
+### Print-resolution raster + export scale
+
+The hybrid PNG uses EXPLICIT pixel dimensions: canvas width/height =
+css px × scale, never multiplied by devicePixelRatio — a 2.5× export
+is 2.5× on every machine. Default 2.5×; **4× print-resolution via
+alt/⌥-click or press-and-hold (≥550 ms) on any camera button**.
+
+File naming ties every artifact to its regeneration recipe:
+`<view>_<scenario|runid>[_batchK]` as the base —
+`<base>.svg`, `<base>_<scale>x.png`, `<base>.provenance.json`
+(e.g. `multiverse_F2_4x.png`, `evidence-theater_F0_batch2.svg`).
+The slug prefers the active scenario key (now recorded by the
+scenario loader and embedded as `provenance.scenario`), falling back
+to the first visible run_id.
+
+### Figure planning: vector-safe vs raster-only (per camera)
+
+| camera / view | export path | print guidance |
+|---|---|---|
+| Evidence Theater (`evidence-theater`) | TRUE-SVG — AI-editable vector | use the SVG directly; teaser + filmstrips |
+| Canvas (`canvas`, React Flow + ribbons + glyph faces) | HYBRID | use the PNG (4× for full-width figures) |
+| Multiverse board (`multiverse`) | HYBRID | use the PNG |
+| Evidence pane (`evidence-current/history/compare` — cards, lineage gutter, funnel strips, signature glyphs, gate-diff chips) | HYBRID | use the PNG |
+
+Nuance for planning: the lineage gutter, outcome/pipeline strips and
+signature glyphs ARE self-contained SVG subtrees (real `<text>`,
+whitelisted presentation) and would take the true-SVG path if a
+camera ever targeted them directly — candidates for dedicated
+cameras if a figure needs them vector. The gate-diff chips and
+evidence cards are HTML (raster-only forever); the canvas is a React
+Flow HTML/SVG composite (raster-only as a whole).
+
+### AI-editability guarantees (what a figure file promises)
+
+1. Opens in Illustrator with editable text objects (concrete font
+   stacks, no webfont/classes dependency).
+2. Every color literal at export time under the print (light) theme —
+   zero `var(`/`currentColor`/`class=`/`<style` (audited per export).
+3. Sized in pt from the viewBox — window-independent, so re-exports
+   are geometrically identical.
+4. Provenance `<metadata id="provenance">` embedded (app version,
+   export time, scenario key, run_ids/root_seeds/config_hashes,
+   SharePayload graph, trace_position when scrubbed) + the
+   `.provenance.json` sidecar for raster-only use. Note: Illustrator
+   may drop `<metadata>` on re-save — the sidecar is the durable
+   copy; keep it next to the .ai file.

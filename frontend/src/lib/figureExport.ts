@@ -9,17 +9,27 @@
 // *provenance-backed* artifact, not a screenshot.
 //
 // Serialization paths (per view):
-//   * TRUE-SVG — when the export target IS an <svg> element (the
-//     SVG-native views: lineage gutter, outcome/pipeline strips,
-//     signature glyphs, ribbon edge layer). The svg subtree is cloned
-//     with all computed styles inlined (CSS variables don't survive
-//     serialization) and written out as standalone vector SVG.
+//   * TRUE-SVG — when the export target IS an <svg> element (today
+//     only the Evidence Theater hands the camera an <svg>; the
+//     lineage gutter / strips / signature glyphs are SVG subtrees but
+//     export as part of their HTML pane, i.e. HYBRID). This path is
+//     ILLUSTRATOR-GRADE: the subtree is cloned with every whitelisted
+//     presentation property resolved through getComputedStyle and
+//     written as a literal presentation ATTRIBUTE (zero var()/
+//     currentColor/class/<style> in the output), text stays real
+//     <text> with a concrete font stack (Helvetica/Arial; mono keeps
+//     a concrete mono stack), viewBox + width/height in pt, and a
+//     standalone XML declaration. Decision logic + safety audit live
+//     in lib/svgPaper.ts (unit-tested by
+//     scripts/check_svg_paper.test.ts in plain node).
 //   * HYBRID — for HTML-heavy composite views (whole canvas, the
 //     Multiverse board, the Evidence pane). foreignObject-in-SVG is
 //     produced (vector text, correct in browsers) BUT some renderers
 //     (older Inkscape/rsvg, some LaTeX toolchains) don't rasterize
-//     foreignObject, so a high-resolution PNG (2.5× device pixels) is
-//     exported alongside as the always-works fallback.
+//     foreignObject, so a high-resolution PNG is exported alongside
+//     as the always-works fallback — explicit pixel dimensions
+//     (css px × scale, never devicePixelRatio), 2.5× by default, 4×
+//     via alt/⌥-click or long-press on the camera button.
 //   Both paths also download a `<name>.provenance.json` sidecar with
 //   the same JSON that is embedded in the SVG <metadata> element.
 //
@@ -36,6 +46,12 @@ import type { SharePayload } from "./share";
 import { APP_NAME } from "./anon";
 import { useApp } from "./store";
 import { listRuns } from "./runStore";
+import { activeScenarioKey } from "./scenarios";
+import {
+  auditIllustratorSafety,
+  finalizeSvgMarkup,
+  inlinePresentation,
+} from "./svgPaper";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
@@ -45,6 +61,14 @@ export interface FigureProvenance {
   app_version: string | null;
   exported_at: string;
   view: string;
+  /** Scenario key (?scenario=F0..F6) active at export time, if any —
+   *  the one-URL recipe that regenerates this figure's app state. */
+  scenario: string | null;
+  /** Evidence-theater trace scrubber position at export time: the
+   *  figure shows the run AS OF batch k (1-based). Absent = final
+   *  state. Filmstrip figures record one k per panel, so each panel
+   *  is bit-reproducible: boot the scenario, scrub to k, export. */
+  trace_position?: number;
   /** Every run visible in the exported view. */
   runs: {
     run_id: string;
@@ -104,6 +128,7 @@ export async function collectProvenance(
     app_version: st.run?.app_version ?? st.health?.version ?? null,
     exported_at: new Date().toISOString(),
     view,
+    scenario: activeScenarioKey(),
     runs: await runsForView(view),
     graph,
     regenerate:
@@ -229,30 +254,82 @@ function download(blob: Blob, filename: string): void {
 // Serialization paths
 // ---------------------------------------------------------------------------
 
-/** TRUE-SVG path: the target is already vector — clone, inline styles,
- *  white background rect, metadata, standalone header. */
+/** Recursively clone an SVG subtree for the Illustrator-grade export:
+ *  every whitelisted presentation property is read from the SOURCE
+ *  element's computed style (var()/currentColor already resolved by
+ *  the browser, under the forced light theme) and written as a
+ *  literal presentation ATTRIBUTE on the clone; class/style are
+ *  dropped (AI ignores the classes and we no longer need the styles);
+ *  SVG <title> tooltip elements are stripped (interactive chrome).
+ *  The decision logic lives in lib/svgPaper.ts so plain node can unit
+ *  test it (scripts/check_svg_paper.test.ts). */
+function cloneSvgForPaper(src: Element): Element | null {
+  if (shouldStrip(src)) return null;
+  const tag = src.tagName.toLowerCase();
+  if (tag === "title" && src.namespaceURI === SVG_NS) return null;
+  const clone = src.cloneNode(false) as Element;
+  clone.removeAttribute("class");
+  clone.removeAttribute("style");
+  if (src instanceof SVGElement) {
+    const cs = window.getComputedStyle(src);
+    for (const [attr, value] of inlinePresentation(tag, (p) =>
+      cs.getPropertyValue(p),
+    )) {
+      clone.setAttribute(attr, value);
+    }
+  }
+  for (const child of Array.from(src.childNodes)) {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      const c = cloneSvgForPaper(child as Element);
+      if (c) clone.appendChild(c);
+    } else if (child.nodeType === Node.TEXT_NODE) {
+      clone.appendChild(child.cloneNode(true));
+    }
+  }
+  return clone;
+}
+
+/** TRUE-SVG path (Illustrator-editable): clone with all presentation
+ *  attributes inlined as literals, white background rect, provenance
+ *  metadata, viewBox + width/height in pt (1px = 0.75pt), standalone
+ *  XML declaration. Dimensions come from the viewBox — NOT the
+ *  rendered bounding rect — so the exported file is independent of
+ *  the browser window (bit-reproducible filmstrips). */
 function serializeSvgNative(
   target: SVGSVGElement,
   provenance: FigureProvenance,
 ): string {
-  const clone = cloneWithStyles(target) as SVGSVGElement;
+  const clone = cloneSvgForPaper(target) as SVGSVGElement;
   clone.setAttribute("xmlns", SVG_NS);
-  const r = target.getBoundingClientRect();
-  if (!clone.getAttribute("viewBox")) {
-    clone.setAttribute("viewBox", `0 0 ${r.width} ${r.height}`);
+  let vb = (target.getAttribute("viewBox") ?? "")
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .map(Number);
+  if (vb.length !== 4 || vb.some((n) => !Number.isFinite(n))) {
+    const r = target.getBoundingClientRect();
+    vb = [0, 0, Math.ceil(r.width), Math.ceil(r.height)];
   }
-  clone.setAttribute("width", String(Math.ceil(r.width)));
-  clone.setAttribute("height", String(Math.ceil(r.height)));
-  const vb = (clone.getAttribute("viewBox") ?? "").split(/\s+/).map(Number);
+  clone.setAttribute("viewBox", vb.join(" "));
+  clone.setAttribute("width", `${Math.round(vb[2] * 0.75 * 100) / 100}pt`);
+  clone.setAttribute("height", `${Math.round(vb[3] * 0.75 * 100) / 100}pt`);
   const bg = document.createElementNS(SVG_NS, "rect");
-  bg.setAttribute("x", String(vb[0] ?? 0));
-  bg.setAttribute("y", String(vb[1] ?? 0));
-  bg.setAttribute("width", String(vb[2] ?? r.width));
-  bg.setAttribute("height", String(vb[3] ?? r.height));
+  bg.setAttribute("x", String(vb[0]));
+  bg.setAttribute("y", String(vb[1]));
+  bg.setAttribute("width", String(vb[2]));
+  bg.setAttribute("height", String(vb[3]));
   bg.setAttribute("fill", "#ffffff");
   clone.insertBefore(bg, clone.firstChild);
   clone.insertBefore(makeMetadata(provenance), clone.firstChild);
-  return new XMLSerializer().serializeToString(clone);
+  const markup = finalizeSvgMarkup(
+    new XMLSerializer().serializeToString(clone),
+  );
+  const issues = auditIllustratorSafety(markup);
+  if (issues.length > 0) {
+    // Never block the download over this — but a violation means a
+    // view snuck a non-whitelisted styled construct into its SVG.
+    console.warn("figure export: Illustrator-safety audit failed:", issues);
+  }
+  return markup;
 }
 
 /** HYBRID path: HTML subtree → foreignObject SVG string. */
@@ -288,12 +365,26 @@ function serializeHtmlHybrid(
   wrap.appendChild(clone);
   fo.appendChild(wrap);
   svg.appendChild(fo);
-  return { svg: new XMLSerializer().serializeToString(svg), width: W, height: H };
+  // finalize: standalone XML header + class attributes dropped (every
+  // computed style is inlined as cssText, so classes are dead weight).
+  // The hybrid file is NOT Illustrator-editable regardless — AI won't
+  // rasterize foreignObject — which is why the PNG ships alongside.
+  return {
+    svg: finalizeSvgMarkup(new XMLSerializer().serializeToString(svg)),
+    width: W,
+    height: H,
+  };
 }
 
 /** Rasterize an SVG string to a PNG blob via canvas. Only safe for
  *  self-contained SVG (all styles inlined, no external resources) —
- *  which is exactly what the serializers above produce. */
+ *  which is exactly what the serializers above produce.
+ *
+ *  Pixel dimensions are EXPLICIT (css-size × scale): the canvas
+ *  width/height attributes are raw device-independent pixels and no
+ *  ctx.scale(devicePixelRatio) is ever applied, so a 2.5× export is
+ *  2.5× on every machine — print resolution never depends on the
+ *  exporting display. */
 function rasterize(
   svgString: string,
   width: number,
@@ -339,32 +430,52 @@ function rasterize(
 // ---------------------------------------------------------------------------
 
 /**
- * Export `target` as a paper figure. Downloads:
- *   <name>.svg              — vector (true-SVG or foreignObject hybrid)
- *   <name>.png              — high-res raster (hybrid targets only)
- *   <name>.provenance.json  — the same provenance embedded in the SVG
+ * Export `target` as a paper figure. Downloads (base name is
+ * `<view>_<scenario|runid>[_batchK]` so the filename itself names the
+ * recipe that regenerates the figure):
+ *   <base>.svg              — vector (true-SVG or foreignObject hybrid)
+ *   <base>_<scale>x.png     — explicit-pixel raster (hybrid targets only)
+ *   <base>.provenance.json  — the same provenance embedded in the SVG
  */
 export async function exportFigure(
   target: HTMLElement | SVGSVGElement,
-  opts: { name: string; view: string; graph?: SharePayload | null },
+  opts: {
+    name: string;
+    view: string;
+    graph?: SharePayload | null;
+    /** PNG raster scale for hybrid targets: 2.5× default; 4× is the
+     *  print-resolution option (alt/⌥-click or long-press the camera). */
+    scale?: number;
+    /** Evidence-theater scrub position: the chart shows the run AS OF
+     *  batch k. Embedded as provenance.trace_position + `_batchK` in
+     *  the filenames, making filmstrip panels self-describing. */
+    tracePosition?: number | null;
+  },
 ): Promise<void> {
   const provenance = await collectProvenance(opts.view, opts.graph ?? null);
+  if (opts.tracePosition != null)
+    provenance.trace_position = opts.tracePosition;
+  const scale = opts.scale ?? 2.5;
+  const slug = provenance.scenario ?? provenance.runs[0]?.run_id ?? null;
+  const base =
+    (slug ? `${opts.name}_${slug}` : opts.name) +
+    (opts.tracePosition != null ? `_batch${opts.tracePosition}` : "");
   await withLightTheme(async () => {
     if (target instanceof SVGSVGElement) {
       const svgString = serializeSvgNative(target, provenance);
       download(
         new Blob([svgString], { type: "image/svg+xml;charset=utf-8" }),
-        `${opts.name}.svg`,
+        `${base}.svg`,
       );
     } else {
       const { svg, width, height } = serializeHtmlHybrid(target, provenance);
       download(
         new Blob([svg], { type: "image/svg+xml;charset=utf-8" }),
-        `${opts.name}.svg`,
+        `${base}.svg`,
       );
       try {
-        const png = await rasterize(svg, width, height);
-        download(png, `${opts.name}.png`);
+        const png = await rasterize(svg, width, height, scale);
+        download(png, `${base}_${scale}x.png`);
       } catch {
         // foreignObject rasterization can fail on exotic browsers —
         // the SVG + sidecar still landed, so don't fail the export.
@@ -375,6 +486,6 @@ export async function exportFigure(
     new Blob([JSON.stringify(provenance, null, 2)], {
       type: "application/json",
     }),
-    `${opts.name}.provenance.json`,
+    `${base}.provenance.json`,
   );
 }
