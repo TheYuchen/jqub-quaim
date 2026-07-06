@@ -239,6 +239,28 @@
   }
 }
 
+/* Restore/replay acknowledgment: FlowCanvas adds .restore-pulse to every
+   node it just rebuilt from an archived run (or a scenario boot) and
+   removes it ~1.4s later. One accent ring swelling out and fading — long
+   enough to catch peripheral vision, short enough not to nag. Radius
+   matches .panel-alt's rounded-xl so the ring hugs the node card. The
+   global prefers-reduced-motion rule below collapses the animation. */
+.react-flow__node.restore-pulse {
+  border-radius: 0.75rem;
+  animation: restore-pulse 1.2s ease-out 1;
+}
+@keyframes restore-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(var(--color-accent) / 0.85);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgb(var(--color-accent) / 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 11px rgb(var(--color-accent) / 0);
+  }
+}
+
 /* ----- prefers-reduced-motion ----------------------------------------
  * Honor the OS-level "reduce motion" setting. Without this rule the
  * default React Flow `animated` edges loop a stroke-dash forever, and

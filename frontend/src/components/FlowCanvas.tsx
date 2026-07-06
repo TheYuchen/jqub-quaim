@@ -858,6 +858,14 @@ export function FlowCanvas() {
       id: pn.i,
       type: "qnode",
       position: { x: pn.x, y: pn.y },
+      // Transient acknowledgment: a restore (and a scenario boot, which
+      // rides the same bridge) swaps the whole canvas behind whatever
+      // panel the user clicked in — a silent mutation disorients ("did
+      // anything happen? whose graph is this?"). Every restored node
+      // pulses an accent ring once (~1.2s CSS animation, class defined
+      // in index.css; the global prefers-reduced-motion rule collapses
+      // it) alongside the textual notice.
+      className: "restore-pulse",
       data: {
         kind: pn.k,
         params: {
@@ -874,6 +882,18 @@ export function FlowCanvas() {
     }));
     setNodes(restoredNodes);
     setEdges(restoredEdges);
+    // Strip the pulse class after the animation ends (functional update:
+    // must not clobber a drag that happened inside the window) so the
+    // NEXT restore re-triggers the animation on reused DOM nodes.
+    window.setTimeout(() => {
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.className?.includes("restore-pulse")
+            ? { ...n, className: undefined }
+            : n,
+        ),
+      );
+    }, 1400);
     setRun(null);
     useApp.getState().setRestoredFrom(sourceRunId);
     if (pinSeed != null) setPinnedSeed(pinSeed);
