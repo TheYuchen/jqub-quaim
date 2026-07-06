@@ -305,3 +305,36 @@ genuinely unnamed ideas; both DEEPEN the existing narrative
 Audit bar for every wave: tsc+build+77 tests, live seeded regression,
 pinned-replay bit-exactness, fresh-visitor first paint, encoding
 rationale comments, this doc updated.
+
+## Wave P — paper-first reorientation (USER DIRECTIVE 2026-07-05, next session)
+
+The system now serves the PAPER, not a product. Figures come from
+here. Reviewers are vis people, not quantum people. Execute:
+
+1. **De-product**: remove product legacy — welcome tour, sign-in/HF
+   OAuth UI, Support/NSF popover, Lab/Papers/Developers header links,
+   plugin upload marketing surfaces (keep the plugin protocol itself:
+   it's a claim), marketing copy. Keep share links (reviewers use
+   them). Mobile polish deprioritized.
+2. **Figure export mode**: one-click paper styling for any view
+   (canvas/multiverse/funnel/lineage/gate-diff/compare): white bg,
+   enlarged fonts, colorblind-safe check, SVG (vector) export via DOM
+   serialization + PNG fallback. Figures must not need Photoshop.
+3. **Scenario loader**: scripted, seed-reproducible states for each
+   planned figure (F1 ribbon mid-pipeline, F2 multiverse board, F3
+   funnel + target stop, F4 lineage with fork/replay, F5 gate diff on
+   QuCAD, F6 interval comparison). One URL/command each — regenerate
+   any figure at any time bit-exactly.
+4. **Non-quantum-reader pass**: plain-language tooltip/glossary for
+   every quantum term; prefer task language (evidence, transformation,
+   composition, replicate) over jargon in ALL UI copy; the demo must
+   be followable by a vis reviewer with zero quantum background.
+5. **Double-anonymous mode** (VIS is double-blind): env-flag that
+   strips ALL identifying branding (GMU, JQub, names, lab links,
+   NSF) for the review deployment; verify no identifying string in
+   the served bundle. Consider a second anonymous Space for
+   submission.
+6. Re-audit every view against: "does this pixel serve a paper claim
+   or figure?" Remove what doesn't.
+
+Also finish: rerecord_demo_archive.py for the 3 vqc records; Wave J.
