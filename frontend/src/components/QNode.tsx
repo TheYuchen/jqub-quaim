@@ -105,8 +105,9 @@ export function QNode({ id, data, selected }: NodeProps) {
           </div>
         </div>
         <div className="mt-1.5 text-[10px] text-mute leading-snug">
-          Re-upload this plugin to make the block work, or hover and
-          click × to remove it.
+          This browser doesn't have the plugin installed — add it via
+          the plugin API (see PLUGIN_SDK.md), or hover and click × to
+          remove the block.
         </div>
       </div>
     );

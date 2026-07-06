@@ -372,7 +372,7 @@ here. Reviewers are vis people, not quantum people. Status per item:
    Lab header link, UploadPluginModal + its palette trigger. The
    plugin protocol itself stays a live claim: manifests are still
    fetched, plugin blocks still render and execute — uploads happen
-   via the API (`POST /api/plugins`), which is how the paper
+   via the API (`POST /api/plugins/upload`), which is how the paper
    exercises the protocol anyway. Kept: theme switcher, share links,
    Export .py. Header is now name + tagline + qiskit/torch chip +
    live-calibration toggle + theme. index.html title/meta and the
