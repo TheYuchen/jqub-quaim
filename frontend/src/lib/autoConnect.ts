@@ -285,7 +285,7 @@ export function autoConnect(
       ...(isNoiseSidechain && {
         label: "noise profile",
         // SVG `fill` accepts `rgb(var(--name))` so the label + background
-        // follow the active theme (dark / light / GMU) automatically.
+        // follow the active theme (dark / light) automatically.
         labelStyle: { fontSize: 10, fill: "rgb(var(--color-mute))" },
         labelBgStyle: {
           fill: "rgb(var(--color-surface))",

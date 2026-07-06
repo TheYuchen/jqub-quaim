@@ -9,7 +9,6 @@
  * so the app renders correctly even before any JS runs (no flash of
  * unthemed content on first paint, SSR-safe, accessibility-friendly).
  *   data-theme="dark" : original navy + cyan palette
- *   data-theme="gmu"  : GMU Mason green canvas + Mason gold primary
  *
  * Values are `R G B` triplets so Tailwind's `/ <alpha-value>` syntax
  * works uniformly: `bg-canvas/80` → rgb(var(--color-canvas) / 0.8).
@@ -64,30 +63,6 @@
     --rf-edge-selected: var(--color-accent);
   }
 
-  [data-theme="gmu"] {
-    color-scheme: dark;
-    /* Mason Green canvas + Mason Gold primary accent */
-    --color-canvas: 10 24 18;
-    --color-surface: 19 46 31;
-    --color-surfaceAlt: 26 61 40;
-    --color-edge: 43 89 57;
-    --color-mute: 137 178 154;
-    --color-ink: 255 248 225;
-    --color-accent: 255 199 44;      /* Mason Gold #FFC72C */
-    --color-accent2: 0 163 81;       /* bright Mason Green */
-    --color-accent3: 232 74 95;      /* warm contrast red */
-    --color-accent4: 109 195 213;    /* soft Patriot teal */
-    --color-warn: 255 152 0;
-    --color-danger: 229 57 53;
-    --color-ok: 0 200 83;
-    --body-bg:
-      radial-gradient(1200px 600px at 80% -10%, rgb(255 199 44 / 0.10), transparent 70%),
-      radial-gradient(1000px 500px at 0% 110%, rgb(0 102 51 / 0.14), transparent 70%),
-      rgb(var(--color-canvas));
-    --scrollbar-thumb: rgb(var(--color-edge));
-    --rf-edge-stroke: 90 130 100;
-    --rf-edge-selected: var(--color-accent);
-  }
 
   html, body, #root {
     height: 100%;

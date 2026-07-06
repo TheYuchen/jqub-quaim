@@ -51,7 +51,7 @@
 //
 // All fills use currentColor driven by the theme token classes
 // (text-ok / text-warn / text-accent / text-mute), so the glyph
-// re-colors under all three themes (dark / light / GMU) for free.
+// re-colors under both themes (dark / light) for free.
 //
 // Two densities:
 //   size="tile"  — 46×14, no labels (tooltip carries numbers); for

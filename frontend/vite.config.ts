@@ -15,34 +15,13 @@ function anonStaticAssets(): Plugin {
   return {
     name: "anon-static-assets",
     transformIndexHtml(html) {
+      // %THEME_KEYS% = non-default themes the pre-hydration script in
+      // index.html may apply before first paint. Only "dark" exists
+      // since the university-branded theme was removed (2026-07) —
+      // which also retired this plugin's old CSS-stripping hook.
       return html
         .replaceAll("%APP_TITLE%", APP_TITLE)
-        .replaceAll(
-          "%THEME_KEYS%",
-          anonBuild ? '["dark"]' : '["dark", "gmu"]',
-        );
-    },
-    generateBundle(_options, bundle) {
-      // Anonymous builds must not ship the university-branded theme
-      // block in the stylesheet either — a curious reviewer reading
-      // the served CSS would find the brand name in the selector.
-      // The block is self-contained (one attribute selector, flat
-      // declarations, no nested braces), so a brace-bounded regex is
-      // safe. The JS side (theme registry + stored-preference
-      // fallback) is dead-code-eliminated in src/lib/theme.ts.
-      if (!anonBuild) return;
-      for (const item of Object.values(bundle)) {
-        if (
-          item.type === "asset" &&
-          item.fileName.endsWith(".css") &&
-          typeof item.source === "string"
-        ) {
-          item.source = item.source.replace(
-            /\[data-theme=(?:"gmu"|gmu)\]\s*\{[^}]*\}/g,
-            "",
-          );
-        }
-      }
+        .replaceAll("%THEME_KEYS%", '["dark"]');
     },
     writeBundle(options) {
       if (!anonBuild) return;
