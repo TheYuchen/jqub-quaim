@@ -11,6 +11,12 @@ import { useApp } from "../../lib/store";
 import { listRunsByConfig } from "../../lib/runStore";
 import { GLOSSARY } from "../../lib/glossary";
 import {
+  poolEvidence,
+  runEvidence,
+  type Evidence,
+  type PooledEvidence,
+} from "../../lib/stats";
+import {
   Caption,
   DepthCompare,
   Gauge,
@@ -547,6 +553,7 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
   const historyVersion = useApp((st) => st.historyVersion);
   const configHash = useApp((st) => st.lastConfigHash);
   const [points, setPoints] = useState<number[]>([]);
+  const [pooled, setPooled] = useState<PooledEvidence | null>(null);
 
   useEffect(() => {
     if (!configHash) return;
@@ -559,6 +566,15 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
             .filter((r) => r.headline_label === "fidelity" && r.headline_value != null)
             .map((r) => r.headline_value as number),
         );
+        // Wave J: pool the archived replicates' binomial counts —
+        // valid within one configuration (same underlying p; see
+        // lib/stats.ts) — so the across-runs answer carries a real
+        // interval, not just a scatter of points.
+        const evs = rs
+          .filter((r) => r.ok)
+          .map((r) => runEvidence(r.response))
+          .filter((e): e is Evidence => e != null);
+        setPooled(evs.length >= 2 ? poolEvidence(evs) : null);
       })
       .catch(() => {});
     return () => {
@@ -587,6 +603,16 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
           />
         ))}
       </div>
+      {pooled && (
+        <div
+          className="text-[10px] text-mute tabular-nums"
+          title={`All ${pooled.nRuns} archived replicates' measurement counts pooled (${pooled.successes}/${pooled.shots}), one Wilson interval over the pooled counts — same math as the Multiverse card's pooled band.`}
+        >
+          pooled μ {(pooled.point * 100).toFixed(1)}% ±
+          {(pooled.halfWidth * 100).toFixed(1)}pp over {pooled.shots} shots (
+          {pooled.nRuns} runs)
+        </div>
+      )}
     </div>
   );
 }

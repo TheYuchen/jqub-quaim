@@ -111,11 +111,14 @@ export const SCENARIOS: Record<string, Scenario> = {
   },
   // F2 — multiverse board: one card per configuration (bell fidelity
   // ×14, vqc+QuCAD ×3), shared-scale outcome strips, baseline chip,
-  // Δpp vs baseline with the honesty "(n small)" tag on the vqc card.
+  // Δpp vs baseline. Since Wave J every archive card carries ≥2048
+  // pooled shots, so the Δ compares POOLED means and the "(n small)"
+  // honesty tag stays off — the pooled band + "over N shots" line say
+  // how much evidence backs each card instead.
   F2: {
     key: "F2",
     expect:
-      "Multiverse board over the bundled archive: small multiples, baseline Δ, (n small) tag.",
+      "Multiverse board over the bundled archive: small multiples, pooled bands, baseline Δ of pooled means.",
     workspaceMode: "multiverse",
     needsArchive: true,
   },

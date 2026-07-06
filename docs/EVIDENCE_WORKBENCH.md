@@ -172,16 +172,15 @@ test_gate_diff 14, test_workflow_helpers 11, test_seed_coverage 8).
     .py preserves run_ids/lineage/created_at, swaps responses;
     RESUMABLE — walks records, caching each via the pinned step cache,
     exits on a per-record timeout so the sandbox's ~40 s process cap
-    can't truncate a long batch). Migration status at this commit:
-    14/17 done (all bell_state 512+2048, the same-seed replay pair);
-    the 3 vqc_2q_small records (QuCAD → sampled) still carry the old
-    single-draw numbers — their sampled step lacks `trace`, so the
-    loader simply omits the funnel and keeps the CI bar (verified
-    graceful). Finish them with the script when the Space is idle:
-    QuCAD's per-request noise-model build outlives a 40 s client
-    window, so it needs an uninterrupted long-lived request. This is
-    demo scaffolding, not a feature dependency — the live-run
-    assertions below hold on the deployed build regardless.
+    can't truncate a long batch). Migration status: COMPLETE
+    (Wave J session, 2026-07-05) — the 3 vqc_2q_small records were
+    finished with the fire-and-repoll pattern (first request warms the
+    now-memoized noise model server-side and times out client-side;
+    the re-request hits the pinned step cache instantly). All 17
+    records now carry per-batch traces (bell 512 → 4 batches, bell
+    2048 / vqc 1024 → 8), every trace's last frame equals the
+    distribution totals, and the same-seed replay pair is bit-
+    identical. Archive 110 KB.
 20. **SSE progress protocol** — during a sampled step the stream
     interleaves `{"step_progress": {node_id, batch_i, n_batches,
     shots_done, successes, point, ci95}}` events between StepResults
@@ -250,6 +249,61 @@ at 512/2048 shots (2/8 batches, half-width 0.0430 ≤ 0.05, point
 and the identical batch trace — optional stopping is bit-exactly
 replayable.
 
+## Shipped, seventh push (Wave J — uncertainty-in-provenance)
+
+Premise: provenance visualizations everywhere assume deterministic
+states; our lineage nodes ARE distributions. Wave J makes the archive
+views answer "how did certainty accumulate over the session?" —
+minimal honest version, no decoration without a task.
+
+24. **Evidence mass in the lineage** (marker/class `evidence-mass`,
+    RunHistory.tsx) — node dot AREA ∝ √(total shots the run's
+    stochastic steps actually EXECUTED), radius 3–7 px against a
+    FIXED 2048-shot reference (not view-normalized, same stability
+    argument as the hash→hue mapping: a run keeps its weight across
+    sessions and figures). Area not radius because dots read as
+    quantities; √shots so one 4096-shot run cannot visually swallow
+    eight 512s; runs with no sampled step keep the 3 px floor
+    (absence of evidence, not zero size). Because
+    `distribution.shots` records EXECUTED shots, an early-stopped run
+    is automatically lighter than a full one — optional stopping is
+    now legible in the provenance record itself. Ring (pinned), 
+    hollow+slash (error), fork-edge endpoints and the hover target
+    all track the radius. Tooltip gains "N shots of evidence".
+25. **Replicate-group certainty funnel** (RunHistory.tsx) — alongside
+    each contiguous replicate band, two thin polylines mirrored
+    around the lane spine: at each run's row, the POOLED Wilson CI
+    half-width of the band's binomial counts accumulated up to and
+    including that run (oldest at the bottom ⇒ the funnel narrows
+    upward ≈ 1/√N). Pooling = Σsuccesses/Σshots + one Wilson
+    interval, valid because a config_hash group is replicates of ONE
+    configuration ⇒ same underlying p (rationale comment in
+    lib/stats.ts). Normalized per group (widest row → ±10 px): the
+    task is the SHAPE of across-run accumulation; absolute numbers
+    live in the tooltip ("pooled ±X.Xpp after n runs / N shots").
+    Deliberately the same visual vocabulary as Wave I's within-run
+    evidence funnel — one motif, two contexts: shots accumulating
+    inside a run, runs accumulating inside a group. Only drawn when
+    the band has ≥2 binomial runs.
+26. **Pooled intervals where replicates aggregate** (lib/stats.ts new;
+    MultiverseBoard.tsx, results/cards.tsx ReplicateStrip) —
+    `wilson95` is a cited port of the backend's
+    app/services/stats.py::wilson_interval (unit-anchor comments pin
+    it to the live-regression numbers, e.g. wilson95(238,512) →
+    ±0.0430); `runEvidence` sums a run's binomial payloads;
+    `poolEvidence` pools runs. Multiverse cards with ≥2 binomial runs
+    show "pooled μ x.x% ±y.ypp over N shots" plus a FILLED BAND on
+    the 0-1 outcome strip — a deliberately different mark than the
+    per-run dots (dots = single draws, band = the interval the pooled
+    counts support). The Δ-vs-baseline line switches to comparing
+    POOLED means when both sides have pools, and the "(n small)"
+    suffix keys on pooled shots: ≥2048 on BOTH sides (worst-case
+    Wilson half-width ≤ ±2.2pp = one full default budget per side) ⇒
+    suffix off; otherwise the old replicate-count heuristic stands.
+    The fidelity card's across-runs ReplicateStrip carries the same
+    pooled summary line. Frontend-only: no server change, archived
+    responses already carry the counts.
+
 ## Not done yet (ordered backlog)
 
 * **Phase 3.5 leftovers** — pick-which-fidelity-node in comparison,
@@ -295,10 +349,11 @@ genuinely unnamed ideas; both DEEPEN the existing narrative
   optional stopping a visual interaction. Sequential-analysis
   steering has no prior art in VIS. Pinned replay stays bit-exact via
   per-batch seeds derived from node_seed.
-* **Wave J — Uncertainty-in-provenance** (next session): lineage nodes
-  ARE distributions; encode evidence mass (node weight) and its
-  split/accumulation across forks. Minimal honest version only — no
-  decoration without a task.
+* **Wave J — Uncertainty-in-provenance** (SHIPPED — see items 24-26):
+  lineage nodes ARE distributions; evidence mass as node weight,
+  pooled-certainty funnels along replicate bands, pooled Wilson
+  intervals wherever replicates aggregate. Minimal honest version —
+  no decoration without a task.
 * Wave K (paper discussion, not build): difference-of-differences
   ("did more shots help bell more than vqc?") as future work.
 
@@ -383,5 +438,5 @@ here. Reviewers are vis people, not quantum people. Status per item:
    surfaces (canvas+ribbons, multiverse, funnel, lineage, compare,
    share/export) each back a claim.
 
-Still open from before Wave P: rerecord_demo_archive.py for the 3
-vqc records; Wave J (uncertainty-in-provenance).
+Both leftovers from before Wave P are now closed: the demo archive
+re-record is complete (see item 19) and Wave J shipped (items 24-26).

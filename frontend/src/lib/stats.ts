@@ -1,0 +1,126 @@
+// Frontend statistics for pooled replicate evidence (Wave J).
+//
+// Pooling rationale: a config_hash group holds replicates of the SAME
+// configuration — same circuit, same backend snapshot, same graph
+// params (that is precisely what the structural hash canonicalizes) —
+// so every run's sampled-fidelity step draws from the same underlying
+// success probability p. Independent binomial draws with a common p
+// pool losslessly: summed successes over summed shots is the
+// sufficient statistic, and ONE Wilson interval over the pooled counts
+// is the tightest honest cross-run summary. Averaging per-run points
+// would throw away the shot counts (a 512-shot draw would outvote its
+// evidence); averaging per-run intervals is simply wrong.
+
+import type { RunResponse } from "./api";
+
+/** 95% Wilson score interval for a binomial proportion.
+ *
+ * Port of backend/app/services/stats.py::wilson_interval (same z,
+ * same [0,1] clamping); the backend additionally carries a pinned
+ * duplicate in qlib/qiskit_utils.py::wilson_interval_95 — see the
+ * layering note there (qlib must not import app.*). Wilson over the
+ * naive normal approximation because sampled fidelities routinely sit
+ * near 0 or 1, where the normal interval collapses to zero width or
+ * escapes [0, 1].
+ *
+ * Unit anchors (match the backend's live regression numbers):
+ *   wilson95(238, 512) → [0.4221, 0.5081]  point 0.4648, half ±0.0430
+ *   wilson95(256, 512) → half-width ≈ 0.0431 (widest case, p = 0.5)
+ *   wilson95(0, 0)     → [0, 1]            no evidence = full unknown
+ */
+export function wilson95(successes: number, n: number): [number, number] {
+  const z = 1.959963984540054;
+  if (n <= 0) return [0, 1];
+  const k = Math.max(0, Math.min(Math.round(successes), Math.round(n)));
+  const p = k / n;
+  const z2 = z * z;
+  const denom = 1 + z2 / n;
+  const centre = (p + z2 / (2 * n)) / denom;
+  const half = (z / denom) * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n));
+  return [Math.max(0, centre - half), Math.min(1, centre + half)];
+}
+
+/** Binomial evidence carried by one run: raw pooled counts. */
+export interface Evidence {
+  successes: number;
+  shots: number;
+}
+
+/** Total binomial evidence a run actually EXECUTED: successes/shots
+ *  summed over every step carrying a binomial distribution payload.
+ *  null when the run has none (deterministic pipeline, error before
+ *  the sampled step, pre-provenance record). `distribution.shots` is
+ *  shots executed — not requested — so an early-stopped run weighs
+ *  exactly the evidence it paid for. */
+export function runEvidence(
+  response: RunResponse | null | undefined,
+): Evidence | null {
+  if (!response?.steps) return null;
+  let shots = 0;
+  let successes = 0;
+  let found = false;
+  for (const step of response.steps) {
+    const d = step.distribution as
+      | { kind?: unknown; shots?: unknown; successes?: unknown }
+      | null
+      | undefined;
+    if (
+      d?.kind === "binomial" &&
+      typeof d.shots === "number" &&
+      Number.isFinite(d.shots) &&
+      d.shots > 0 &&
+      typeof d.successes === "number" &&
+      Number.isFinite(d.successes)
+    ) {
+      shots += d.shots;
+      successes += d.successes;
+      found = true;
+    }
+  }
+  return found ? { successes, shots } : null;
+}
+
+export interface PooledEvidence extends Evidence {
+  /** How many runs contributed counts. */
+  nRuns: number;
+  /** Pooled point estimate: Σsuccesses / Σshots. */
+  point: number;
+  ci95: [number, number];
+  /** (hi − lo) / 2. Defined from the interval, not z·SE, because
+   *  Wilson is asymmetric near 0 and 1. */
+  halfWidth: number;
+}
+
+/** Pool runs' binomial evidence (see module comment for why summing
+ *  counts is valid within one configuration).
+ *
+ * Unit anchor: eight 512-shot runs at p ≈ 0.46 pool to 4096 shots
+ * with half-width ≈ ±0.0153 — the 1/√N narrowing the lineage funnel
+ * draws (√8 ≈ 2.8× tighter than one run's ±0.0430). */
+export function poolEvidence(runs: Evidence[]): PooledEvidence | null {
+  if (runs.length === 0) return null;
+  let shots = 0;
+  let successes = 0;
+  for (const r of runs) {
+    shots += r.shots;
+    successes += r.successes;
+  }
+  if (shots <= 0) return null;
+  const ci95 = wilson95(successes, shots);
+  return {
+    successes,
+    shots,
+    nRuns: runs.length,
+    point: successes / shots,
+    ci95,
+    halfWidth: (ci95[1] - ci95[0]) / 2,
+  };
+}
+
+/** Pooled-shots threshold below which a Δ-vs-baseline keeps the
+ *  "(n small)" honesty suffix. Rationale: at 2048 shots the
+ *  worst-case (p = 0.5) Wilson half-width is ±2.2pp, so once BOTH
+ *  sides carry ≥2048 pooled shots a multi-pp Δ is signal, not shot
+ *  noise; 2048 is also the app's default full shot budget — "at
+ *  least one full run's worth of evidence on each side". */
+export const POOLED_SMALL_N_SHOTS = 2048;

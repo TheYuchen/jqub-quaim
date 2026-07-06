@@ -21,8 +21,24 @@
 //     headline values archived up to that moment, so older strips
 //     have fewer dots.
 //
-// Node size is deliberately constant — magnitude lives in the strip,
-// not the graph, so the lineage stays comparable dot-to-dot.
+//   * node AREA (Wave J) = evidence mass: dot area ∝ √(total shots
+//     the run's stochastic steps actually EXECUTED). Provenance
+//     usually pretends every state is equally solid; here a run IS a
+//     distribution, and how much evidence backs it is part of the
+//     record — an early-stopped run renders visibly lighter than a
+//     full one, so optional stopping stays legible in the timeline.
+//     Area (not radius) because dots read as quantities; √shots (not
+//     shots) so a 4096-shot run cannot visually swallow eight 512s.
+//     Runs with no sampled step keep the minimum radius: absence of
+//     evidence, not zero size.
+//   * group FUNNEL (Wave J) = two thin symmetric polylines around a
+//     replicate band's spine: at each run's row, the POOLED Wilson CI
+//     half-width of the group's binomial counts accumulated up to and
+//     including that run (oldest at the bottom, so the funnel narrows
+//     upward ≈ 1/√N). Same visual vocabulary as the within-run
+//     evidence funnel on the fidelity card — one motif, two contexts:
+//     shots accumulating inside a run, runs accumulating inside a
+//     group. Pooled numbers live in the funnel tooltip.
 //
 // All list behaviors are preserved: restore / replay(pin seed) /
 // delete per run, compare checkboxes (max 2, wired to useApp), the
@@ -35,6 +51,7 @@ import { History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { deleteRun, listRuns, type RunRecord } from "../lib/runStore";
 import { hashHue, hueCss } from "../lib/hues";
+import { runEvidence, wilson95 } from "../lib/stats";
 import { DemoArchiveBanner } from "./DemoArchiveBanner";
 
 // --- layout constants (px) --------------------------------------------------
@@ -46,8 +63,21 @@ const STRIP_H = 20; // height of a group distribution-strip row
 const LANE_X0 = 13; // x of lane 0 inside the gutter
 const LANE_DX = 11; // horizontal distance between lanes
 const N_LANES = 4; // lanes cycle mod 4 — enough separation for edges to read
-const R_NODE = 4; // constant node radius (size is intentionally NOT a channel)
-const R_RING = 6.5; // pinned-seed ring radius
+const R_MIN = 3; // node radius floor (runs with no sampled evidence)
+const R_MAX = 7; // node radius cap
+const SHOTS_REF = 2048; // shots that earn R_MAX = the app's default full budget
+const RING_PAD = 2.5; // pinned-seed ring sits this far outside the dot
+const FUNNEL_MAX_PX = 10; // widest half-width of a group certainty funnel
+
+/** Wave J evidence mass: dot AREA ∝ √shots ⇒ radius ∝ shots^(1/4),
+ *  against a FIXED 2048-shot reference (not view-normalized) so the
+ *  same run keeps the same weight across sessions and figures — the
+ *  same stability argument as the hash→hue mapping. 512 shots ≈ 5px,
+ *  2048 ≈ 7px; an early stop at 512 of 2048 is plainly lighter. */
+function evidenceRadius(shots: number): number {
+  if (!(shots > 0)) return R_MIN;
+  return Math.max(R_MIN, Math.min(R_MAX, R_MAX * Math.pow(shots / SHOTS_REF, 0.25)));
+}
 const STRIP_W = 92; // width of the 0-1 distribution mini strip
 
 function timeLabel(ts: number): string {
@@ -60,6 +90,7 @@ function timeLabel(ts: number): string {
 
 /** Multi-line native tooltip carrying the full provenance detail. */
 function nodeTitle(r: RunRecord): string {
+  const ev = runEvidence(r.response);
   const lines = [
     `run ${r.run_id}`,
     new Date(r.created_at).toLocaleString(),
@@ -71,6 +102,9 @@ function nodeTitle(r: RunRecord): string {
       ? `${r.headline_label ?? "metric"} = ${(r.headline_value * 100).toFixed(2)}%`
       : "no headline metric",
     `${r.n_steps} steps · ${r.ok ? "completed" : "errored"}`,
+    ev
+      ? `${ev.shots} shots of evidence (dot area)`
+      : "no sampled evidence (deterministic steps only)",
   ];
   if (r.forked_from) lines.push(`forked from run ${r.forked_from}`);
   return lines.join("\n");
@@ -78,13 +112,18 @@ function nodeTitle(r: RunRecord): string {
 
 /** Cubic bezier from a child run down to its ancestor. Same-lane edges
  *  bow left so they separate from the straight lane spine. */
-function edgePath(c: { x: number; y: number }, p: { x: number; y: number }): string {
+function edgePath(
+  c: { x: number; y: number },
+  p: { x: number; y: number },
+  rc: number,
+  rp: number,
+): string {
   const dy = p.y - c.y;
   if (c.x === p.x) {
     const bow = c.x - 8;
-    return `M ${c.x} ${c.y + R_NODE} C ${bow} ${c.y + dy * 0.3} ${bow} ${p.y - dy * 0.3} ${p.x} ${p.y - R_NODE}`;
+    return `M ${c.x} ${c.y + rc} C ${bow} ${c.y + dy * 0.3} ${bow} ${p.y - dy * 0.3} ${p.x} ${p.y - rp}`;
   }
-  return `M ${c.x} ${c.y + R_NODE} C ${c.x} ${c.y + dy * 0.5} ${p.x} ${p.y - dy * 0.5} ${p.x} ${p.y - R_NODE}`;
+  return `M ${c.x} ${c.y + rc} C ${c.x} ${c.y + dy * 0.5} ${p.x} ${p.y - dy * 0.5} ${p.x} ${p.y - rp}`;
 }
 
 // --- layout model -------------------------------------------------------
@@ -115,6 +154,16 @@ interface Layout {
   /** Children whose ancestor fell outside the visible window. */
   stubs: { childId: string }[];
   spines: { x: number; y0: number; y1: number; hue: number; ids: string[] }[];
+  /** Wave J: per-run node radius (evidence mass). */
+  radius: Map<string, number>;
+  /** Wave J: one cumulative-certainty funnel per replicate band with
+   *  ≥2 binomial runs. `pts` run oldest (widest) → newest. */
+  funnels: {
+    x: number;
+    hue: number;
+    ids: string[];
+    pts: { y: number; hw: number; nRuns: number; shots: number }[];
+  }[];
   parentOf: Map<string, string | null>;
 }
 
@@ -141,6 +190,12 @@ function computeLayout(records: RunRecord[]): Layout {
   const rows: Row[] = [];
   const nodeAt = new Map<string, NodePos>();
   const spines: Layout["spines"] = [];
+  const funnels: Layout["funnels"] = [];
+  // Evidence mass per run, computed once (records carry full responses).
+  const evidence = new Map(records.map((r) => [r.run_id, runEvidence(r.response)]));
+  const radius = new Map(
+    records.map((r) => [r.run_id, evidenceRadius(evidence.get(r.run_id)?.shots ?? 0)]),
+  );
   let y = 0;
 
   for (const sec of sections) {
@@ -179,8 +234,36 @@ function computeLayout(records: RunRecord[]): Layout {
       nodeAt.set(rec.run_id, { x, y: y + RUN_H / 2 });
       y += RUN_H;
     }
-    if (sec.length >= 2)
+    if (sec.length >= 2) {
       spines.push({ x, y0, y1: y - RUN_H / 2, hue, ids: sec.map((r) => r.run_id) });
+      // Wave J — cumulative certainty funnel for this replicate band.
+      // Pooling (Σsuccesses / Σshots + one Wilson interval) is valid
+      // because the band holds replicates of ONE configuration — same
+      // circuit, same backend snapshot, same params — so every run
+      // draws from the same underlying success probability p; summed
+      // counts are the sufficient statistic (full rationale in
+      // lib/stats.ts). Walked oldest → newest so each row carries the
+      // pooled half-width of everything up to and including it.
+      const pts: Layout["funnels"][number]["pts"] = [];
+      let cSucc = 0;
+      let cShots = 0;
+      let cRuns = 0;
+      for (let i = sec.length - 1; i >= 0; i--) {
+        const ev = evidence.get(sec[i].run_id);
+        if (!ev) continue; // non-binomial runs neither widen nor narrow the pool
+        cSucc += ev.successes;
+        cShots += ev.shots;
+        cRuns += 1;
+        const [lo, hi] = wilson95(cSucc, cShots);
+        pts.push({
+          y: nodeAt.get(sec[i].run_id)?.y ?? 0,
+          hw: (hi - lo) / 2,
+          nRuns: cRuns,
+          shots: cShots,
+        });
+      }
+      if (pts.length >= 2) funnels.push({ x, hue, ids: sec.map((r) => r.run_id), pts });
+    }
   }
 
   const edges: Layout["edges"] = [];
@@ -199,6 +282,8 @@ function computeLayout(records: RunRecord[]): Layout {
     edges,
     stubs,
     spines,
+    radius,
+    funnels,
     parentOf: new Map(records.map((r) => [r.run_id, r.forked_from])),
   };
 }
@@ -484,12 +569,12 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                   above the row hover background; pointer events off except
                   on the node hit-targets (tooltips + hover-highlight). */}
               <svg
-                className="absolute top-0 left-0"
+                className="evidence-mass absolute top-0 left-0"
                 width={GUTTER_W}
                 height={layout.totalH}
                 style={{ pointerEvents: "none" }}
                 role="img"
-                aria-label="Run lineage graph: dots are runs colored by configuration, rings mark pinned seeds, curved edges link forked runs to their ancestors"
+                aria-label="Run lineage graph: dots are runs colored by configuration and sized by shots of evidence, rings mark pinned seeds, curved edges link forked runs to their ancestors, funnels show pooled certainty accumulating across replicates"
               >
                 {/* replicate bands + spines (background layer) */}
                 {layout.spines.map((s, i) => {
@@ -508,6 +593,53 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                     </g>
                   );
                 })}
+                {/* Wave J — group certainty funnels: pooled Wilson CI
+                    half-width at each replicate row, drawn as two thin
+                    polylines mirrored around the band spine. Normalized
+                    per group (widest row → ±FUNNEL_MAX_PX): the task is
+                    the SHAPE of accumulation (≈1/√N narrowing upward,
+                    echoing the fidelity card's within-run funnel);
+                    absolute pooled numbers live in the tooltip. */}
+                {layout.funnels.map((f, i) => {
+                  const dimmed = related != null && !f.ids.some((id) => related.has(id));
+                  const maxHw = Math.max(...f.pts.map((pt) => pt.hw));
+                  const off = (hw: number) =>
+                    maxHw > 0 ? (FUNNEL_MAX_PX * hw) / maxHw : 0;
+                  const left = f.pts.map((pt) => `${f.x - off(pt.hw)},${pt.y}`);
+                  const right = f.pts.map((pt) => `${f.x + off(pt.hw)},${pt.y}`);
+                  const newest = f.pts[f.pts.length - 1];
+                  return (
+                    <g
+                      key={`funnel-${i}`}
+                      className="transition-opacity"
+                      style={{ opacity: dimmed ? 0.15 : 1 }}
+                    >
+                      <polyline
+                        points={left.join(" ")}
+                        fill="none"
+                        stroke={hueCss(f.hue, 0.6)}
+                        strokeWidth={1}
+                      />
+                      <polyline
+                        points={right.join(" ")}
+                        fill="none"
+                        stroke={hueCss(f.hue, 0.6)}
+                        strokeWidth={1}
+                      />
+                      {/* invisible hit area carrying the pooled numbers */}
+                      <polygon
+                        points={[...left, ...right.slice().reverse()].join(" ")}
+                        fill="transparent"
+                        style={{ pointerEvents: "auto" }}
+                      >
+                        <title>
+                          {`pooled ±${(newest.hw * 100).toFixed(1)}pp after ${newest.nRuns} runs / ${newest.shots} shots
+cumulative Wilson CI half-width of this configuration's pooled counts, widest (oldest) row scaled to ${FUNNEL_MAX_PX}px — the funnel narrowing upward is certainty accumulating across replicates`}
+                        </title>
+                      </polygon>
+                    </g>
+                  );
+                })}
                 {/* fork edges: child -> ancestor, in the child's hue */}
                 {layout.edges.map((e) => {
                   const c = layout.nodeAt.get(e.childId);
@@ -518,7 +650,12 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                   return (
                     <path
                       key={`edge-${e.childId}`}
-                      d={edgePath(c, p)}
+                      d={edgePath(
+                        c,
+                        p,
+                        layout.radius.get(e.childId) ?? R_MIN,
+                        layout.radius.get(e.parentId) ?? R_MIN,
+                      )}
                       fill="none"
                       stroke={hueCss(e.hue, 0.55)}
                       strokeWidth={related != null && lit ? 1.8 : 1.2}
@@ -531,10 +668,11 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                 {layout.stubs.map((s) => {
                   const c = layout.nodeAt.get(s.childId);
                   if (!c) return null;
+                  const rs = layout.radius.get(s.childId) ?? R_MIN;
                   return (
                     <path
                       key={`stub-${s.childId}`}
-                      d={`M ${c.x} ${c.y + R_NODE} C ${c.x - 5} ${c.y + 8} ${c.x - 6} ${c.y + 12} ${c.x - 6} ${c.y + 16}`}
+                      d={`M ${c.x} ${c.y + rs} C ${c.x - 5} ${c.y + rs + 4} ${c.x - 6} ${c.y + rs + 8} ${c.x - 6} ${c.y + rs + 12}`}
                       fill="none"
                       stroke="rgb(var(--color-mute))"
                       strokeWidth={1.2}
@@ -549,28 +687,32 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                   if (!pos) return null;
                   const hue = hashHue(rec.config_hash);
                   const dimmed = related != null && !related.has(rec.run_id);
+                  // Wave J: dot area = evidence mass; ring/slash/hit
+                  // geometry all track the radius so the pinned ring,
+                  // error slash and hover target stay legible at 3-7px.
+                  const rad = layout.radius.get(rec.run_id) ?? R_MIN;
                   return (
                     <g key={rec.run_id} className="transition-opacity" style={{ opacity: dimmed ? 0.2 : 1 }}>
                       {rec.seed_mode === "pinned" && (
-                        <circle cx={pos.x} cy={pos.y} r={R_RING} fill="none" stroke={hueCss(hue, 0.9)} strokeWidth={1.3} />
+                        <circle cx={pos.x} cy={pos.y} r={rad + RING_PAD} fill="none" stroke={hueCss(hue, 0.9)} strokeWidth={1.3} />
                       )}
                       {rec.ok ? (
                         <circle
                           cx={pos.x}
                           cy={pos.y}
-                          r={R_NODE}
+                          r={rad}
                           fill={hueCss(hue, 0.95)}
                           stroke={`hsl(${hue} 60% 38%)`}
                           strokeWidth={0.8}
                         />
                       ) : (
                         <>
-                          <circle cx={pos.x} cy={pos.y} r={R_NODE} fill="none" stroke={hueCss(hue, 0.9)} strokeWidth={1.2} />
+                          <circle cx={pos.x} cy={pos.y} r={rad} fill="none" stroke={hueCss(hue, 0.9)} strokeWidth={1.2} />
                           <line
-                            x1={pos.x - R_NODE - 1}
-                            y1={pos.y + R_NODE + 1}
-                            x2={pos.x + R_NODE + 1}
-                            y2={pos.y - R_NODE - 1}
+                            x1={pos.x - rad - 1}
+                            y1={pos.y + rad + 1}
+                            x2={pos.x + rad + 1}
+                            y2={pos.y - rad - 1}
                             stroke="rgb(var(--color-danger))"
                             strokeWidth={1.3}
                           />
@@ -580,7 +722,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                       <circle
                         cx={pos.x}
                         cy={pos.y}
-                        r={R_RING + 2.5}
+                        r={Math.max(9, rad + RING_PAD + 2.5)}
                         fill="transparent"
                         style={{ pointerEvents: "auto" }}
                         onMouseEnter={() => enter(rec.run_id)}
@@ -597,10 +739,12 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
           {/* legend: one line, doubles as the figure caption key */}
           <div className="px-3 py-1 border-t border-edge/60 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9px] text-mute">
             <span>hue = configuration</span>
+            <span>area = shots of evidence</span>
             <span>ring = pinned seed</span>
             <span>slash = error</span>
             <span>curve = forked from</span>
             <span>strip = replicate metrics (0–1)</span>
+            <span>funnel = pooled CI narrowing</span>
           </div>
         </>
       )}

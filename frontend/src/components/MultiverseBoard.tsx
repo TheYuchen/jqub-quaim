@@ -24,6 +24,13 @@
 //   * Δmean vs baseline is stated in percentage points and flagged
 //     "(n small)" below 3 replicates on either side — a difference
 //     built on one draw is not evidence, and the UI says so.
+//   * POOLED BAND (Wave J) = when ≥2 runs carry binomial payloads,
+//     their counts pool (Σsuccesses/Σshots, one Wilson interval — see
+//     lib/stats.ts for why that is valid within a configuration) into
+//     a filled band on the same 0-1 strip: a deliberately DIFFERENT
+//     mark than the per-run dots, because dots are single draws and
+//     the band is the interval the pooled evidence supports. The Δ
+//     line compares pooled means when both sides have pools.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GitCompare, RotateCcw, Workflow } from "lucide-react";
@@ -33,6 +40,13 @@ import type { SharePayload, ShareNode } from "../lib/share";
 import { resolveNodeSpec, type NodeSpec } from "../lib/nodeCatalog";
 import type { PluginManifest } from "../lib/api";
 import { hashHue, hueCss } from "../lib/hues";
+import {
+  POOLED_SMALL_N_SHOTS,
+  poolEvidence,
+  runEvidence,
+  type Evidence,
+  type PooledEvidence,
+} from "../lib/stats";
 import { WorkspaceToggle } from "./WorkspaceToggle";
 import { DemoArchiveBanner } from "./DemoArchiveBanner";
 import { FigureExportButton } from "./FigureExportButton";
@@ -51,6 +65,11 @@ interface ConfigGroup {
   /** Headline values of ok runs, chronological (latest last). */
   values: number[];
   mean: number | null;
+  /** Wilson interval over the group's pooled binomial counts; null
+   *  unless ≥2 ok runs carry binomial payloads (a pool of one is
+   *  just that run's own interval — the fidelity card already shows
+   *  it). */
+  pooled: PooledEvidence | null;
   nErr: number;
   circuitTag: string;
   /** Representative graph: latest ok run's, else latest run's. */
@@ -73,6 +92,9 @@ function buildGroups(runs: RunRecord[]): ConfigGroup[] {
     const values = oks
       .filter((r) => r.headline_value != null)
       .map((r) => Math.min(1, Math.max(0, r.headline_value as number)));
+    const evs = oks
+      .map((r) => runEvidence(r.response))
+      .filter((e): e is Evidence => e != null);
     groups.push({
       hash,
       hue: hashHue(hash),
@@ -84,6 +106,7 @@ function buildGroups(runs: RunRecord[]): ConfigGroup[] {
         values.length > 0
           ? values.reduce((a, b) => a + b, 0) / values.length
           : null,
+      pooled: evs.length >= 2 ? poolEvidence(evs) : null,
       nErr: sorted.filter((r) => !r.ok).length,
       circuitTag:
         latest.sample_key ?? latest.circuit_name ?? "uploaded circuit",
@@ -253,7 +276,15 @@ function PipelineStrip({
 
 // --- outcome distribution ---------------------------------------------------
 
-function OutcomeStrip({ values, hue }: { values: number[]; hue: number }) {
+function OutcomeStrip({
+  values,
+  hue,
+  pooled,
+}: {
+  values: number[];
+  hue: number;
+  pooled?: PooledEvidence | null;
+}) {
   const W = 220;
   const H = 26;
   const X0 = 8;
@@ -267,8 +298,25 @@ function OutcomeStrip({ values, hue }: { values: number[]; hue: number }) {
       height={H}
       preserveAspectRatio="xMidYMid meet"
       role="img"
-      aria-label={`${values.length} replicates, mean ${(mean * 100).toFixed(1)}%`}
+      aria-label={`${values.length} replicates, mean ${(mean * 100).toFixed(1)}%${pooled ? `, pooled ${(pooled.point * 100).toFixed(1)}% ±${(pooled.halfWidth * 100).toFixed(1)}pp over ${pooled.shots} shots` : ""}`}
     >
+      {/* Pooled Wilson interval (Wave J): a filled band UNDER the dot
+          line — a different mark than the dots on purpose (dots =
+          single draws, band = what the pooled counts support). */}
+      {pooled && (
+        <rect
+          x={px(pooled.ci95[0])}
+          y={H / 2 + 6}
+          width={Math.max(1.5, px(pooled.ci95[1]) - px(pooled.ci95[0]))}
+          height={4}
+          rx={2}
+          fill={hueCss(hue, 0.3)}
+          stroke={hueCss(hue, 0.6)}
+          strokeWidth={0.75}
+        >
+          <title>{`pooled 95% interval: ${(pooled.ci95[0] * 100).toFixed(1)}–${(pooled.ci95[1] * 100).toFixed(1)}% (${pooled.successes}/${pooled.shots} pooled counts over ${pooled.nRuns} runs)`}</title>
+        </rect>
+      )}
       <line x1={X0} x2={X1} y1={H / 2} y2={H / 2} stroke="rgb(var(--color-edge))" strokeWidth={1} />
       <line x1={X0} x2={X0} y1={H / 2 - 3} y2={H / 2 + 3} stroke="rgb(var(--color-edge))" strokeWidth={1} />
       <line x1={X1} x2={X1} y1={H / 2 - 3} y2={H / 2 + 3} stroke="rgb(var(--color-edge))" strokeWidth={1} />
@@ -433,11 +481,26 @@ export function MultiverseBoard() {
                 baseline != null && !isBaseline
                   ? diffKinds(g.graph, baseline.graph)
                   : null;
-              const nSmall =
-                baseline != null &&
-                (g.values.length < 3 || baseline.values.length < 3);
-              const delta =
-                !isBaseline && g.mean != null && baseline?.mean != null
+              // Wave J: when BOTH sides carry pooled binomial counts,
+              // Δ compares POOLED means (shot-weighted, the honest
+              // estimator) instead of unweighted per-run means, and
+              // the "(n small)" suffix keys on pooled SHOTS: ≥2048 on
+              // both sides ⇒ worst-case Wilson half-width ≤ ±2.2pp,
+              // so a multi-pp Δ is signal, not shot noise (threshold
+              // rationale in lib/stats.ts). Without pools the old
+              // replicate-count heuristic stands.
+              const pooledBoth =
+                !isBaseline && g.pooled != null && baseline?.pooled != null;
+              const nSmall = pooledBoth
+                ? (g.pooled as PooledEvidence).shots < POOLED_SMALL_N_SHOTS ||
+                  (baseline?.pooled as PooledEvidence).shots < POOLED_SMALL_N_SHOTS
+                : baseline != null &&
+                  (g.values.length < 3 || baseline.values.length < 3);
+              const delta = pooledBoth
+                ? ((g.pooled as PooledEvidence).point -
+                    (baseline?.pooled as PooledEvidence).point) *
+                  100
+                : !isBaseline && g.mean != null && baseline?.mean != null
                   ? (g.mean - baseline.mean) * 100
                   : null;
               const abSelected =
@@ -486,7 +549,17 @@ export function MultiverseBoard() {
                   {/* outcome distribution */}
                   {g.values.length >= 2 ? (
                     <>
-                      <OutcomeStrip values={g.values} hue={g.hue} />
+                      <OutcomeStrip values={g.values} hue={g.hue} pooled={g.pooled} />
+                      {g.pooled && (
+                        <div
+                          className="text-[10px] text-mute tabular-nums"
+                          title={`All ${g.pooled.nRuns} runs' measurement counts pooled (valid within one configuration: same underlying probability), then one Wilson interval — the filled band on the strip above.`}
+                        >
+                          pooled μ {(g.pooled.point * 100).toFixed(1)}% ±
+                          {(g.pooled.halfWidth * 100).toFixed(1)}pp over{" "}
+                          {g.pooled.shots} shots
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 text-[10px] text-mute">
                         <span className="tabular-nums">
                           μ={((g.mean as number) * 100).toFixed(1)}%
@@ -495,7 +568,11 @@ export function MultiverseBoard() {
                         {delta != null && (
                           <span
                             className={`tabular-nums ${delta >= 0 ? "text-ok" : "text-warn"}`}
-                            title="Difference of mean headline metric vs the baseline configuration, in percentage points."
+                            title={
+                              pooledBoth
+                                ? "Difference of POOLED means (shot-weighted, Wilson-pooled counts) vs the baseline configuration, in percentage points."
+                                : "Difference of mean headline metric vs the baseline configuration, in percentage points."
+                            }
                           >
                             Δ {delta >= 0 ? "+" : ""}
                             {delta.toFixed(1)}pp vs baseline
