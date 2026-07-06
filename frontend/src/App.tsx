@@ -15,6 +15,7 @@ import { MultiverseBoard } from "./components/MultiverseBoard";
 import { EvidenceTheater } from "./components/EvidenceTheater";
 import { CircuitPicker } from "./components/CircuitPicker";
 import { MobileDrawer } from "./components/MobileDrawer";
+import { WelcomeTour, useFirstVisitTour } from "./components/WelcomeTour";
 import { activateScenario } from "./lib/scenarios";
 
 // Default + clamp bounds for the two side panels. The middle canvas flexes.
@@ -72,6 +73,10 @@ export default function App() {
   const theaterOpen = useApp((s) => s.theaterOpen);
   const [ready, setReady] = useState(false);
   const isDesktop = useIsDesktop();
+
+  // Welcome tour: auto-opens on the first visit (skipped under
+  // ?scenario= boots), re-openable from the TopBar Tour button.
+  const [tourOpen, setTourOpen] = useFirstVisitTour();
 
   // Desktop pane widths — unused on mobile (drawers take over there).
   const [leftW, setLeftW] = useState<number>(() =>
@@ -273,6 +278,7 @@ export default function App() {
         mobile={!isDesktop}
         onOpenLeftDrawer={() => setLeftDrawerOpen(true)}
         onOpenRightDrawer={() => setRightDrawerOpen(true)}
+        onOpenTour={() => setTourOpen(true)}
       />
       {isDesktop ? (
         /* =====================  Desktop  ===================== */
@@ -428,6 +434,7 @@ export default function App() {
           </MobileDrawer>
         </div>
       )}
+      <WelcomeTour open={tourOpen} onClose={() => setTourOpen(false)} />
       {!ready && (
         <div className="absolute inset-0 bg-canvas/80 flex items-center justify-center backdrop-blur">
           <div className="text-mute text-sm">Connecting to compute backend…</div>

@@ -1,5 +1,5 @@
 import { useApp } from "../lib/store";
-import { Activity, PanelLeft, PanelRight, Zap } from "lucide-react";
+import { Activity, Compass, PanelLeft, PanelRight, Zap } from "lucide-react";
 import { APP_NAME, APP_TAGLINE } from "../lib/anon";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { TipIcon } from "./TipIcon";
@@ -8,10 +8,12 @@ import { TipIcon } from "./TipIcon";
  * Top application bar — deliberately minimal since Wave P (the system
  * serves the paper, not a product): app name + tagline, the runtime
  * environment chip (qiskit/torch versions), the live-calibration
- * toggle when the server supports it, and the theme switcher. All
- * product-era surfaces (tour, sign-in, lab/paper/developer links,
- * funding popover) were removed — every remaining pixel serves a
- * paper claim or figure.
+ * toggle when the server supports it, the welcome-tour reopener, and
+ * the theme switcher. The product-era surfaces (sign-in, lab/paper/
+ * developer links, funding popover) stay removed; the tour returned
+ * in 2026-07 — with double-blind treatment no longer needed,
+ * onboarding affordances are back, rewritten for the
+ * evidence-workbench system.
  *
  * Mobile: the two side panes are swapped for drawers, so we surface two
  * edge buttons (PanelLeft / PanelRight) for toggling them.
@@ -20,10 +22,12 @@ export function TopBar({
   mobile = false,
   onOpenLeftDrawer,
   onOpenRightDrawer,
+  onOpenTour,
 }: {
   mobile?: boolean;
   onOpenLeftDrawer?: () => void;
   onOpenRightDrawer?: () => void;
+  onOpenTour?: () => void;
 }) {
   const health = useApp((s) => s.health);
   const useLiveIbm = useApp((s) => s.useLiveIbm);
@@ -123,6 +127,18 @@ export function TopBar({
         </div>
       </div>
       <div className="flex items-center gap-1 sm:gap-2 text-xs shrink-0">
+        {onOpenTour && (
+          <button
+            type="button"
+            onClick={onOpenTour}
+            className="btn-ghost"
+            title="Replay the welcome tour — what this system is and how evidence accumulates"
+            aria-label="Open welcome tour"
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Tour</span>
+          </button>
+        )}
         <ThemeSwitcher />
         {mobile && onOpenRightDrawer && (
           <button
