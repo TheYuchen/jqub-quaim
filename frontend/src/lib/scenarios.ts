@@ -56,10 +56,11 @@ const QUCAD_GRAPH = chain([
 
 /** Sampled-fidelity pipeline with a big shot budget — the F3 graph.
  *  4096 requested shots + a ±2pp target: bell_state's sampled point
- *  sits near 0.45 (ideal |00⟩ probability is 0.5), so the Wilson
- *  interval reaches ±2pp after roughly 2,300–2,500 shots — the run
- *  stops early and the evidence funnel shows both the narrowing AND
- *  the stop (verified against the live API with seed 424242). */
+ *  sits near 0.49 (ideal |00⟩ probability is 0.5); batches are 512
+ *  shots each, and the Wilson interval first reaches ±2pp at the 5th
+ *  batch — the run stops early at 2,560 of 4096 shots and the
+ *  evidence funnel shows both the narrowing AND the stop (verified
+ *  against the live API with seed 424242: 1251/2560, ±1.94pp). */
 const FUNNEL_GRAPH = chain([
   { k: "input_circuit" },
   { k: "fake_backend", p: { backend_name: "FakeFez", shots: 4096 } },
@@ -97,8 +98,12 @@ export interface Scenario {
 export const SCENARIOS: Record<string, Scenario> = {
   // F1 — ribbon canvas after a run: tapered ribbons (width ∝ √gates),
   // green shrink taper on the QuCAD edge, delta-strip glyphs on node
-  // faces, legend chip bottom-left. Pinned seed 336157917 (one of the
-  // bundled vqc demo draws) so the numbers match the archive.
+  // faces, legend chip bottom-left. Pinned seed 336157917 (borrowed
+  // from a bundled vqc demo draw) — but NOTE: this graph's node ids
+  // (s1..s5) and fidelity method (statevector) differ from the
+  // archived record (n1..n5, sampled), and per-node seeds derive from
+  // node ids, so the numbers do NOT reproduce the archived record's.
+  // The figure is reproducible via its own pinned seed.
   F1: {
     key: "F1",
     expect:
@@ -128,7 +133,7 @@ export const SCENARIOS: Record<string, Scenario> = {
   F3: {
     key: "F3",
     expect:
-      "Evidence funnel: sampled fidelity on bell_state, ±2pp target reached around ~2,400 of 4096 shots → early stop.",
+      "Evidence funnel: sampled fidelity on bell_state, ±2pp target reached at 2,560 of 4096 shots → early stop.",
     graph: FUNNEL_GRAPH,
     sampleKey: "bell_state",
     pinSeed: 424242,

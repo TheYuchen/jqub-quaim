@@ -1548,7 +1548,7 @@ function colorForKind(kind: NodeKind): string {
 }
 
 
-const LEGEND_LS_KEY = "quaim-ribbon-legend-dismissed";
+const LEGEND_LS_KEY = "quda.ribbonLegendDismissed";
 
 /** Canvas encoding key — a small dismissible chip anchored to the
  *  bottom-left of the canvas (right of the React Flow zoom controls).

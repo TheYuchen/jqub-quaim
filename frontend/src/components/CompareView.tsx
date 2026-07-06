@@ -303,7 +303,7 @@ export function CompareView() {
             A {(va * 100).toFixed(2)}% · B {(vb * 100).toFixed(2)}% · Δ(B−A){" "}
             {((vb - va) * 100).toFixed(2)}pp
             {overlap === true && (
-              <span className="text-warn ml-1" title="The two 95% intervals overlap — this difference is within run-to-run noise at these shot counts. Run more replicates or raise shots before reading anything into it.">
+              <span className="text-warn ml-1" title="The two 95% intervals overlap — at these shot counts this view cannot distinguish the difference from run-to-run noise (overlap is a conservative screen, not a hypothesis test: a formal test could still detect a smaller real difference). Run more replicates or raise shots before reading anything into it.">
                 — intervals overlap: not evidence
               </span>
             )}

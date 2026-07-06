@@ -1335,7 +1335,13 @@ def _execute_pipeline(
             else:
                 ctx.update(cached_ctx)
                 _step_cache.move_to_end(prefix_key)  # LRU refresh
-                yield cached_result.model_copy(update={"from_step_cache": True})
+                # The prefix hash ignores node ids, so the cached result
+                # may have been written by a graph with different ids —
+                # re-stamp the CURRENT node's id or the frontend cannot
+                # map this step back to its canvas node.
+                yield cached_result.model_copy(
+                    update={"from_step_cache": True, "node_id": node.id}
+                )
                 continue
 
         # Cache miss: actually run the node. Stochastic handlers read

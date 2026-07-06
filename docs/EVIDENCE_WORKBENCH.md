@@ -403,7 +403,7 @@ here. Reviewers are vis people, not quantum people. Status per item:
    vqc_2q_small, seed 336157917, auto-run), F2 multiverse board over
    the bundled archive, F3 evidence funnel with ±2pp optional stop
    (bell_state, 4096 shots, seed 424242, auto-run, early stop
-   ~2,400 shots — bell's sampled point sits near 0.45), F4 lineage with the archived fork+replay, F5 QuCAD
+   at 2,560 of 4096 shots — bell's sampled point sits near 0.49), F4 lineage with the archived fork+replay, F5 QuCAD
    card with the gate diff booted open (auto-run), F6 interval
    comparison of the two most-replicated archive configurations.
    Auto-run is sequenced through pendingRestore.autoRunAfter → the
