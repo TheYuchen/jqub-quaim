@@ -167,6 +167,11 @@ function ciOf(s: StepResult | undefined): [number, number] | null {
 export function CompareView() {
   const compareIds = useApp((s) => s.compareIds);
   const clearCompare = useApp((s) => s.clearCompare);
+  // historyVersion: a selected run can be DELETED from the archive
+  // while it is being compared. The bump re-runs the lookup below, and
+  // the missing-record branch clears the stale pair — without this the
+  // view kept rendering the deleted run's data.
+  const historyVersion = useApp((s) => s.historyVersion);
   const [recs, setRecs] = useState<[RunRecord, RunRecord] | null>(null);
 
   useEffect(() => {
@@ -175,13 +180,20 @@ export function CompareView() {
       return;
     }
     let cancelled = false;
-    Promise.all([getRun(compareIds[0]), getRun(compareIds[1])]).then(([a, b]) => {
-      if (!cancelled && a && b) setRecs([a, b]);
-    });
+    Promise.all([getRun(compareIds[0]), getRun(compareIds[1])])
+      .then(([a, b]) => {
+        if (cancelled) return;
+        // Either record gone (deleted / IndexedDB hiccup) → show
+        // nothing rather than a stale or half pair.
+        setRecs(a && b ? [a, b] : null);
+      })
+      .catch(() => {
+        if (!cancelled) setRecs(null);
+      });
     return () => {
       cancelled = true;
     };
-  }, [compareIds]);
+  }, [compareIds, historyVersion]);
 
   if (compareIds.length !== 2 || !recs) return null;
   const [A, B] = recs;
@@ -244,7 +256,11 @@ export function CompareView() {
 
   return (
     <div className="panel-alt p-3 space-y-2 border !border-accent/40">
-      <div className="flex items-center gap-2">
+      {/* flex-wrap: the verdict chip alone (~230px) plus the A/B time
+          chips exceed a narrow Evidence pane / mobile drawer; without
+          wrapping the ml-auto close button was pushed out of the
+          overflow-x-hidden aside. */}
+      <div className="flex flex-wrap items-center gap-2 gap-y-1">
         <span className="text-xs font-semibold text-ink">Comparing two runs</span>
         <span className="chip">A · {new Date(A.created_at).toLocaleTimeString()}</span>
         <span className="chip">B · {new Date(B.created_at).toLocaleTimeString()}</span>

@@ -486,6 +486,19 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                       >
                         #{r.config_hash.slice(0, 4)}
                       </span>
+                      {/* Shrinkable metadata group. The row's fixed-width
+                          pieces (checkbox, time, hash, three action
+                          buttons) alone add up to ~280px; with the demo
+                          chip, F=…%, ⏹ and the seed glyph the old flat
+                          layout exceeded a narrow Evidence pane and pushed
+                          the restore/replay/delete buttons out of the
+                          overflow-x-hidden aside. Grouping the middle
+                          fields under min-w-0 + overflow-hidden makes THEM
+                          give way (name truncates first, then the chips
+                          clip) while the action buttons stay reachable at
+                          any pane width. Everything stays one line — the
+                          gutter's dot arithmetic depends on RUN_H. */}
+                      <span className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                       <span
                         className="truncate text-ink"
                         title={r.sample_key ?? r.circuit_name ?? "uploaded circuit"}
@@ -523,6 +536,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                       >
                         {r.seed_mode === "pinned" ? "⚲" : "∿"}
                       </span>
+                      </span>
                       <span className="ml-auto flex items-center gap-1 shrink-0">
                         <button
                           type="button"
@@ -553,9 +567,15 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                           title="Delete this record"
                           aria-label="Delete run record"
                           onClick={() => {
-                            void deleteRun(r.run_id).then(() =>
-                              useApp.getState().bumpHistoryVersion(),
-                            );
+                            void deleteRun(r.run_id).then(() => {
+                              const st = useApp.getState();
+                              // A deleted run must not stay selected for
+                              // comparison — CompareView would look up a
+                              // record that no longer exists.
+                              if (st.compareIds.includes(r.run_id))
+                                st.toggleCompare(r.run_id);
+                              st.bumpHistoryVersion();
+                            });
                           }}
                         >
                           <Trash2 className="w-3 h-3" />
