@@ -326,8 +326,6 @@ minimal honest version, no decoration without a task.
   provenance/transformation fields. Either re-run
   scripts/precompute_preset_results.py against the new schema or
   accept cold first hits.
-* **Welcome/tour copy** — slide 1 now tells the evidence story; the
-  middle slides are still feature-tour-oriented.
 * **Formative study** — interview protocol before locking the task
   taxonomy (Meyer-Dykes INFORMED). Blocked on user's go-ahead.
 
@@ -734,3 +732,55 @@ Flow HTML/SVG composite (raster-only as a whole).
    `.provenance.json` sidecar for raster-only use. Note: Illustrator
    may drop `<metadata>` on re-save — the sidecar is the durable
    copy; keep it next to the .ai file.
+
+## UX comprehension + polish wave (SHIPPED 2026-07-06)
+
+Reviewers see the paper, not the site — double-blind treatment of the
+SITE is no longer needed, so onboarding affordances returned. VITE_ANON
+machinery stays fully working for possible future use (the tour brands
+itself only via APP_NAME, so anon builds show the neutral codename).
+
+1. **Welcome tour restored** (`components/WelcomeTour.tsx`, single
+   file). The Wave-P-deleted modal shell was resurrected from git and
+   ALL content rewritten for the current system — five slides:
+   (1) what this is: seeded/archived/replayable experiments,
+   "evidence, not just output"; (2) compose & run: ribbons = circuit
+   flow, node faces = delta strip + CI bar; (3) evidence accumulates:
+   ×N replicates, lineage (hue = configuration, dot area = shots),
+   funnel, precision-target stopping; (4) compare & explore:
+   multiverse + honest A/B ("overlap ≠ evidence"); (5) try it: demo-
+   archive first moves, an "Open Multiverse" button, ?scenario=F0
+   pointer. Copy ≤~60 words/slide, task language, TipIcon glosses
+   from lib/glossary.ts, one theme-token SVG per slide. Auto-opens on
+   first visit (flag `quda-tour-seen-v2`) EXCEPT under ?scenario=
+   boots (figure states must not be covered); a TopBar "Tour" button
+   reopens it. Keyboard: Esc / ← →.
+2. **GMU theme removed entirely** — theme.ts (ThemeKey = light|dark),
+   index.css token block, vite.config.ts %THEME_KEYS% (now always
+   ["dark"]) and the anon CSS-stripping generateBundle hook (nothing
+   left to strip). A stored "gmu" preference migrates to the light
+   default; the migration comment is the only residual mention of the
+   key in the codebase.
+3. **Comprehension audit** — walked every interactive element; fixed:
+   ×N selector now discloses prefix-caching, precision-target selector
+   discloses that the target is archived + replayed, Evidence tabs
+   gained title tooltips, the two funnels cross-reference each other
+   (one motif: shot batches within a run / runs within a group),
+   the multiverse card key moved into the always-visible header
+   TipIcon (was lg-only), EmptyCanvas closes the drag → Run →
+   evidence loop.
+4. **UI conventions written down** — index.css carries a
+   UI-conventions comment block (type scale with a 9px floor, label
+   casing rules, chip paddings + deliberate exceptions, percent/pp
+   decimal rules, mono/tabular-nums for numbers). Drift fixed: two
+   8px labels → 9px, one section label missing tracking-wider, one
+   mixed-decimal summary line.
+
+Known remaining first-contact rough edges (copy alone won't fix;
+candidates for a future wave): (a) the first-visit Multiverse landing
+relies on the tour + demo banner for orientation — the board itself
+has no empty-state-style intro once cards exist; (b) restore/replay
+success is communicated by the canvas silently changing behind the
+Evidence pane — a brief highlight of what just changed would help;
+(c) the Compare tab is only reachable through History checkboxes or
+multiverse A/B, which slide 4 now teaches but the tab itself cannot.
