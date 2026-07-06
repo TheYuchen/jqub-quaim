@@ -865,7 +865,9 @@ backend unit lane green, live checks where the server is involved.
    the multi-node small-multiple layout (panelH 250): the single-panel
    F0 teaser/filmstrip exports are recorded bit-exact SVGs and keep
    their original anchors (including the old pool-vs-final nudge,
-   which the dodge subsumes where active). (b) Multiverse
+   which the dodge subsumes where active). SUPERSEDED 2026-07-06:
+   the multi-node-only restriction was the wrong call — see "Theater
+   margin labels: universal dodge pass" below. (b) Multiverse
    PipelineStrip node cap 14 → 11 (+k overflow chip): 14 squares are
    233 px and overflow the 240 px card floor's ~210 px content box;
    11 + "+k" fits, so long pipelines degrade to an explicit count
@@ -892,3 +894,47 @@ backend unit lane green, live checks where the server is involved.
    metrics their own scales is a separate design question, opened
    only if a case study needs it. Decision comments live in both
    handlers.
+
+## Theater margin labels: universal dodge pass (SHIPPED 2026-07-06)
+
+The leftover-wave item 5(a) above scoped `dodgeMarginLabels` to the
+multi-node small-multiple layout to keep the recorded F0 exports
+bit-exact. That was the wrong trade: the collision it prevents hits
+hardest in the DEFAULT single-panel hero view, in the most common
+success case. A run that stops at its precision target has, by the
+stopping rule itself, final half-width ≈ target — so y(final point)
+and y(point + target) are inherently about one text line apart and
+the blue "final: …" readout overprints the amber "target ±" tag.
+The old single-panel stand-in (nudge final up 24 px when the archive
+pool label was within 30 px) made it deterministic: at typical zoom
+the ±target corridor offset is ≈ 24 px, so the nudge landed final
+EXACTLY on the target tag (user-reported with a screenshot: jumbled
+orange/blue text, green archive block just beneath).
+
+Now (EvidenceTheater.tsx, layout-contract comment in `Panel`): the
+right margin is one readout column and ALL its blocks — final/so-far
+(2 lines), target tag (1 line), archive pool (2 lines) — run through
+`dodgeMarginLabels` in every layout: anchors sorted by data y, tops
+separated by ≥ max(12, blockHeight+2) px (2-line blocks reserve
+~28 px), clamped into the plot band. The ad-hoc pool nudge is
+deleted — the dodge subsumes it (pool near final ⇒ pool pushed below
+final, both legible). In-plot annotations can't collide with the
+column by construction: the no-target ghost hint ends at the plot
+edge, and when the non-flipped ⏹ stop text extends into the column's
+x-range (late stops; F0 itself does at stopX ≈ 520 → text ends
+≈ 858) the column's top clamp drops below the stop's two lines. The
+pass is two linear sweeps — terminates unconditionally; on a band
+shorter than the pile it preserves separations and lets the pile rise
+rather than overprint or loop.
+
+Consequence for recorded figures: F0/F3 theater exports (teaser +
+filmstrip panels) shift slightly — when no archive pool is present
+the anchors are unchanged, but any panel where a pool band or a
+target-stop collision was in play now lays out differently, and the
+export SVG no longer matches byte-for-byte what was recorded before
+this change. **Previously exported theater figures must be
+re-exported.** That is the designed cost: every export is
+provenance-backed (scenario key + pinned seed + trace_position) and
+bit-exactly regenerable from the live app, so re-export is a replay,
+not a re-measurement. Data, seeds, traces, and every number in the
+F0/F3 recipes are untouched.

@@ -392,50 +392,82 @@ function Panel({
       ? s.shotsRequested - s.shotsExecuted
       : 0;
 
-  // Right-margin readout placement. Three text blocks share
-  // x = W - M.r + 10: the final/so-far readout (2 lines), the amber
-  // "target ±" tag (1 line) and the green archive-pool tag (2 lines).
-  // Their anchors are data-driven ys; in the MULTI-NODE small-multiple
-  // layout (plotH ≈ 144 px) two of them routinely land within a line
-  // height of each other and overprint. Run the dodging pass there —
-  // it subsumes the single ad-hoc pool-vs-final nudge below. The
-  // single-panel layout keeps its original anchors untouched: the
-  // recorded F0 teaser/filmstrip exports are bit-exact SVGs and must
-  // not shift under a layout-affecting change.
-  let finalLabelY =
-    y(last.point) -
-    (pool && Math.abs(y(pool.point) - y(last.point)) < 30 ? 24 : 0) +
-    3;
-  let targetLabelY =
-    s.precisionTarget != null
-      ? Math.max(
-          M.t + 8,
-          Math.min(axisY - 4, y(last.point + s.precisionTarget) + 3),
-        )
-      : 0;
-  let poolLabelY = pool ? y(pool.point) + 3 : 0;
-  if (height < 300) {
-    const blocks: Array<{ anchor: number; h: number }> = [
-      // natural (un-nudged) anchor — the dodge replaces the ad-hoc rule
-      { anchor: y(last.point) + 3, h: 26 },
-    ];
-    if (s.precisionTarget != null)
-      blocks.push({ anchor: targetLabelY, h: 10 });
-    if (pool) blocks.push({ anchor: poolLabelY, h: 24 });
-    const dodged = dodgeMarginLabels(blocks, M.t + 8, axisY - 2);
-    finalLabelY = dodged[0];
-    let bi = 1;
-    if (s.precisionTarget != null) targetLabelY = dodged[bi++];
-    if (pool) poolLabelY = dodged[bi];
-  }
   // Which side of the stop line the "⏹ stopped here" label sits on.
   // The label is ~330px at fontSize 11; a stop late in the budget
-  // (e.g. batch 7 of 8 → stopX ≈ 700) used to run the text past the
-  // 1000px viewBox and clip it. Flip to the left of the line only when
-  // the right side would clip — the threshold keeps the verified F0
-  // teaser (stop at 2,560 of 4,096 → stopX ≈ 520, text ends ≈ 858)
-  // on its right side, bit-identical to the recorded figure.
-  const stopLabelFlip = stopX != null && stopX + 8 + 330 > W - 4;
+  // (e.g. batch 7 of 8 → stopX ≈ 700) would run the text past the
+  // 1000px viewBox and clip it — flip to the left of the line when the
+  // right side would clip (the flipped text ends at stopX - 8 - 330,
+  // still inside the plot for any stopX past the flip threshold, and
+  // a stop at the FINAL batch puts the line at the plot's right edge
+  // → always flipped). A non-flipped label can still legitimately
+  // extend past the plot edge into the right-margin readout column
+  // (F0: stopX ≈ 520, text ends ≈ 858 > column x 802); that overlap
+  // is resolved VERTICALLY by stopIntrudes below, not by flipping
+  // earlier — the label reads best pointing into the unspent region
+  // it annotates.
+  const stopTextW = 330;
+  const stopLabelFlip = stopX != null && stopX + 8 + stopTextW > W - 4;
+
+  // Right-margin readout placement — the panel's LAYOUT CONTRACT:
+  //
+  //   * The right margin (x = W - M.r + 10) is ONE readout column with
+  //     up to three blocks: the blue final/so-far readout (2 lines),
+  //     the amber "target ±" tag (1 line), the green archive-pool tag
+  //     (2 lines). In EVERY layout — the single-panel hero view and
+  //     the multi-node small multiples alike — the blocks go through
+  //     dodgeMarginLabels: sorted by data-driven anchor y, tops pushed
+  //     ≥ max(12, blockHeight + 2) px apart (2-line blocks reserve
+  //     ~28 px), then clamped back into the plot band. Universality
+  //     matters most in the DEFAULT single-panel view: a run that
+  //     stops at its precision target has final half-width ≈ target,
+  //     so y(point) and y(point + target) nearly coincide and the
+  //     final + target labels overprint without the pass. (An older
+  //     rule dodged only multi-node panels to keep recorded F0
+  //     exports bit-exact — wrong call, the exports are provenance-
+  //     backed and regenerable — and its single-panel stand-in, a
+  //     "nudge final up 24 px when the pool label is near" rule,
+  //     shoved final EXACTLY onto the target tag in the target-stop
+  //     case (24 px ≈ the corridor offset at typical zoom). The dodge
+  //     subsumes that nudge: pool close to final ⇒ pool is pushed
+  //     below final instead.)
+  //   * In-plot annotations never enter the column by construction:
+  //     the no-target ghost hint is textAnchor=end at the plot's
+  //     right edge, and the ⏹ stop label — the one annotation whose
+  //     x-range CAN reach the column — owns the top band instead
+  //     (stopIntrudes lowers the column's top clamp below it).
+  //   * Degradation on short panels: the dodge is two linear sweeps
+  //     (push down, pull back inside) — it terminates unconditionally,
+  //     and on a band shorter than the pile it lets the pile rise
+  //     above the band top while KEEPING the separations, so labels
+  //     never overprint and never loop. Multi-node panels (plotH ≈
+  //     144 px) fit the worst-case ~68 px pile with room to spare;
+  //     no target ⇒ 2 blocks; no archive pool ⇒ ≤ 2 blocks; both
+  //     absent ⇒ the final readout alone, clamp-only.
+  //
+  // The stop text occupies two lines with baselines M.t+12 / M.t+26;
+  // when it intrudes into the column's x-range (not flipped, ending
+  // past the column start) the band top drops below it so a
+  // top-clamped readout can never overprint the stop annotation.
+  const stopIntrudes =
+    stopX != null && !stopLabelFlip && stopX + 8 + stopTextW > W - M.r + 6;
+  const bandTop = M.t + (stopIntrudes ? 38 : 8);
+  const blocks: Array<{ anchor: number; h: number }> = [
+    // final/so-far readout: value line + successes line
+    { anchor: y(last.point) + 3, h: 26 },
+  ];
+  if (s.precisionTarget != null)
+    // Natural anchor = the UPPER corridor line. (If the corridor falls
+    // outside the clamped y-domain its lines are skipped below, but
+    // the tag still renders — y() extrapolates and the dodge clamps it
+    // back into the band; the RULE is worth stating even when its
+    // lines are off-scale.)
+    blocks.push({ anchor: y(last.point + s.precisionTarget) + 3, h: 10 });
+  if (pool) blocks.push({ anchor: y(pool.point) + 3, h: 24 });
+  const dodged = dodgeMarginLabels(blocks, bandTop, axisY - 2);
+  const finalLabelY = dodged[0];
+  let bi = 1;
+  const targetLabelY = s.precisionTarget != null ? dodged[bi++] : 0;
+  const poolLabelY = pool ? dodged[bi] : 0;
 
   const titleBits = s.scrubbed
     ? `replay @ batch ${s.frames.length} of ${s.nBatches} — so far: ${fmtShots(last.shots)} shots · point ${fmtPct(last.point, 2)} ± ${fmtPp(lastHalf, 2)}`
