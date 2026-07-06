@@ -354,6 +354,14 @@ function Panel({
     s.stoppedEarly && s.shotsExecuted != null
       ? s.shotsRequested - s.shotsExecuted
       : 0;
+  // Which side of the stop line the "⏹ stopped here" label sits on.
+  // The label is ~330px at fontSize 11; a stop late in the budget
+  // (e.g. batch 7 of 8 → stopX ≈ 700) used to run the text past the
+  // 1000px viewBox and clip it. Flip to the left of the line only when
+  // the right side would clip — the threshold keeps the verified F0
+  // teaser (stop at 2,560 of 4,096 → stopX ≈ 520, text ends ≈ 858)
+  // on its right side, bit-identical to the recorded figure.
+  const stopLabelFlip = stopX != null && stopX + 8 + 330 > W - 4;
 
   const titleBits = s.scrubbed
     ? `replay @ batch ${s.frames.length} of ${s.nBatches} — so far: ${fmtShots(last.shots)} shots · point ${fmtPct(last.point, 2)} ± ${fmtPp(lastHalf, 2)}`
@@ -424,11 +432,11 @@ function Panel({
         <g>
           <rect x={stopX} y={M.t} width={M.l + plotW - stopX} height={plotH} fill="rgb(var(--color-mute))" opacity={0.05} />
           <line x1={stopX} x2={stopX} y1={M.t - 4} y2={axisY} stroke="rgb(var(--color-warn))" strokeWidth={1.5} strokeDasharray="5 3" />
-          <text x={stopX + 8} y={M.t + 12} fontSize={11} fontWeight={600} fill="rgb(var(--color-warn))">
+          <text x={stopLabelFlip ? stopX - 8 : stopX + 8} textAnchor={stopLabelFlip ? "end" : "start"} y={M.t + 12} fontSize={11} fontWeight={600} fill="rgb(var(--color-warn))">
             ⏹ stopped here — target reached at {fmtShots(s.shotsExecuted ?? 0)} of {fmtShots(s.shotsRequested)} shots
             <title>{GLOSSARY.precisionTarget}</title>
           </text>
-          <text x={stopX + 8} y={M.t + 26} fontSize={10} fill="rgb(var(--color-mute))">
+          <text x={stopLabelFlip ? stopX - 8 : stopX + 8} textAnchor={stopLabelFlip ? "end" : "start"} y={M.t + 26} fontSize={10} fill="rgb(var(--color-mute))">
             {fmtShots(shotsSaved)} shots not spent
           </text>
         </g>
@@ -437,12 +445,16 @@ function Panel({
       {/* optional-stopping target corridor (amber + DASHED) */}
       {s.precisionTarget != null ? (
         <g>
-          {[last.point - s.precisionTarget, last.point + s.precisionTarget].map(
-            (v, i) => (
+          {/* yDomain extends to point ± 1.6×target but clamps to [0,1];
+              with a point near the scale ends a corridor value can fall
+              outside the domain, and y() extrapolates — the line used
+              to escape the plot into the title area. Skip those. */}
+          {[last.point - s.precisionTarget, last.point + s.precisionTarget]
+            .filter((v) => v >= dLo && v <= dHi)
+            .map((v, i) => (
               <line key={i} x1={M.l} x2={M.l + plotW} y1={y(v)} y2={y(v)} stroke="rgb(var(--color-warn))" strokeWidth={1.2} strokeDasharray="7 4" opacity={0.9} />
-            ),
-          )}
-          <text x={W - M.r + 10} y={y(last.point + s.precisionTarget) + 3} fontSize={10} fill="rgb(var(--color-warn))">
+            ))}
+          <text x={W - M.r + 10} y={Math.max(M.t + 8, Math.min(axisY - 4, y(last.point + s.precisionTarget) + 3))} fontSize={10} fill="rgb(var(--color-warn))">
             target ±{fmtPp(s.precisionTarget, 1)}
             <title>{GLOSSARY.precisionTarget}</title>
           </text>
@@ -567,6 +579,11 @@ export function EvidenceTheater() {
   const circuit = useApp((st) => st.circuit);
   const sampleKey = useApp((st) => st.sampleKey);
   const setTheaterOpen = useApp((st) => st.setTheaterOpen);
+  // Archive changes (a run archived elsewhere, a record deleted from
+  // History) must refresh the pooled prior-evidence band below — the
+  // created_at < startedAt cutoff keeps the streaming run's own
+  // replicates out either way, so re-running the query is idempotent.
+  const historyVersion = useApp((st) => st.historyVersion);
   const svgRef = useRef<SVGSVGElement>(null);
   const [autoOpenPref, setAutoOpenPref] = useState(theaterAutoOpenEnabled());
 
@@ -649,7 +666,7 @@ export function EvidenceTheater() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theaterRun?.configHash, theaterRun?.startedAt, theaterRun?.runId, timesTrusted]);
+  }, [theaterRun?.configHash, theaterRun?.startedAt, theaterRun?.runId, timesTrusted, historyVersion]);
 
   const configHash = timesTrusted ? theaterRun?.configHash ?? null : null;
   const rootSeed = timesTrusted

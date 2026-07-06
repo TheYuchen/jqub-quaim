@@ -560,7 +560,11 @@ export function MultiverseBoard() {
                           {g.pooled.shots} shots
                         </div>
                       )}
-                      <div className="flex items-center gap-2 text-[10px] text-mute">
+                      {/* flex-wrap: at the 240px card minimum the Δ-vs-
+                          baseline span (~160px) plus μ and ×n exceed the
+                          content box; wrapping keeps each stat intact on
+                          its own line instead of mid-text folding. */}
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-mute">
                         <span className="tabular-nums">
                           μ={((g.mean as number) * 100).toFixed(1)}%
                         </span>

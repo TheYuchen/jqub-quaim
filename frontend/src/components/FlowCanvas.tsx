@@ -937,6 +937,13 @@ export function FlowCanvas() {
       });
       return;
     }
+    // A manual Run supersedes any still-pending scenario auto-run.
+    // The auto-run consumer only DEFERS on `running`, so without this
+    // a user who presses Run before the scenario's auto-run fires
+    // would get a second, unasked-for run the moment this one ends.
+    // (The scenario path itself is unaffected: its consumer clears
+    // the flag before calling runPipeline.)
+    if (useApp.getState().pendingAutoRun) useApp.getState().clearAutoRun();
     setRunning(true);
     setRun(null);
     setNotice(null);
