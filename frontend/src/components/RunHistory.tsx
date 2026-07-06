@@ -47,7 +47,7 @@
 // by dimming unrelated rows, nodes and edges.
 
 import { useEffect, useMemo, useState } from "react";
-import { History, Play, RotateCcw, Trash2 } from "lucide-react";
+import { GitCompareArrows, History, Play, RotateCcw, Trash2 } from "lucide-react";
 import { useApp } from "../lib/store";
 import { deleteRun, listRuns, type RunRecord } from "../lib/runStore";
 import { hashHue, hueCss } from "../lib/hues";
@@ -404,6 +404,23 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
       {(embedded || open) && (
         <>
           {records.some((r) => r.demo) && <DemoArchiveBanner />}
+          {/* Compare needs TWO runs, but nothing used to acknowledge the
+              first checkbox beyond a "1" on a tab the user may never
+              look at — the interaction just seemed to do nothing. One
+              transient chip closes the loop and names the alternative
+              entry point (Multiverse A/B). Disappears at 0 or 2. */}
+          {compareIds.length === 1 && (
+            <div
+              role="status"
+              className="mx-2 mt-2 flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent/10 px-2 py-1 text-[10px] text-accent"
+            >
+              <GitCompareArrows className="w-3 h-3 shrink-0" />
+              <span>
+                1 of 2 picked — tick one more run to compare, or A/B a
+                card in Multiverse.
+              </span>
+            </div>
+          )}
           <div className={embedded ? "" : "max-h-[320px] overflow-y-auto"}>
             {/* Relative wrapper: the SVG gutter is absolutely positioned
                 inside the scrolled content, so lineage marks scroll in

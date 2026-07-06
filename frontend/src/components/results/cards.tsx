@@ -565,6 +565,12 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
   const configHash = useApp((st) => st.lastConfigHash);
   const [points, setPoints] = useState<number[]>([]);
   const [pooled, setPooled] = useState<PooledEvidence | null>(null);
+  // The two most recent archived runs of this configuration (oldest →
+  // newest pair), fuel for the one-hop compare link below. By the time
+  // this card renders, the run it belongs to is already archived
+  // (FlowCanvas archives before bumping historyVersion), so "the two
+  // latest" is "this run vs its predecessor".
+  const [latestPair, setLatestPair] = useState<[string, string] | null>(null);
 
   useEffect(() => {
     if (!configHash) return;
@@ -572,6 +578,11 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
     listRunsByConfig(configHash)
       .then((rs) => {
         if (cancelled) return;
+        setLatestPair(
+          rs.length >= 2
+            ? [rs[rs.length - 2].run_id, rs[rs.length - 1].run_id]
+            : null,
+        );
         setPoints(
           rs
             .filter((r) => r.headline_label === "fidelity" && r.headline_value != null)
@@ -623,6 +634,22 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
           {(pooled.halfWidth * 100).toFixed(1)}pp over {pooled.shots} shots (
           {pooled.nRuns} runs)
         </div>
+      )}
+      {/* One-hop route into the Compare view. Without it, comparison is
+          only reachable via two History checkboxes or a Multiverse A/B —
+          three panels away from the card that just made the user ask
+          "is this different from last time?". Setting both ids at once
+          rides the Evidence pane's existing auto-switch to Compare. */}
+      {latestPair && (
+        <button
+          type="button"
+          data-marker="compare-vs-previous"
+          className="text-[10px] text-accent hover:underline"
+          onClick={() => useApp.getState().setCompareIds(latestPair)}
+          title="Open the Compare tab with this configuration's two most recent archived runs side by side."
+        >
+          compare vs previous run of this configuration ↗
+        </button>
       )}
     </div>
   );

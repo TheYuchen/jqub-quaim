@@ -182,6 +182,12 @@ interface AppState {
    */
   compareIds: string[];
   toggleCompare: (runId: string) => void;
+  /** Replace the selection wholesale (max 2 kept). Used by one-hop
+   *  affordances that KNOW both runs — e.g. the fidelity card's
+   *  "compare vs previous run of this configuration" link — so the
+   *  user doesn't have to find and tick two checkboxes. Setting two
+   *  ids triggers the Evidence pane's auto-switch to Compare. */
+  setCompareIds: (ids: string[]) => void;
   clearCompare: () => void;
 
   health: HealthResponse | null;
@@ -366,6 +372,7 @@ export const useApp = create<AppState>((set) => ({
         return { compareIds: s.compareIds.filter((x) => x !== runId) };
       return { compareIds: [...s.compareIds, runId].slice(-2) };
     }),
+  setCompareIds: (ids) => set({ compareIds: ids.slice(-2) }),
   clearCompare: () => set({ compareIds: [] }),
   health: null,
   setHealth: (h) => set({ health: h }),
