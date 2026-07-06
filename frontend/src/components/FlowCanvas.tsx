@@ -165,8 +165,6 @@ export function FlowCanvas() {
   const useLiveIbm = useApp((s) => s.useLiveIbm);
   const pendingBlockKinds = useApp((s) => s.pendingBlockKinds);
   const clearPendingBlocks = useApp((s) => s.clearPendingBlocks);
-  const pendingQuickStart = useApp((s) => s.pendingQuickStart);
-  const clearQuickStart = useApp((s) => s.clearQuickStart);
   const pinnedSeed = useApp((s) => s.pinnedSeed);
   const setPinnedSeed = useApp((s) => s.setPinnedSeed);
   const replicateCount = useApp((s) => s.replicateCount);
@@ -315,20 +313,6 @@ export function FlowCanvas() {
 
     requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
   }, [pendingBlockKinds]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Watch the quick-start trigger from TrySlide. When set, load the
-  // preset + sample combination, fit the view, and clear the trigger.
-  useEffect(() => {
-    if (!pendingQuickStart) return;
-    const { presetKey, sampleKey: sk } = pendingQuickStart;
-    clearQuickStart();
-    loadPreset(presetKey, sk);
-    setNotice({
-      text: `Loaded ${presetKey} preset with ${sk}. Hit Run pipeline to try it.`,
-      tone: "ok",
-    });
-    requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
-  }, [pendingQuickStart]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-load a sample circuit on boot so the canvas has something to chew
   // on. Prefer the share-link's `sk` key if present; fall back to bell_state.
@@ -732,9 +716,8 @@ export function FlowCanvas() {
     setEdges(g.edges);
     setRun(null);
     setNotice(null);
-    // Sample selection: explicit override (e.g. from tour quick-start)
-    // beats the preset's defaultCircuit, which beats keeping the
-    // current sample. Skip the network round-trip if we're already on
+    // Sample selection: an explicit override beats the preset's
+    // defaultCircuit, which beats keeping the current sample. Skip the network round-trip if we're already on
     // the requested sample.
     const targetSample = sampleOverride ?? preset.defaultCircuit;
     if (targetSample && targetSample !== sampleKey) {
@@ -1584,7 +1567,11 @@ function RibbonLegend() {
               />
             </svg>
             <span>
-              <span className="text-ink">ribbon width</span> = circuit size (√gates)
+              {/* "(clamped)" disclosure: RibbonEdge clamps thickness to
+                  [3px, 18px], so extreme circuits compress at the ends
+                  of the scale — the legend must say the encoding is
+                  not linear all the way out (audit MINOR). */}
+              <span className="text-ink">ribbon width</span> = circuit size (√gates, clamped)
             </span>
           </div>
           <div className="flex items-center gap-1.5">

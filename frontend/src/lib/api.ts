@@ -169,24 +169,6 @@ export interface RunRequest {
   precision_target?: number | null;
 }
 
-/** /api/auth/status — public capability probe. The frontend uses
- *  this to decide whether to render the Login button at all (e.g.
- *  hide it in local dev where OAuth isn't wired up). */
-export interface AuthStatus {
-  oauth_enabled: boolean;
-  persistence_enabled: boolean;
-  provider: string;
-}
-
-/** /api/auth/me payload (when logged in). */
-export interface SessionUser {
-  username: string;
-  avatar_url: string | null;
-  expires_at: number;
-  persistence_enabled: boolean;
-  user_data_repo: string | null;
-}
-
 /** Plugin manifest returned by the server. Mirrors PluginManifest in
  *  backend/app/services/plugin_service.py + a `is_plugin: true` flag
  *  the frontend uses to tell user-uploaded blocks apart from
@@ -264,29 +246,10 @@ export const api = {
       body: JSON.stringify(body),
     }).then((r) => json<RunResponse>(r)),
 
-  // ---- auth ----
-
-  /** Public capability probe: is OAuth wired up on this deployment? */
-  authStatus: () =>
-    authedFetch(`${BASE}/auth/status`).then((r) => json<AuthStatus>(r)),
-
-  /** Current session or null if not logged in. */
-  authMe: async (): Promise<SessionUser | null> => {
-    const r = await authedFetch(`${BASE}/auth/me`);
-    if (r.status === 401) return null;
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return r.json();
-  },
-
-  /** URL the browser should navigate to (full page navigation, NOT
-   *  fetch) to start the OAuth dance. */
-  authLoginUrl: () => `${BASE}/auth/login`,
-
-  /** Clear the session cookie. */
-  authLogout: () =>
-    authedFetch(`${BASE}/auth/logout`, { method: "POST" }).then(
-      (r) => json<{ ok: boolean }>(r),
-    ),
+  // (The auth client block was removed with the Wave P de-product
+  // pass: no frontend surface renders login any more, so the
+  // /api/auth/* wrappers were producer-less dead code. The backend
+  // routes still exist for API users.)
 
   // ---- plugin endpoints ----
 

@@ -38,7 +38,7 @@ export const GLOSSARY = {
   errorBound:
     "Predicted upper limit on how much error today's machine noise adds to this circuit. Lower is better.",
   precisionTarget:
-    "Optional stopping rule: keep measuring in batches and stop as soon as the uncertainty interval is at most this wide (± percentage points).",
+    "Optional stopping rule: keep measuring in batches and stop as soon as the uncertainty interval is at most this wide (± percentage points). Because stopping depends on the data, interval coverage is approximate under early stopping.",
   replicate:
     "Replicate = run the identical configuration again with a fresh random draw. The spread across replicates is the real uncertainty.",
   configuration:

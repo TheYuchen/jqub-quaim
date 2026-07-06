@@ -358,6 +358,19 @@ def sampledFidelityEstimator(
         # for shots. Guarded by min-2-batches; if the target is only
         # met on the final batch nothing was saved, so it is not
         # flagged as an early stop.
+        #
+        # LIMITATION (statistical honesty): the reported 95% interval
+        # is a fixed-n Wilson interval, but stopping on it is
+        # data-dependent — width-based stopping perturbs the exact
+        # nominal coverage of the FINAL interval (the stopping time is
+        # not independent of the estimate). The effect is second-order
+        # for width-keyed rules like this one (width depends on the
+        # data only through p̂(1-p̂), which varies slowly), unlike
+        # significance-keyed rules ("stop when significant"), which
+        # genuinely inflate error rates. The rigorous fix is an
+        # anytime-valid confidence sequence (time-uniform bounds);
+        # adopting one is future work — until then, interval coverage
+        # is approximate under early stopping, and the UI says so.
         if (
             precision_target is not None
             and batches_done >= 2

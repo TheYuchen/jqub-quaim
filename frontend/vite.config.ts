@@ -22,6 +22,28 @@ function anonStaticAssets(): Plugin {
           anonBuild ? '["dark"]' : '["dark", "gmu"]',
         );
     },
+    generateBundle(_options, bundle) {
+      // Anonymous builds must not ship the university-branded theme
+      // block in the stylesheet either — a curious reviewer reading
+      // the served CSS would find the brand name in the selector.
+      // The block is self-contained (one attribute selector, flat
+      // declarations, no nested braces), so a brace-bounded regex is
+      // safe. The JS side (theme registry + stored-preference
+      // fallback) is dead-code-eliminated in src/lib/theme.ts.
+      if (!anonBuild) return;
+      for (const item of Object.values(bundle)) {
+        if (
+          item.type === "asset" &&
+          item.fileName.endsWith(".css") &&
+          typeof item.source === "string"
+        ) {
+          item.source = item.source.replace(
+            /\[data-theme=(?:"gmu"|gmu)\]\s*\{[^}]*\}/g,
+            "",
+          );
+        }
+      }
+    },
     writeBundle(options) {
       if (!anonBuild) return;
       const dir = options.dir ?? resolve(__dirname, "dist");

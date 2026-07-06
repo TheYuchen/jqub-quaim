@@ -63,12 +63,14 @@ export function loadStoredTheme(): ThemeKey {
   if (typeof window === "undefined") return DEFAULT_THEME;
   try {
     const raw = window.localStorage.getItem(LS_THEME);
-    if (raw && (raw === "dark" || raw === "light" || raw === "gmu")) {
-      // Anonymous mode: a stored branded-theme preference falls back
-      // to light rather than rendering university colors.
-      if (raw === "gmu" && ANON) return DEFAULT_THEME;
-      return raw;
-    }
+    if (raw === "dark" || raw === "light") return raw;
+    // The branded theme key is only honoured OUTSIDE anonymous mode.
+    // Gated behind `!ANON &&` so that (a) a runtime ?anon=1 session
+    // falls back to light instead of rendering university colors, and
+    // (b) a VITE_ANON=1 build constant-folds ANON to true and the
+    // minifier dead-code-eliminates the key literal — anonymous JS
+    // must not even MENTION the branded theme key (M3 audit fix).
+    if (!ANON && raw === "gmu") return raw;
   } catch {
     /* ignore */
   }

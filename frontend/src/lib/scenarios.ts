@@ -45,14 +45,50 @@ function chain(
   };
 }
 
-/** QuCAD pipeline on the small VQC sample — the graph used by F1/F5. */
-const QUCAD_GRAPH = chain([
-  { k: "input_circuit" },
-  { k: "fake_backend", p: { backend_name: "FakeFez", shots: 1024 } },
-  { k: "qucad", p: { iterations: 3, lam: 0.005, rho: 500.0 } },
-  { k: "fidelity", p: { method: "statevector", unbound_param_policy: "bind_zero" } },
-  { k: "output" },
-]);
+/** QuCAD pipeline on the small VQC sample — the graph used by F1/F5.
+ *  This is the EXACT graph of the bundled vqc_2q_small demo records
+ *  (src/data/demoArchive.json: ids n1..n5, sampled fidelity, same
+ *  params and positions) — deliberately NOT a chain() rebuild.
+ *  Node ids are part of per-node seed identity (seed =
+ *  sha256(root_seed:node_id)) and the structural config_hash groups
+ *  by kinds+params, so matching the archive bit-for-bit means
+ *  (a) scenario runs land in the same multiverse/timeline group as
+ *  the demo cards, and (b) pinning an archived record's root_seed
+ *  replays that record's exact numbers. */
+const QUCAD_GRAPH: SharePayload = {
+  v: 1,
+  n: [
+    { i: "n1", k: "input_circuit", x: 40, y: 140 },
+    {
+      i: "n2",
+      k: "fake_backend",
+      p: { backend_name: "FakeFez", shots: 1024 },
+      x: 300,
+      y: 140,
+    },
+    {
+      i: "n3",
+      k: "qucad",
+      p: { iterations: 3, lam: 0.005, rho: 500.0 },
+      x: 560,
+      y: 140,
+    },
+    {
+      i: "n4",
+      k: "fidelity",
+      p: { method: "sampled", unbound_param_policy: "bind_zero" },
+      x: 820,
+      y: 140,
+    },
+    { i: "n5", k: "output", x: 1080, y: 140 },
+  ],
+  e: [
+    { s: "n1", t: "n2" },
+    { s: "n2", t: "n3" },
+    { s: "n3", t: "n4" },
+    { s: "n4", t: "n5" },
+  ],
+};
 
 /** Sampled-fidelity pipeline with a big shot budget — the F3 graph.
  *  4096 requested shots + a ±2pp target: bell_state's sampled point
@@ -98,12 +134,11 @@ export interface Scenario {
 export const SCENARIOS: Record<string, Scenario> = {
   // F1 — ribbon canvas after a run: tapered ribbons (width ∝ √gates),
   // green shrink taper on the QuCAD edge, delta-strip glyphs on node
-  // faces, legend chip bottom-left. Pinned seed 336157917 (borrowed
-  // from a bundled vqc demo draw) — but NOTE: this graph's node ids
-  // (s1..s5) and fidelity method (statevector) differ from the
-  // archived record (n1..n5, sampled), and per-node seeds derive from
-  // node ids, so the numbers do NOT reproduce the archived record's.
-  // The figure is reproducible via its own pinned seed.
+  // faces, legend chip bottom-left. Pinned seed 336157917 is the
+  // root_seed of bundled demo record 5c2a6a71a7a4, and QUCAD_GRAPH is
+  // that record's exact graph (ids included) — so the auto-run
+  // reproduces the archived numbers bit-exactly (fidelity
+  // 0.974609375, 998/1024) and groups with the demo cards.
   F1: {
     key: "F1",
     expect:

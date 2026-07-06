@@ -205,7 +205,11 @@ test_gate_diff 14, test_workflow_helpers 11, test_seed_coverage 8).
     EXECUTED, so every downstream CI comparison stays honest
     automatically. Precomputed-cache bypass when a target is set;
     pinned step-cache salt includes the target (same seed + different
-    target = different numbers).
+    target = different numbers). Known limitation (disclosed in the
+    code and the tooltip): width-based data-dependent stopping
+    perturbs the exact nominal coverage of the final fixed-n 95%
+    interval — second-order for width-keyed rules, and anytime-valid
+    confidence sequences are the rigorous alternative (future work).
 22. **Live narrowing UI + evidence funnel** — toolbar select
     "target: off|±5pp|±2pp|±1pp" (marker `precision-target`) next to
     the replicate selector, visible under a pinned seed because the
@@ -440,3 +444,60 @@ here. Reviewers are vis people, not quantum people. Status per item:
 
 Both leftovers from before Wave P are now closed: the demo archive
 re-record is complete (see item 19) and Wave J shipped (items 24-26).
+
+## Adversarial audit fixes (2026-07-05)
+
+A red-team audit of the deployed system (cache identity, scenario
+lineage, statistical honesty, anonymity, encoding disclosures) found
+1 critical + 3 medium + a batch of minor findings. All resolved:
+
+* **C1 (critical) — pinned cache identity includes node ids.**
+  `_prefix_hash` hashed only {type, data} per node while per-node
+  seeds derive from sha256(root_seed:node_id): two id-renamed but
+  structurally identical graphs under the same pinned seed shared
+  cache entries yet owe different draws — live-demonstrated
+  cross-graph poisoning (run B served run A's seeded numbers). Fixed
+  by folding each node's id into the per-node hash payload in the
+  salted (seed-pinned) regime ONLY; the fresh regime stays id-free so
+  the precomputed/prewarm namespace is untouched (fresh runs never
+  cache stochastic steps, so id-blind sharing is sound there).
+  Regression tests: pinned hash id-sensitivity, fresh hash
+  id-blindness, and an executor-level a1-vs-b1 same-seed test
+  asserting B executes with its OWN derived seed and replays from its
+  own cache entry. Unit lane now 80 green.
+* **M1 — F1/F5 scenario graph now IS the archived graph.** The
+  scenario loader rebuilt the QuCAD pipeline with ids s1..s5 and
+  statevector fidelity while the bundled vqc demo records use n1..n5
+  and sampled — so scenario runs neither grouped with the demo cards
+  (different config_hash) nor reproduced the archived numbers under
+  the borrowed pinned seed (node ids are seed identity). QUCAD_GRAPH
+  is now a literal copy of demo record 5c2a6a71a7a4's graph (ids,
+  params, positions); pinned seed 336157917 replays the archived
+  fidelity 0.974609375 (998/1024) bit-exactly and groups with the
+  demo replicates.
+* **M2 — optional-stopping coverage limitation disclosed.** Width-
+  based data-dependent stopping perturbs the exact nominal coverage
+  of the final fixed-n 95% interval (second-order for width-keyed
+  rules; confidence sequences are the rigorous alternative — future
+  work). Stated in three places: the stopping-rule implementation
+  (qlib/qiskit_utils.py), the Wave I section above, and the
+  precision-target tooltip ("interval coverage is approximate under
+  early stopping").
+* **M3 — anon bundle fully scrubbed of the branded theme.** The
+  VITE_ANON build now (a) strips the `[data-theme=gmu]` block from
+  the emitted stylesheet (generateBundle hook) and (b) dead-code-
+  eliminates the stored-preference fallback's key literal
+  (`!ANON &&` gate in theme.ts, runtime behavior unchanged: ?anon=1
+  still falls back to light). Post-fix audit of the anon dist:
+  zero "gmu"/"Mason" hits anywhere; the only remaining internal
+  identifiers are the documented "quda.*" storage keys and the
+  "quda-provenance" IndexedDB name (never rendered; renaming would
+  orphan returning users' persisted state).
+* **Minors (disclosure honesty + dead code).** Delta-strip: outward
+  arrowhead at the bar tip when |Δ/before| ≥ 100% (the cap used to
+  saturate silently). Lineage legend: evidence-mass clause gains
+  "(floor ≤69, cap 2048)" and the funnel clause "(per-group scale)".
+  Ribbon legend: "(√gates, clamped)". Removed: the producer-less
+  auth client block in api.ts, the pendingQuickStart store bridge +
+  FlowCanvas consumer (its TrySlide producer died in Wave P), and
+  stale tour comments.

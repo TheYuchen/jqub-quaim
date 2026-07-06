@@ -739,12 +739,20 @@ cumulative Wilson CI half-width of this configuration's pooled counts, widest (o
           {/* legend: one line, doubles as the figure caption key */}
           <div className="px-3 py-1 border-t border-edge/60 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9px] text-mute">
             <span>hue = configuration</span>
-            <span>area = shots of evidence</span>
+            {/* floor/cap disclosure: evidenceRadius clamps to
+                [R_MIN, R_MAX], i.e. ≤69 shots all read as the 3px
+                floor and ≥2048 as the cap (audit MINOR — the clamp
+                was silent). */}
+            <span>area = shots of evidence (floor ≤69, cap 2048)</span>
             <span>ring = pinned seed</span>
             <span>slash = error</span>
             <span>curve = forked from</span>
             <span>strip = replicate metrics (0–1)</span>
-            <span>funnel = pooled CI narrowing</span>
+            {/* per-group scale disclosure: each band's funnel is
+                normalized to its own widest row, so funnel widths are
+                comparable WITHIN a band, not across bands (audit
+                MINOR). */}
+            <span>funnel = pooled CI narrowing (per-group scale)</span>
           </div>
         </>
       )}

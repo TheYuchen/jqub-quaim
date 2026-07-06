@@ -86,7 +86,7 @@ interface AppState {
   setLastConfigHash: (h: string | null) => void;
 
   /**
-   * Restore bridge (same pattern as pendingQuickStart): the timeline
+   * Restore bridge (a pending-intent field FlowCanvas consumes): the timeline
    * panel pushes an archived run here; FlowCanvas watches it, rebuilds
    * the canvas from the stored SharePayload, reloads the sample
    * circuit, and optionally pins the run's seed for exact replay.
@@ -150,14 +150,6 @@ interface AppState {
   pendingBlockKinds: NodeKind[];
   addBlocksToCanvas: (kinds: NodeKind[]) => void;
   clearPendingBlocks: () => void;
-
-  /**
-   * Quick-start trigger from TrySlide: load a preset + sample
-   * combination in one action. FlowCanvas watches this and applies it.
-   */
-  pendingQuickStart: { presetKey: string; sampleKey: string } | null;
-  triggerQuickStart: (presetKey: string, sampleKey: string) => void;
-  clearQuickStart: () => void;
 
   /**
    * Hint flag set by FlowCanvas error paths: tells App.tsx to open
@@ -287,10 +279,6 @@ export const useApp = create<AppState>((set) => ({
   pendingBlockKinds: [],
   addBlocksToCanvas: (kinds) => set({ pendingBlockKinds: kinds }),
   clearPendingBlocks: () => set({ pendingBlockKinds: [] }),
-  pendingQuickStart: null,
-  triggerQuickStart: (presetKey, sampleKey) =>
-    set({ pendingQuickStart: { presetKey, sampleKey } }),
-  clearQuickStart: () => set({ pendingQuickStart: null }),
   hintExpandLeftPane: 0,
   bumpHintExpandLeftPane: () =>
     set((s) => ({ hintExpandLeftPane: s.hintExpandLeftPane + 1 })),

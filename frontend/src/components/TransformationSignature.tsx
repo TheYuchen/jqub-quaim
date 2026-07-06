@@ -124,6 +124,17 @@ function relChange(before: number | undefined, delta: number): number {
   return Math.max(-1, Math.min(1, delta / before));
 }
 
+/** True when the capped encoding is saturated: |Δ/before| ≥ 100% (or
+ *  the channel appeared from nothing). A saturated bar is rendered at
+ *  the cap, so without a marker a 100% change and a 400% change look
+ *  identical — the glyph must disclose "≥ cap", not pretend "= cap"
+ *  (audit fix: silent saturation is a lie of omission). */
+function isSaturated(before: number | undefined, delta: number): boolean {
+  if (delta === 0) return false;
+  if (!before || before <= 0) return true;
+  return Math.abs(delta / before) >= 1;
+}
+
 function sigTooltip(t: TransformationPayload): string {
   return `Circuit transformation (Δ / before):\n${CHANNELS.map((c) => {
     const b = t.before ? t.before[c.key] : 0;
@@ -228,17 +239,38 @@ export function SignatureGlyph({
           );
         } else {
           const len = Math.max(g.minBar, Math.abs(rel) * g.half);
+          const saturated = isSaturated(t.before ? t.before[c.key] : 0, d);
+          // Outward arrowhead at the bar tip when the ±100% cap is
+          // hit: the bar cannot grow past the cap, so the notch says
+          // "at least this much" instead of silently reading as
+          // exactly 100%.
+          const aw = size === "card" ? 3.5 : 2;
+          const tipX = rel < 0 ? g.cx - len : g.cx + len;
           bar = (
-            <rect
-              x={rel < 0 ? g.cx - len : g.cx}
-              y={y}
-              width={len}
-              height={g.barH}
-              rx={size === "card" ? 1 : 0.5}
-              fill="currentColor"
-              className={tone}
-              opacity={0.9}
-            />
+            <>
+              <rect
+                x={rel < 0 ? g.cx - len : g.cx}
+                y={y}
+                width={len}
+                height={g.barH}
+                rx={size === "card" ? 1 : 0.5}
+                fill="currentColor"
+                className={tone}
+                opacity={0.9}
+              />
+              {saturated && (
+                <path
+                  d={
+                    rel < 0
+                      ? `M ${tipX} ${y - 1} L ${tipX - aw} ${y + g.barH / 2} L ${tipX} ${y + g.barH + 1} Z`
+                      : `M ${tipX} ${y - 1} L ${tipX + aw} ${y + g.barH / 2} L ${tipX} ${y + g.barH + 1} Z`
+                  }
+                  fill="currentColor"
+                  className={tone}
+                  opacity={0.9}
+                />
+              )}
+            </>
           );
         }
         return (
