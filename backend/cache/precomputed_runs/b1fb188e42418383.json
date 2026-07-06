@@ -1,0 +1,291 @@
+{
+  "circuit_id": "5f1b6acbefd7",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1783314981.3658051,
+      "finished_at": 1783314981.3658085,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 6,
+        "num_parameters": 0
+      },
+      "message": null,
+      "from_step_cache": true,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 3,
+        "depth": 6,
+        "size": 7,
+        "num_parameters": 0
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 3,
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          }
+        },
+        "after": {
+          "num_qubits": 3,
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1783314981.3660693,
+      "finished_at": 1783314981.3679137,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156,
+        "shots": 1024
+      },
+      "message": null,
+      "from_step_cache": true,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 3,
+        "depth": 6,
+        "size": 7,
+        "num_parameters": 0
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 3,
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          }
+        },
+        "after": {
+          "num_qubits": 3,
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n3",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "skipped",
+      "started_at": 1783315096.7427871,
+      "finished_at": 1783315096.742792,
+      "summary": {
+        "num_parameters": 0
+      },
+      "message": "CompressVQC only acts on parameterized rotation gates; this circuit has 0 parameters.",
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": null,
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1783315096.7429686,
+      "finished_at": 1783315096.7440963,
+      "summary": {
+        "fidelity": 0.0,
+        "method": "statevector"
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 3,
+        "depth": 6,
+        "size": 7,
+        "num_parameters": 0
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 3,
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          }
+        },
+        "after": {
+          "num_qubits": 3,
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n5",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1783315096.7444549,
+      "finished_at": 1783315096.7661016,
+      "summary": {
+        "num_qubits": 3,
+        "depth": 6,
+        "size": 7,
+        "ops": {
+          "x": 3,
+          "cx": 2,
+          "ry": 1,
+          "cry": 1
+        },
+        "diagram_text": "     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2500\u2500\u2510           \u250c\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2510\nq_0: \u2524 Ry(1.9106) \u251c\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u25a0\u2500\u2500\u2524 X \u251c\n     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2510\u2514\u2500\u2500\u2500\u2518\u250c\u2500\u2534\u2500\u2510\u2514\u2500\u2500\u2500\u2518\nq_1: \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 Ry(\u03c0/2) \u251c\u2500\u2500\u25a0\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\n                        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2534\u2500\u2510\u2514\u2500\u2500\u2500\u2518     \nq_2: \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n                                   \u2514\u2500\u2500\u2500\u2518          ",
+        "transpiled_depth": 15,
+        "transpiled_size": 28,
+        "fidelity": 0.0
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 3,
+        "depth": 6,
+        "size": 7,
+        "num_parameters": 0
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 3,
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          }
+        },
+        "after": {
+          "num_qubits": 3,
+          "depth": 6,
+          "size": 7,
+          "num_parameters": 0,
+          "ops": {
+            "x": 3,
+            "cx": 2,
+            "ry": 1,
+            "cry": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 3,
+    "depth": 6,
+    "size": 7,
+    "ops": {
+      "x": 3,
+      "cx": 2,
+      "ry": 1,
+      "cry": 1
+    },
+    "diagram_text": "     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2500\u2500\u2510           \u250c\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2510\nq_0: \u2524 Ry(1.9106) \u251c\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u25a0\u2500\u2500\u2524 X \u251c\n     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2510\u2514\u2500\u2500\u2500\u2518\u250c\u2500\u2534\u2500\u2510\u2514\u2500\u2500\u2500\u2518\nq_1: \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 Ry(\u03c0/2) \u251c\u2500\u2500\u25a0\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\n                        \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2534\u2500\u2510\u2514\u2500\u2500\u2500\u2518     \nq_2: \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n                                   \u2514\u2500\u2500\u2500\u2518          ",
+    "transpiled_depth": 15,
+    "transpiled_size": 28,
+    "fidelity": 0.0
+  },
+  "run_id": null,
+  "seed_mode": null,
+  "root_seed": null,
+  "app_version": "0.2.0-provenance-core",
+  "cache_schema": 2
+}

@@ -3,10 +3,11 @@
 Motivation: most visitors to the demo just want to see what the bundled
 preset pipelines produce on a bundled sample. Running the full stack
 takes 30-60 s per click, which is plenty of time for someone to bounce.
-With a shipped cache, the preset × sample combinations all return in
-milliseconds with a "cached" badge in the UI. (At time of writing:
-5 presets × 9 samples; the precompute script under scripts/ enumerates
-the actual matrix when run.)
+With a shipped cache, the covered preset × sample combinations return
+in milliseconds with a "cached" badge in the UI. (At time of writing:
+the two torch-light presets, qucad + compvqc, × 9 samples — the
+torch-heavy presets run fresh on purpose; see
+scripts/regenerate_precomputed_cache_live.py.)
 
 The cache is keyed by a deterministic hash of:
 
@@ -18,8 +19,11 @@ So it hits when and only when a user replays exactly the same circuit
 + graph the precompute script saw. Any diff (different parameter values,
 a different algorithm block, even an extra edge) misses.
 
-Cache entries are plain JSON on disk. Read-only from the serving path;
-the precompute script under scripts/ is the only thing that writes.
+Cache entries are plain JSON on disk, stamped with ``cache_schema``
+(see CACHE_SCHEMA below — entries from an older schema are treated as
+misses instead of being served with rendering-critical fields absent).
+Read-only from the serving path; the regeneration/precompute scripts
+under scripts/ are the only things that write.
 """
 
 from __future__ import annotations
@@ -27,12 +31,31 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 from pathlib import Path
 from typing import Any, Iterable
 
 from qiskit import QuantumCircuit, qpy
 
 from app.schemas import FlowEdge, FlowNode, RunResponse
+
+log = logging.getLogger(__name__)
+
+# Schema stamp written into every cache file (top-level "cache_schema"
+# key, popped before pydantic validation). The provenance rework taught
+# the UI to expect per-step ``transformation`` / ``distribution`` /
+# ``seed_used`` payloads; a pre-rework cache entry still VALIDATES as a
+# RunResponse (all those fields default to None) but renders a crippled
+# first-run experience — no ribbons, no glyphs, no CIs — which is worse
+# than a slow fresh run. Entries without the current stamp are treated
+# as misses. Bump this whenever RunResponse/StepResult gain fields the
+# UI's rendering depends on and regenerate the cache
+# (scripts/regenerate_precomputed_cache_live.py).
+CACHE_SCHEMA = 2
+
+# Log each stale key once per process, not once per request — a popular
+# preset would otherwise spam the log on every drive-by visitor.
+_stale_keys_logged: set[str] = set()
 
 
 # Lives under backend/cache/precomputed_runs/, alongside the IBM history
@@ -117,6 +140,18 @@ def load_cached_response(
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    # Schema gate: refuse to serve entries written before the current
+    # cache schema (see CACHE_SCHEMA above). Missing key == legacy.
+    if raw.pop("cache_schema", None) != CACHE_SCHEMA:
+        if key not in _stale_keys_logged:
+            _stale_keys_logged.add(key)
+            log.warning(
+                "precomputed cache entry %s predates cache_schema=%s; "
+                "skipping it (the run executes fresh instead)",
+                key,
+                CACHE_SCHEMA,
+            )
+        return None
     raw["circuit_id"] = circuit_id
     raw["from_cache"] = True
     try:
@@ -131,5 +166,17 @@ def save_cached_response(key: str, response: RunResponse) -> Path:
     script; the serving route never calls this."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     path = CACHE_DIR / f"{key}.json"
-    path.write_text(response.model_dump_json(indent=2), encoding="utf-8")
+    data = json.loads(response.model_dump_json())
+    data["cache_schema"] = CACHE_SCHEMA
+    # The disk cache is seed-free by design: it serves FRESH-mode
+    # requests, and the serving route advertises root_seed=None ("no
+    # seed drawn") because the cached numbers were not produced with
+    # that request's seed draw. Scrubbing the producing run's envelope
+    # here keeps the committed files from carrying a seed that nothing
+    # may ever honour. Per-step ``seed_used`` values stay: they are the
+    # honest record of how the cached numbers were actually produced.
+    data["run_id"] = None
+    data["seed_mode"] = None
+    data["root_seed"] = None
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path

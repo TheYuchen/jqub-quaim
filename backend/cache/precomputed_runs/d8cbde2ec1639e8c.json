@@ -1,0 +1,275 @@
+{
+  "circuit_id": "413699ac5991",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1783314980.5840604,
+      "finished_at": 1783314980.5840638,
+      "summary": {
+        "num_qubits": 6,
+        "depth": 7,
+        "num_parameters": 12
+      },
+      "message": null,
+      "from_step_cache": true,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 6,
+        "depth": 7,
+        "size": 17,
+        "num_parameters": 12
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 6,
+          "depth": 7,
+          "size": 17,
+          "num_parameters": 12,
+          "ops": {
+            "ry": 12,
+            "cx": 5
+          }
+        },
+        "after": {
+          "num_qubits": 6,
+          "depth": 7,
+          "size": 17,
+          "num_parameters": 12,
+          "ops": {
+            "ry": 12,
+            "cx": 5
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1783314980.584446,
+      "finished_at": 1783314980.5871751,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156,
+        "shots": 1024
+      },
+      "message": null,
+      "from_step_cache": true,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 6,
+        "depth": 7,
+        "size": 17,
+        "num_parameters": 12
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 6,
+          "depth": 7,
+          "size": 17,
+          "num_parameters": 12,
+          "ops": {
+            "ry": 12,
+            "cx": 5
+          }
+        },
+        "after": {
+          "num_qubits": 6,
+          "depth": 7,
+          "size": 17,
+          "num_parameters": 12,
+          "ops": {
+            "ry": 12,
+            "cx": 5
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n3",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "skipped",
+      "started_at": 1783314983.541163,
+      "finished_at": 1783314983.5814679,
+      "summary": {
+        "lut_size": 1,
+        "num_qp_vars": 60,
+        "num_rotation_instances": 12,
+        "qaoa_max_vars": 22
+      },
+      "message": "CompressVQC would build a 60-binary-variable QUBO from 12 parameterised rotation gate instance(s) in this circuit, and the underlying QAOA solver runs on a state-vector simulator capped near 22 qubits. Try a circuit with fewer parameterised rotations (e.g. fewer reps in EfficientSU2 / a smaller HEA), or split the circuit and compress per-block.",
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": null,
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1783314983.581734,
+      "finished_at": 1783314983.58313,
+      "summary": {
+        "fidelity": 1.0,
+        "method": "statevector",
+        "bound_unbound_to_zero": 12
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 6,
+        "depth": 7,
+        "size": 17,
+        "num_parameters": 12
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 6,
+          "depth": 7,
+          "size": 17,
+          "num_parameters": 12,
+          "ops": {
+            "ry": 12,
+            "cx": 5
+          }
+        },
+        "after": {
+          "num_qubits": 6,
+          "depth": 7,
+          "size": 17,
+          "num_parameters": 12,
+          "ops": {
+            "ry": 12,
+            "cx": 5
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n5",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1783314983.5836368,
+      "finished_at": 1783314983.5982213,
+      "summary": {
+        "num_qubits": 6,
+        "depth": 7,
+        "size": 17,
+        "ops": {
+          "ry": 12,
+          "cx": 5
+        },
+        "diagram_text": "     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                                            \nq_0: \u2524 Ry(a_0) \u251c\u2500\u2500\u25a0\u2500\u2500\u2524 Ry(b_0) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\u250c\u2500\u2534\u2500\u2510\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                                 \nq_1: \u2524 Ry(a_1) \u251c\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 Ry(b_1) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\u2514\u2500\u2500\u2500\u2518   \u250c\u2500\u2534\u2500\u2510   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                      \nq_2: \u2524 Ry(a_2) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 Ry(b_2) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524        \u2514\u2500\u2500\u2500\u2518      \u250c\u2500\u2534\u2500\u2510   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510           \nq_3: \u2524 Ry(a_3) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 Ry(b_3) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524                   \u2514\u2500\u2500\u2500\u2518      \u250c\u2500\u2534\u2500\u2510   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\nq_4: \u2524 Ry(a_4) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 Ry(b_4) \u251c\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524                              \u2514\u2500\u2500\u2500\u2518      \u250c\u2500\u2534\u2500\u2510   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\nq_5: \u2524 Ry(a_5) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2524 Ry(b_5) \u251c\n     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                                         \u2514\u2500\u2500\u2500\u2518   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518",
+        "transpiled_depth": 27,
+        "transpiled_size": 67,
+        "fidelity": 1.0
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 6,
+        "depth": 7,
+        "size": 17,
+        "num_parameters": 12
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 6,
+          "depth": 7,
+          "size": 17,
+          "num_parameters": 12,
+          "ops": {
+            "ry": 12,
+            "cx": 5
+          }
+        },
+        "after": {
+          "num_qubits": 6,
+          "depth": 7,
+          "size": 17,
+          "num_parameters": 12,
+          "ops": {
+            "ry": 12,
+            "cx": 5
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 6,
+    "depth": 7,
+    "size": 17,
+    "ops": {
+      "ry": 12,
+      "cx": 5
+    },
+    "diagram_text": "     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                                            \nq_0: \u2524 Ry(a_0) \u251c\u2500\u2500\u25a0\u2500\u2500\u2524 Ry(b_0) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\u250c\u2500\u2534\u2500\u2510\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                                 \nq_1: \u2524 Ry(a_1) \u251c\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 Ry(b_1) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\u2514\u2500\u2500\u2500\u2518   \u250c\u2500\u2534\u2500\u2510   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                      \nq_2: \u2524 Ry(a_2) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 Ry(b_2) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524        \u2514\u2500\u2500\u2500\u2518      \u250c\u2500\u2534\u2500\u2510   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510           \nq_3: \u2524 Ry(a_3) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 Ry(b_3) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524                   \u2514\u2500\u2500\u2500\u2518      \u250c\u2500\u2534\u2500\u2510   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\nq_4: \u2524 Ry(a_4) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2524 Ry(b_4) \u251c\n     \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524                              \u2514\u2500\u2500\u2500\u2518      \u250c\u2500\u2534\u2500\u2510   \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\nq_5: \u2524 Ry(a_5) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2524 Ry(b_5) \u251c\n     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                                         \u2514\u2500\u2500\u2500\u2518   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518",
+    "transpiled_depth": 27,
+    "transpiled_size": 67,
+    "fidelity": 1.0
+  },
+  "run_id": null,
+  "seed_mode": null,
+  "root_seed": null,
+  "app_version": "0.2.0-provenance-core",
+  "cache_schema": 2
+}

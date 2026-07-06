@@ -45,16 +45,29 @@ from app.services.run_cache import (  # noqa: E402
 from app.services.workflow_service import run_pipeline  # noqa: E402
 
 
-# Mirror of frontend/src/lib/presets.ts. Node defaults (params) must match
-# what the frontend sends: backend_name, cache_backend, iterations, etc.
-# If you add a preset in the TS file, mirror it here.
+# Mirror of frontend/src/lib/presets.ts + nodeCatalog.ts. Node data must
+# match what the frontend sends BYTE-FOR-BYTE after JSON parsing: the
+# cache key hashes json.dumps(data), so `rho: 500.0` here vs the
+# frontend's `rho: 500` (JS numbers drop the trailing .0) is a
+# permanent cache miss. Use Python ints wherever JS would serialize an
+# integer. If you add/change a preset or a defaultData in the TS files,
+# mirror it here — drift is easy to notice because the frontend
+# sample+preset combos just stop hitting cache and start doing live
+# runs.
+#
+# NOTE the second silent-miss trap: the key also hashes the circuit's
+# QPY bytes, which change with the qiskit version. Keys must be
+# computed with the SAME qiskit version the deployed server runs
+# (backend/requirements.txt pin) — this is why
+# scripts/regenerate_precomputed_cache_live.py refuses to run when the
+# local qiskit differs from the live /api/health's.
 PRESETS: dict[str, dict] = {
     "qubound": {
         "label": "QuBound",
         "nodes": [
             {"id": "n1", "type": "input_circuit", "data": {}},
-            {"id": "n2", "type": "fake_backend", "data": {"backend_name": "FakeFez"}},
-            {"id": "n3", "type": "qubound", "data": {"cache_backend": "ibm_fez"}},
+            {"id": "n2", "type": "fake_backend", "data": {"backend_name": "FakeFez", "shots": 1024}},
+            {"id": "n3", "type": "qubound", "data": {"cache_backend": "ibm_fez", "threshold": 0}},
             {"id": "n4", "type": "output", "data": {}},
         ],
         "edges": [
@@ -67,13 +80,13 @@ PRESETS: dict[str, dict] = {
         "label": "QuCAD",
         "nodes": [
             {"id": "n1", "type": "input_circuit", "data": {}},
-            {"id": "n2", "type": "fake_backend", "data": {"backend_name": "FakeFez"}},
+            {"id": "n2", "type": "fake_backend", "data": {"backend_name": "FakeFez", "shots": 1024}},
             {
                 "id": "n3",
                 "type": "qucad",
-                "data": {"iterations": 3, "lam": 0.005, "rho": 500.0},
+                "data": {"iterations": 3, "lam": 0.005, "rho": 500},
             },
-            {"id": "n4", "type": "fidelity", "data": {}},
+            {"id": "n4", "type": "fidelity", "data": {"method": "statevector", "unbound_param_policy": "bind_zero"}},
             {"id": "n5", "type": "output", "data": {}},
         ],
         "edges": [
@@ -87,9 +100,9 @@ PRESETS: dict[str, dict] = {
         "label": "CompressVQC",
         "nodes": [
             {"id": "n1", "type": "input_circuit", "data": {}},
-            {"id": "n2", "type": "fake_backend", "data": {"backend_name": "FakeFez"}},
+            {"id": "n2", "type": "fake_backend", "data": {"backend_name": "FakeFez", "shots": 1024}},
             {"id": "n3", "type": "compvqc", "data": {}},
-            {"id": "n4", "type": "fidelity", "data": {}},
+            {"id": "n4", "type": "fidelity", "data": {"method": "statevector", "unbound_param_policy": "bind_zero"}},
             {"id": "n5", "type": "output", "data": {}},
         ],
         "edges": [
@@ -125,15 +138,15 @@ PRESETS: dict[str, dict] = {
         "label": "Full stack",
         "nodes": [
             {"id": "n1", "type": "input_circuit", "data": {}},
-            {"id": "n2", "type": "fake_backend", "data": {"backend_name": "FakeFez"}},
+            {"id": "n2", "type": "fake_backend", "data": {"backend_name": "FakeFez", "shots": 1024}},
             {
                 "id": "n3",
                 "type": "qucad",
-                "data": {"iterations": 3, "lam": 0.005, "rho": 500.0},
+                "data": {"iterations": 3, "lam": 0.005, "rho": 500},
             },
             {"id": "n4", "type": "compvqc", "data": {}},
-            {"id": "n5", "type": "qubound", "data": {"cache_backend": "ibm_fez"}},
-            {"id": "n6", "type": "fidelity", "data": {}},
+            {"id": "n5", "type": "qubound", "data": {"cache_backend": "ibm_fez", "threshold": 0}},
+            {"id": "n6", "type": "fidelity", "data": {"method": "statevector", "unbound_param_policy": "bind_zero"}},
             {"id": "n7", "type": "output", "data": {}},
         ],
         "edges": [

@@ -1,0 +1,349 @@
+{
+  "circuit_id": "3892c8859338",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1783314980.9873068,
+      "finished_at": 1783314980.9873092,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "num_parameters": 2
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 3,
+        "num_parameters": 2
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 2,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "after": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 2,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1783314980.987495,
+      "finished_at": 1783314980.989234,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156,
+        "shots": 1024
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 3,
+        "num_parameters": 2
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 2,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "after": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 2,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n3",
+      "node_type": "qucad",
+      "label": "QuCAD",
+      "status": "ok",
+      "started_at": 1783314980.9894202,
+      "finished_at": 1783314981.0842626,
+      "summary": {
+        "iterations": 3,
+        "original_parameters": 2,
+        "kept_parameters": 1,
+        "final_loss": 1.00089339801425,
+        "sparsity_trace": [
+          1,
+          1,
+          1
+        ]
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 3,
+        "num_parameters": 0
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 2,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "after": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": -2
+        },
+        "ops_delta": {},
+        "changed": true,
+        "gate_diff": {
+          "qubits": {
+            "0": [
+              {
+                "op": "ry(theta_0)",
+                "s": "removed"
+              },
+              {
+                "op": "ry(0)",
+                "s": "added"
+              },
+              {
+                "op": "cx\u00b7c",
+                "s": "kept"
+              }
+            ],
+            "1": [
+              {
+                "op": "ry(theta_1)",
+                "s": "removed"
+              },
+              {
+                "op": "ry(0.007)",
+                "s": "added"
+              },
+              {
+                "op": "cx\u00b7t",
+                "s": "kept"
+              }
+            ]
+          },
+          "n_kept": 2,
+          "n_removed": 2,
+          "n_added": 2,
+          "truncated": false
+        }
+      }
+    },
+    {
+      "node_id": "n4",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1783314981.0846848,
+      "finished_at": 1783314981.0853643,
+      "summary": {
+        "fidelity": 0.9999890445302271,
+        "method": "statevector"
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 3,
+        "num_parameters": 0
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "after": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n5",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1783314981.0856185,
+      "finished_at": 1783314981.2416124,
+      "summary": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 3,
+        "ops": {
+          "ry": 2,
+          "cx": 1
+        },
+        "diagram_text": "         \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510         \nq_0: \u2500\u2500\u2500\u2500\u2524 Ry(0) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\n     \u250c\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2510\u250c\u2500\u2534\u2500\u2510\nq_1: \u2524 Ry(0.0066198) \u251c\u2524 X \u251c\n     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518",
+        "transpiled_depth": 7,
+        "transpiled_size": 7,
+        "fidelity": 0.9999890445302271
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 2,
+        "depth": 2,
+        "size": 3,
+        "num_parameters": 0
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "after": {
+          "num_qubits": 2,
+          "depth": 2,
+          "size": 3,
+          "num_parameters": 0,
+          "ops": {
+            "ry": 2,
+            "cx": 1
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 2,
+    "depth": 2,
+    "size": 3,
+    "ops": {
+      "ry": 2,
+      "cx": 1
+    },
+    "diagram_text": "         \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510         \nq_0: \u2500\u2500\u2500\u2500\u2524 Ry(0) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\n     \u250c\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2510\u250c\u2500\u2534\u2500\u2510\nq_1: \u2524 Ry(0.0066198) \u251c\u2524 X \u251c\n     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518",
+    "transpiled_depth": 7,
+    "transpiled_size": 7,
+    "fidelity": 0.9999890445302271
+  },
+  "run_id": null,
+  "seed_mode": null,
+  "root_seed": null,
+  "app_version": "0.2.0-provenance-core",
+  "cache_schema": 2
+}

@@ -1,0 +1,295 @@
+{
+  "circuit_id": "c25d4de8ca9e",
+  "ok": true,
+  "from_cache": false,
+  "steps": [
+    {
+      "node_id": "n1",
+      "node_type": "input_circuit",
+      "label": "Input circuit",
+      "status": "ok",
+      "started_at": 1783314979.840561,
+      "finished_at": 1783314979.8405645,
+      "summary": {
+        "num_qubits": 4,
+        "depth": 14,
+        "num_parameters": 2
+      },
+      "message": null,
+      "from_step_cache": true,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 4,
+        "depth": 14,
+        "size": 20,
+        "num_parameters": 2
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 4,
+          "depth": 14,
+          "size": 20,
+          "num_parameters": 2,
+          "ops": {
+            "cx": 8,
+            "h": 4,
+            "rz": 4,
+            "rx": 4
+          }
+        },
+        "after": {
+          "num_qubits": 4,
+          "depth": 14,
+          "size": 20,
+          "num_parameters": 2,
+          "ops": {
+            "cx": 8,
+            "h": 4,
+            "rz": 4,
+            "rx": 4
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n2",
+      "node_type": "fake_backend",
+      "label": "Noisy simulator",
+      "status": "ok",
+      "started_at": 1783314979.8410623,
+      "finished_at": 1783314979.8438795,
+      "summary": {
+        "backend_name": "FakeFez",
+        "num_qubits": 156,
+        "shots": 1024
+      },
+      "message": null,
+      "from_step_cache": true,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 4,
+        "depth": 14,
+        "size": 20,
+        "num_parameters": 2
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 4,
+          "depth": 14,
+          "size": 20,
+          "num_parameters": 2,
+          "ops": {
+            "cx": 8,
+            "h": 4,
+            "rz": 4,
+            "rx": 4
+          }
+        },
+        "after": {
+          "num_qubits": 4,
+          "depth": 14,
+          "size": 20,
+          "num_parameters": 2,
+          "ops": {
+            "cx": 8,
+            "h": 4,
+            "rz": 4,
+            "rx": 4
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n3",
+      "node_type": "compvqc",
+      "label": "CompressVQC",
+      "status": "skipped",
+      "started_at": 1783314983.1877172,
+      "finished_at": 1783314983.2666595,
+      "summary": {
+        "lut_size": 2,
+        "num_qp_vars": 40,
+        "num_rotation_instances": 8,
+        "qaoa_max_vars": 22
+      },
+      "message": "CompressVQC would build a 40-binary-variable QUBO from 8 parameterised rotation gate instance(s) in this circuit, and the underlying QAOA solver runs on a state-vector simulator capped near 22 qubits. Try a circuit with fewer parameterised rotations (e.g. fewer reps in EfficientSU2 / a smaller HEA), or split the circuit and compress per-block.",
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": null,
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": null
+    },
+    {
+      "node_id": "n4",
+      "node_type": "fidelity",
+      "label": "Fidelity estimate",
+      "status": "ok",
+      "started_at": 1783314983.2669501,
+      "finished_at": 1783314983.2685897,
+      "summary": {
+        "fidelity": 0.06249999999999996,
+        "method": "statevector",
+        "bound_unbound_to_zero": 2
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 4,
+        "depth": 14,
+        "size": 20,
+        "num_parameters": 2
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 4,
+          "depth": 14,
+          "size": 20,
+          "num_parameters": 2,
+          "ops": {
+            "cx": 8,
+            "h": 4,
+            "rz": 4,
+            "rx": 4
+          }
+        },
+        "after": {
+          "num_qubits": 4,
+          "depth": 14,
+          "size": 20,
+          "num_parameters": 2,
+          "ops": {
+            "cx": 8,
+            "h": 4,
+            "rz": 4,
+            "rx": 4
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    },
+    {
+      "node_id": "n5",
+      "node_type": "output",
+      "label": "Output",
+      "status": "ok",
+      "started_at": 1783314983.2691154,
+      "finished_at": 1783314983.2929616,
+      "summary": {
+        "num_qubits": 4,
+        "depth": 14,
+        "size": 20,
+        "ops": {
+          "cx": 8,
+          "h": 4,
+          "rz": 4,
+          "rx": 4
+        },
+        "diagram_text": "     \u250c\u2500\u2500\u2500\u2510                                                                                    \u250c\u2500\u2500\u2500\u2510\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2500\u2500\u2510\u00bb\nq_0: \u2524 H \u251c\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2524 Rz(2*gamma) \u251c\u2524 X \u251c\u00bb\n     \u251c\u2500\u2500\u2500\u2524\u250c\u2500\u2534\u2500\u2510\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2534\u2500\u2510                         \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                    \u2514\u2500\u252c\u2500\u2518\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u252c\u2500\u2518\u00bb\nq_1: \u2524 H \u251c\u2524 X \u251c\u2524 Rz(2*gamma) \u251c\u2524 X \u251c\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2524 Rx(2*beta) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u00bb\n     \u251c\u2500\u2500\u2500\u2524\u2514\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518\u250c\u2500\u2534\u2500\u2510\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2534\u2500\u2510\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                      \u2502   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u2502  \u00bb\nq_2: \u2524 H \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2524 Rz(2*gamma) \u251c\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2524 Rx(2*beta) \u251c\u2500\u2500\u253c\u2500\u2500\u00bb\n     \u251c\u2500\u2500\u2500\u2524                         \u2514\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518    \u250c\u2500\u2534\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2534\u2500\u2510  \u2502   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2502  \u00bb\nq_3: \u2524 H \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2524 Rz(2*gamma) \u251c\u2524 X \u251c\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u00bb\n     \u2514\u2500\u2500\u2500\u2518                                                      \u2514\u2500\u2500\u2500\u2518     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518                         \u00bb\n\u00ab     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u00abq_0: \u2524 Rx(2*beta) \u251c\n\u00ab     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\u00abq_1: \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\u00ab                   \n\u00abq_2: \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\u00ab     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u00abq_3: \u2524 Rx(2*beta) \u251c\n\u00ab     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518",
+        "transpiled_depth": 53,
+        "transpiled_size": 69,
+        "fidelity": 0.06249999999999996
+      },
+      "message": null,
+      "from_step_cache": false,
+      "figures": null,
+      "circuit_shape": {
+        "num_qubits": 4,
+        "depth": 14,
+        "size": 20,
+        "num_parameters": 2
+      },
+      "nondeterministic": false,
+      "seed_used": null,
+      "distribution": null,
+      "transformation": {
+        "before": {
+          "num_qubits": 4,
+          "depth": 14,
+          "size": 20,
+          "num_parameters": 2,
+          "ops": {
+            "cx": 8,
+            "h": 4,
+            "rz": 4,
+            "rx": 4
+          }
+        },
+        "after": {
+          "num_qubits": 4,
+          "depth": 14,
+          "size": 20,
+          "num_parameters": 2,
+          "ops": {
+            "cx": 8,
+            "h": 4,
+            "rz": 4,
+            "rx": 4
+          }
+        },
+        "delta": {
+          "num_qubits": 0,
+          "depth": 0,
+          "size": 0,
+          "num_parameters": 0
+        },
+        "ops_delta": {},
+        "changed": false
+      }
+    }
+  ],
+  "final_metrics": {
+    "num_qubits": 4,
+    "depth": 14,
+    "size": 20,
+    "ops": {
+      "cx": 8,
+      "h": 4,
+      "rz": 4,
+      "rx": 4
+    },
+    "diagram_text": "     \u250c\u2500\u2500\u2500\u2510                                                                                    \u250c\u2500\u2500\u2500\u2510\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2500\u2500\u2510\u00bb\nq_0: \u2524 H \u251c\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2524 Rz(2*gamma) \u251c\u2524 X \u251c\u00bb\n     \u251c\u2500\u2500\u2500\u2524\u250c\u2500\u2534\u2500\u2510\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2534\u2500\u2510                         \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510                    \u2514\u2500\u252c\u2500\u2518\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u252c\u2500\u2518\u00bb\nq_1: \u2524 H \u251c\u2524 X \u251c\u2524 Rz(2*gamma) \u251c\u2524 X \u251c\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2524 Rx(2*beta) \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u00bb\n     \u251c\u2500\u2500\u2500\u2524\u2514\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518\u250c\u2500\u2534\u2500\u2510\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2534\u2500\u2510\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518                      \u2502   \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510  \u2502  \u00bb\nq_2: \u2524 H \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2524 Rz(2*gamma) \u251c\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2524 Rx(2*beta) \u251c\u2500\u2500\u253c\u2500\u2500\u00bb\n     \u251c\u2500\u2500\u2500\u2524                         \u2514\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518    \u250c\u2500\u2534\u2500\u2510     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\u250c\u2500\u2534\u2500\u2510  \u2502   \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518  \u2502  \u00bb\nq_3: \u2524 H \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524 X \u251c\u2500\u2500\u2500\u2500\u2500\u2524 Rz(2*gamma) \u251c\u2524 X \u251c\u2500\u2500\u25a0\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25a0\u2500\u2500\u00bb\n     \u2514\u2500\u2500\u2500\u2518                                                      \u2514\u2500\u2500\u2500\u2518     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\u2514\u2500\u2500\u2500\u2518                         \u00bb\n\u00ab     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u00abq_0: \u2524 Rx(2*beta) \u251c\n\u00ab     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\u00abq_1: \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\u00ab                   \n\u00abq_2: \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\u00ab     \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u00abq_3: \u2524 Rx(2*beta) \u251c\n\u00ab     \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518",
+    "transpiled_depth": 53,
+    "transpiled_size": 69,
+    "fidelity": 0.06249999999999996
+  },
+  "run_id": null,
+  "seed_mode": null,
+  "root_seed": null,
+  "app_version": "0.2.0-provenance-core",
+  "cache_schema": 2
+}
