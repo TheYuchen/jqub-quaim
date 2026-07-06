@@ -601,7 +601,7 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
     <div className="panel-alt p-2 space-y-1">
       <div className="text-[10px] text-mute">
         Across {points.length} archived runs of this configuration: mean{" "}
-        {(mean * 100).toFixed(2)}% · range {(min * 100).toFixed(1)}–
+        {(mean * 100).toFixed(1)}% · range {(min * 100).toFixed(1)}–
         {(max * 100).toFixed(1)}%
       </div>
       <div className="relative h-4 rounded bg-surfaceAlt" aria-hidden>

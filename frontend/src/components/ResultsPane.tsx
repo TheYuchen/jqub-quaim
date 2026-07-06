@@ -467,7 +467,7 @@ function FinalMetrics({ metrics }: { metrics: Record<string, unknown> }) {
       <div className="grid grid-cols-2 gap-2">
         {items.map((m) => (
           <div key={m.key} className="panel-alt p-2">
-            <div className="text-[10px] text-mute uppercase">{m.label}</div>
+            <div className="text-[10px] uppercase tracking-wider text-mute">{m.label}</div>
             <div className={`font-mono text-lg ${m.tone ?? "text-ink"}`}>
               {m.big}
             </div>

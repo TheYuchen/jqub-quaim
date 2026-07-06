@@ -212,7 +212,7 @@ export function BlockPicker({
                           <span className="text-[11px] text-ink block truncate">
                             {n.label}
                             {isPlugin && (
-                              <span className="ml-1 text-[8px] uppercase tracking-wider text-mute/60">
+                              <span className="ml-1 text-[9px] uppercase tracking-wider text-mute/60">
                                 plugin
                               </span>
                             )}

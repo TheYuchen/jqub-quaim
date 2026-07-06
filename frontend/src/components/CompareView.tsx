@@ -75,7 +75,7 @@ function CompareRow({
         )}
         {divergence && (
           <span
-            className="ml-1.5 text-[8px] uppercase tracking-wider text-accent"
+            className="ml-1.5 text-[9px] uppercase tracking-wider text-accent"
             title="First step where the two compositions differ (node kind, params, or transformation signature). Everything above is shared prefix."
           >
             divergence point

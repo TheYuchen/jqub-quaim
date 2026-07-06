@@ -83,6 +83,34 @@
   }
 }
 
+/* ============================================================
+ * UI conventions (typography / spacing / numbers) — audit 2026-07
+ *
+ * Type scale (floor is 9px — nothing smaller anywhere):
+ *   text-[9px]  micro-annotations only: legend lines, strip labels,
+ *               role suffixes ("plugin", "divergence point").
+ *   text-[10px] dense metadata rows, section labels, chip-adjacent
+ *               stats inside cards/boards.
+ *   text-[11px] body copy of dense panels (hints, tooltips, captions).
+ *   text-xs(12) tab labels, toolbar copy, pane headers' metadata.
+ *   text-sm(14) primary copy, card titles, buttons.
+ *
+ * Labels: section labels are `text-[10px] uppercase tracking-wider
+ * text-mute`; `tracking-widest` is reserved for the palette/picker
+ * family badges. Kickers (tour, hints) are `text-xs uppercase
+ * tracking-wider text-mute`.
+ *
+ * Chips: the .chip component (px-2 py-0.5, rounded-full) is the
+ * default. Deliberate exceptions: micro-chips inside 28px history
+ * rows (px-1, rounded) and count badges inside tabs (!px-1 !py-0).
+ *
+ * Numbers: all values that update or align vertically render in
+ * font-mono or tabular-nums. Percent/pp decimals — headline metric
+ * values and mono detail lines: 2dp; compact strips, chips, board
+ * stats and legends: 1dp; precision targets are whole pp (±2pp).
+ * Units are stated at the value, not in the label.
+ * ============================================================ */
+
 @layer components {
   .panel {
     @apply bg-surface border border-edge rounded-xl shadow-card;
