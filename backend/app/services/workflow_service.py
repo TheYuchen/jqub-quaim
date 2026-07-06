@@ -603,6 +603,17 @@ def _handle_qubound(node: FlowNode, ctx: dict, settings: Settings) -> StepResult
     node_seed = ctx.get("node_seed")
     _seed_stochastic_libs(node_seed)
 
+    # No within-run ``distribution`` payload — DECIDED, not pending
+    # (docs/EVIDENCE_WORKBENCH.md, leftover-clearing wave). A run
+    # trains ONE LSTM and emits ONE bound: the step consumes its
+    # stochasticity in a single draw, so there is no free replication
+    # inside the run to summarize (sampled fidelity's binomial payload
+    # falls out of its own shots; the analogue here would be k
+    # training restarts at ~minutes each). Training-loss residuals are
+    # NOT a sampling distribution of the prediction and would fake a
+    # CI. The honest uncertainty view is ACROSS runs: fresh seeds make
+    # each run an independent draw of the training stochasticity, and
+    # the archive's replicate machinery renders that buildup.
     def _build_summary(bound_value: float, source: str, extra: dict | None = None) -> dict:
         out: dict = {
             "predicted_error_bound": float(bound_value),
@@ -828,6 +839,19 @@ def _handle_qshot(node: FlowNode, ctx: dict, _settings: Settings) -> StepResult:
     # public API promises (`recommended_shots`, `method`, …). Lift the
     # interesting fields into `summary` so the React card can render
     # them without having to know the internal fit-dict shape.
+    #
+    # No within-run ``distribution`` payload — DECIDED, not pending
+    # (docs/EVIDENCE_WORKBENCH.md, leftover-clearing wave). The
+    # recommendation is a single decision per run: one seeded pilot →
+    # one curve fit → one inverted shot count. Its within-run sampling
+    # uncertainty would require bootstrap re-fits over resampled pilot
+    # counts (not cheap), and the pilot fit's residuals measure curve
+    # MISFIT, not the decision's sampling distribution — deriving a
+    # "±shots" interval from them would invent a model. The pilot
+    # points themselves already ship below (``pilot_pf``) and render
+    # as the card's "where the curve came from" chart; run-to-run
+    # variability of the DECISION is what the archive's across-run
+    # replicates show honestly.
     fit = result.get("fit") or {}
     summary = {
         "recommended_shots": int(result["recommended_shots"]),

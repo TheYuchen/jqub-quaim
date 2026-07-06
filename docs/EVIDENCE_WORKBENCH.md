@@ -318,14 +318,11 @@ minimal honest version, no decoration without a task.
 * **Gate-diff niceties** — pair remove+add of the same op with only a
   param change into a "modified" state; column-align lanes across
   qubits by circuit moment.
-* **Distribution payloads for QuBound/Qshot** — seed-plumbed now
-  (see 15), but they still emit scalar summaries only; no
-  across-replicate distribution payload like sampled fidelity's.
-* **Prewarm decision** — precomputed disk cache untouched and still
-  served (fresh-mode namespace unchanged), but responses in it lack
-  provenance/transformation fields. Either re-run
-  scripts/precompute_preset_results.py against the new schema or
-  accept cold first hits.
+* ~~Distribution payloads for QuBound/Qshot~~ — CLOSED 2026-07-06,
+  decided AGAINST adding payloads (rationale in the leftover-clearing
+  wave section below and in both handlers).
+* ~~Prewarm decision~~ — CLOSED 2026-07-06: cache schema gate +
+  live-API regeneration (leftover-clearing wave below).
 * **Formative study** — interview protocol before locking the task
   taxonomy (Meyer-Dykes INFORMED). Blocked on user's go-ahead.
 
@@ -779,8 +776,119 @@ itself only via APP_NAME, so anon builds show the neutral codename).
 Known remaining first-contact rough edges (copy alone won't fix;
 candidates for a future wave): (a) the first-visit Multiverse landing
 relies on the tour + demo banner for orientation — the board itself
-has no empty-state-style intro once cards exist; (b) restore/replay
-success is communicated by the canvas silently changing behind the
-Evidence pane — a brief highlight of what just changed would help;
-(c) the Compare tab is only reachable through History checkboxes or
-multiverse A/B, which slide 4 now teaches but the tab itself cannot.
+has no empty-state-style intro once cards exist. Items (b) restore
+silence and (c) Compare reachability were fixed in the
+leftover-clearing wave below.
+
+## Leftover-clearing wave (SHIPPED 2026-07-06)
+
+Six known leftovers closed. Verification bar per change: tsc + build,
+backend unit lane green, live checks where the server is involved.
+
+1. **Precomputed disk cache: schema gate + regeneration (the critical
+   one).** The 36 shipped cache entries predated the provenance rework
+   — no transformation/distribution/seed fields — yet still VALIDATED
+   as RunResponses (new fields default to None), so a hit would have
+   served a first-time visitor a run with no ribbons, glyphs or CIs.
+   Investigation found something better and worse at once: every key
+   had silently gone UNREACHABLE, because the cache key hashes the
+   circuit's QPY bytes and a qiskit upgrade (now 2.3.0 on the Space)
+   changed them — AND the script's preset mirror had drifted from the
+   frontend's defaultData (`rho: 500.0` vs the `500` a JS number
+   serializes to; missing fidelity `method`/`unbound_param_policy`).
+   So nobody was being served stale schema — everyone was paying full
+   price for every preset run. Fixes, layered:
+   * `run_cache.py` stamps `cache_schema: 2` on write and treats any
+     entry without the CURRENT stamp as a miss (logged once per key
+     per process). Writes also scrub the envelope (run_id/seed_mode/
+     root_seed = null): the disk cache is seed-free by design — the
+     serving route advertises root_seed=None ("no seed drawn" chip
+     tooltip, verified present in ResultsPane) because cached numbers
+     were not produced with the requester's draw. Per-step `seed_used`
+     stays: it is the honest record of how the numbers were produced.
+     Unit lane: tests/test_run_cache.py (6 tests — legacy shape is a
+     miss, wrong stamp is a miss, roundtrip serves, stamp+scrub on
+     write, corrupt file, log-once).
+   * The 36 dead files are deleted; the cache is regenerated from the
+     LIVE API by `scripts/regenerate_precomputed_cache_live.py`:
+     responses recorded fresh-mode (no seed) against the deployed
+     runtime, keys computed locally with `compute_cache_key`, and the
+     script REFUSES to run unless local qiskit == live
+     /api/health qiskit (the only way keys can match; a
+     `--system-site-packages` venv with `pip install --no-deps
+     qiskit==<live>` suffices). Resumable (`--budget-seconds`, skips
+     existing files) for the sandbox's ~40 s process cap.
+   * Coverage decision: only the torch-light presets are cached —
+     qucad + compvqc × all 9 samples (18 entries, each a deterministic
+     statevector pipeline, 1-10 s live). qubound / qshot / full stay
+     absent ON PURPOSE: the schema gate makes them run fresh, and a
+     slow true answer beats an instant stale one (their LSTM/GNN runs
+     are also poor cache citizens: one training draw frozen forever).
+   * `precompute_preset_results.py`'s preset mirror is fixed to match
+     the frontend byte-for-byte, with a comment naming both silent-
+     miss traps (JS integer serialization; QPY qiskit-version drift).
+2. **TipIcon tooltip portal.** The CSS-only bubble clipped inside
+   every overflow ancestor (Evidence pane scroll body). Now
+   `createPortal` to document.body, `position: fixed` from the
+   trigger's getBoundingClientRect, measured-then-placed (one hidden
+   layout pass), flips above/below by viewport space, clamps
+   horizontally, closes on any scroll (capture) or resize. Hover +
+   focus/blur still drive it; the trigger keeps an sr-only copy of
+   the hint (accessible name unchanged), the bubble is aria-hidden +
+   pointer-events-none. Figure export safety: trigger keeps
+   `data-export-strip`, and the bubble lives on document.body —
+   outside every subtree a camera clones. No new deps.
+3. **Restore/replay canvas pulse.** When the provenance bridge applies
+   a pendingRestore (History restore/replay AND scenario boots — same
+   code path), every restored node gets a `.restore-pulse` class:
+   one 1.2 s accent box-shadow ring swelling out and fading
+   (index.css), class stripped after 1.4 s via a functional setNodes
+   so drags inside the window aren't clobbered and the next restore
+   re-triggers. Rationale in-code: the canvas swap happens behind the
+   pane the user clicked in; a silent mutation disorients. The global
+   prefers-reduced-motion rule collapses the animation.
+4. **Compare reachability (one hop from where the question arises).**
+   (a) RunHistory: while exactly ONE compare checkbox is ticked, a
+   status chip at the panel top says "1 of 2 picked — tick one more
+   run to compare, or A/B a card in Multiverse" (the first tick used
+   to feed only a tab badge the user may never look at). (b) Fidelity
+   card: when the archive holds ≥2 runs of the current configuration,
+   the across-runs strip grows a "compare vs previous run of this
+   configuration ↗" link (marker `compare-vs-previous`) that sets
+   compareIds to the two latest run_ids via the new store action
+   `setCompareIds` — the Evidence pane's existing length===2
+   auto-switch does the rest.
+5. **Small-panel legibility.** (a) EvidenceTheater: the three right-
+   margin readouts (final/so-far, target ±, archive pool) now go
+   through `dodgeMarginLabels` — anchors sorted, tops pushed ≥12 px
+   apart (more for 2-line blocks), clamped to the plot — but ONLY in
+   the multi-node small-multiple layout (panelH 250): the single-panel
+   F0 teaser/filmstrip exports are recorded bit-exact SVGs and keep
+   their original anchors (including the old pool-vs-final nudge,
+   which the dodge subsumes where active). (b) Multiverse
+   PipelineStrip node cap 14 → 11 (+k overflow chip): 14 squares are
+   233 px and overflow the 240 px card floor's ~210 px content box;
+   11 + "+k" fits, so long pipelines degrade to an explicit count
+   instead of an invisible crop.
+6. **QuBound/Qshot distribution payloads — decided: NO payload.**
+   The criterion that separates them from sampled fidelity: a
+   within-run distribution payload is honest when the step's own
+   computation already CONTAINS replication (1024 shots → binomial
+   counts for free). Both of these consume their stochasticity in a
+   single draw per run — QuBound trains one LSTM and emits one bound
+   (k restarts would cost minutes each; training-loss residuals are
+   not a sampling distribution of the prediction), Qshot runs one
+   seeded pilot → one fit → one inverted shot count (bootstrap
+   re-fits would be needed for a real interval; fit residuals measure
+   curve misfit, not decision uncertainty — and the pilot points
+   already render in the card as the "where the curve came from"
+   chart). For single-draw-per-run steps the honest uncertainty view
+   is ACROSS runs: fresh seeds make replicates independent draws, and
+   the archive's replicate machinery (history strips, multiverse
+   outcome strips) is the correct representation. Known limitation,
+   recorded not hidden: those strips key on the FIDELITY headline and
+   a fixed 0-1 scale, so a QuBound-preset pipeline (no fidelity node)
+   accumulates replicate rows without a value strip; giving decision
+   metrics their own scales is a separate design question, opened
+   only if a case study needs it. Decision comments live in both
+   handlers.
