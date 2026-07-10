@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   Box,
   Check,
+  LayoutGrid,
   Link2,
   Loader2,
   Play,
@@ -60,6 +61,7 @@ import {
   saveRun,
 } from "../lib/runStore";
 import { GLOSSARY } from "../lib/glossary";
+import { hashHue, hueCss } from "../lib/hues";
 import {
   estimatePipeline,
   formatSeconds,
@@ -175,6 +177,7 @@ export function FlowCanvas() {
   const precisionTarget = useApp((s) => s.precisionTarget);
   const setPrecisionTarget = useApp((s) => s.setPrecisionTarget);
   const pendingRestore = useApp((s) => s.pendingRestore);
+  const editorContext = useApp((s) => s.editorContext);
   const [notice, setNotice] = useState<Notice>(null);
   // cost-estimate: per-kind medians from this browser's run archive,
   // recomputed when the canvas kind-set changes or a run is archived
@@ -844,6 +847,78 @@ export function FlowCanvas() {
     });
   };
 
+  // ---- Definition-view identity (marker: config-context) -------------
+  // While the context bar is up (editor entered from the board), the
+  // structural config hash of the CURRENT canvas is recomputed on
+  // every graph/param/circuit change, debounced — the same
+  // computeConfigHash archiving uses, so what the bar names is
+  // exactly what the next Run would archive under. liveCount asks the
+  // archive how many runs already carry that hash (re-asked when a
+  // run archives), which is what turns "edited" into "will archive as
+  // a NEW configuration" vs "matches an archived one".
+  const [liveHash, setLiveHash] = useState<string | null>(null);
+  const [liveCount, setLiveCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!editorContext) return;
+    const t = window.setTimeout(() => {
+      setLiveHash(
+        nodes.length === 0
+          ? null
+          : computeConfigHash(
+              sampleKey,
+              circuit?.name ?? null,
+              buildSharePayload(nodes, edges, sampleKey),
+              useLiveIbm,
+            ),
+      );
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [editorContext, nodes, edges, sampleKey, circuit, useLiveIbm]);
+  useEffect(() => {
+    if (!editorContext || liveHash == null) {
+      setLiveCount(null);
+      return;
+    }
+    let alive = true;
+    listRuns(500)
+      .then((rs) => {
+        if (alive)
+          setLiveCount(rs.filter((r) => r.config_hash === liveHash).length);
+      })
+      .catch(() => {
+        /* archive unreadable — the bar just omits the count */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [editorContext, liveHash, historyVersion]);
+
+  // ---- "New configuration" bridge (IA inversion) ----------------------
+  // The board's New-configuration button clears the canvas so the
+  // editor opens as a blank definition view: no leftover graph, no
+  // stale pinned seed, no fork parentage to mis-thread into the next
+  // archived run. (editorContext itself is set by requestNewConfig.)
+  const newConfigRequest = useApp((s) => s.newConfigRequest);
+  const lastNewConfigRef = useRef(0);
+  useEffect(() => {
+    if (
+      newConfigRequest === 0 ||
+      newConfigRequest === lastNewConfigRef.current
+    )
+      return;
+    lastNewConfigRef.current = newConfigRequest;
+    setNodes([]);
+    setEdges([]);
+    setRun(null);
+    setPinnedSeed(null);
+    useApp.getState().setRestoredFrom(null);
+    setNotice({
+      text: "New configuration — drag blocks from the strip above or pick a preset, then Run to archive its first evidence.",
+      tone: "ok",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newConfigRequest]);
+
   // ---- Provenance restore bridge -------------------------------------
   // The timeline panel pushes an archived run into the store; we
   // rebuild the canvas from its SharePayload (same shape the share
@@ -1116,7 +1191,17 @@ export function FlowCanvas() {
   const pendingAutoRun = useApp((s) => s.pendingAutoRun);
   const autoRunFiredRef = useRef(false);
   useEffect(() => {
-    if (!pendingAutoRun || running || autoRunFiredRef.current) return;
+    // Re-arm once a request is consumed/cleared: the board's quick
+    // actions (replay latest / +3 replicates, marker card-expand)
+    // issue REPEATED auto-run requests within one page life, unlike
+    // the one-shot scenario boot this guard was built for. The ref
+    // still swallows double-fires while one request is in flight
+    // (StrictMode double-effects, rapid dep churn).
+    if (!pendingAutoRun) {
+      autoRunFiredRef.current = false;
+      return;
+    }
+    if (running || autoRunFiredRef.current) return;
     if (!circuit || nodes.length === 0) return;
     if (
       pendingAutoRun.sampleKey != null &&
@@ -1131,6 +1216,21 @@ export function FlowCanvas() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
+      {/* Definition-view context bar (marker: config-context) — IA
+          inversion: rendered only when the editor was entered FROM
+          the board (card Open / New configuration). It makes
+          configuration identity — the thing replicates and
+          comparisons key on — visible at authoring time. Scenario
+          boots and plain mode toggles never set editorContext, so
+          scripted figure states render pixel-identically without it. */}
+      {editorContext && (
+        <ConfigContextBar
+          ctx={editorContext}
+          liveHash={liveHash}
+          liveCount={liveCount}
+          circuitTag={sampleKey ?? circuit?.name ?? "no circuit"}
+        />
+      )}
       {/* No overflow-x clip here: CSS spec forces overflow-y to auto
           when overflow-x is auto, which would clip the dropdowns
           (PresetPicker, MoreMenu) that anchor below this row. On
@@ -1443,6 +1543,120 @@ export function FlowCanvas() {
           )}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Definition-view context bar (marker: config-context).
+ *
+ *  The editor, framed: "you are defining ONE configuration". The chip
+ *  colors derive from the same hash→hue mapping every other panel
+ *  uses, so the identity the bar names is visually the same object as
+ *  the board card / lineage dots. States:
+ *    * card, unedited → "Defining configuration #hash — tag · runs
+ *      archived: N"
+ *    * card, edited (live hash diverged) → "edited: will archive as a
+ *      new configuration #newhash" (or names the EXISTING
+ *      configuration it now matches, with its run count)
+ *    * new → "New configuration #hash — not yet run" until the first
+ *      archive lands, then it becomes a normal "Defining…" line.
+ */
+type EditorCtx =
+  | { source: "card"; hash: string; circuitTag: string; runCount: number }
+  | { source: "new" };
+
+function ConfigContextBar({
+  ctx,
+  liveHash,
+  liveCount,
+  circuitTag,
+}: {
+  ctx: EditorCtx;
+  liveHash: string | null;
+  liveCount: number | null;
+  circuitTag: string;
+}) {
+  const setWorkspaceMode = useApp((s) => s.setWorkspaceMode);
+  const setEditorContext = useApp((s) => s.setEditorContext);
+  const chip = (hash: string) => (
+    <span
+      className="chip shrink-0"
+      style={{
+        color: hueCss(hashHue(hash), 0.95),
+        borderColor: hueCss(hashHue(hash), 0.5),
+      }}
+      title={`configuration #${hash}`}
+    >
+      #{hash.slice(0, 6)}
+    </span>
+  );
+  const matched = (liveCount ?? 0) > 0;
+  return (
+    <div
+      data-marker="config-context"
+      role="note"
+      aria-label="Configuration context"
+      className="shrink-0 border-b border-edge/60 bg-surfaceAlt/40 px-3 sm:px-4 py-1 flex items-center gap-1.5 text-[11px] text-mute min-w-0"
+    >
+      <span className="flex items-center gap-1.5 min-w-0 truncate">
+        {ctx.source === "card" ? (
+          liveHash == null ? (
+            <>
+              Configuration {chip(ctx.hash)} — canvas cleared
+            </>
+          ) : liveHash === ctx.hash ? (
+            <>
+              Defining configuration {chip(ctx.hash)} —{" "}
+              <span className="text-ink truncate">{ctx.circuitTag}</span> ·
+              runs archived: {liveCount ?? ctx.runCount}
+            </>
+          ) : (
+            <>
+              Configuration {chip(ctx.hash)} —{" "}
+              <span className="text-warn">edited</span>: will archive as{" "}
+              {matched ? (
+                <>
+                  configuration {chip(liveHash)} (runs archived: {liveCount})
+                </>
+              ) : (
+                <>a new configuration {chip(liveHash)}</>
+              )}
+            </>
+          )
+        ) : liveHash == null ? (
+          <>New configuration — empty canvas, not yet run</>
+        ) : matched ? (
+          <>
+            Defining configuration {chip(liveHash)} —{" "}
+            <span className="text-ink truncate">{circuitTag}</span> · runs
+            archived: {liveCount}
+          </>
+        ) : (
+          <>
+            New configuration {chip(liveHash)} —{" "}
+            <span className="text-ink truncate">{circuitTag}</span> · not yet
+            run
+          </>
+        )}
+      </span>
+      <button
+        type="button"
+        className="ml-auto btn shrink-0"
+        title="Back to the Evidence board (home)"
+        onClick={() => setWorkspaceMode("multiverse")}
+      >
+        <LayoutGrid className="w-3 h-3" />
+        <span className="hidden sm:inline">Back to board</span>
+      </button>
+      <button
+        type="button"
+        className="shrink-0 p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
+        title="Dismiss (the bar returns next time you enter from the board)"
+        aria-label="Dismiss configuration context bar"
+        onClick={() => setEditorContext(null)}
+      >
+        <X className="w-3 h-3" />
+      </button>
     </div>
   );
 }
