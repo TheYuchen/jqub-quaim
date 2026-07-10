@@ -404,7 +404,7 @@ here. Reviewers are vis people, not quantum people. Status per item:
    itself: rebuild the graph from the payload, pin the recorded
    seed, replay.
 3. **Scenario loader — shipped** (`lib/scenarios.ts`; boot hook in
-   App.tsx). `?scenario=F0..F6` (F0 added with the Evidence Theater
+   App.tsx). `?scenario=F0..F7` (F0 added with the Evidence Theater
    wave, see its own section below): F1 ribbon canvas post-run (QuCAD on
    vqc_2q_small, seed 336157917, auto-run), F2 multiverse board over
    the bundled archive, F3 evidence funnel with ±2pp optional stop
@@ -982,3 +982,95 @@ free — though it is currently unmounted (ResultsPane's History tab is
 the only usage). Since the key renders inside the panel body it is
 captured by figure export while visible — figure-makers keep it,
 daily users dismiss it once (the RibbonLegend contract).
+
+## Improvement wave (SHIPPED 2026-07-10)
+
+Seven items in one pass: two honesty/consistency fixes, one designed-
+but-never-built promise closed, one new figure capability, the last
+open UX item, the repo front door, and a reader-orientation overlay.
+
+1. **Export script threads precision_target (honesty fix).** Item 12's
+   claim ("the exported script reproduces the archived run's exact
+   draw") overstated for early-stopped runs: the export emitted
+   `_derive_seed` + the seed but NOT the stopping rule, so the script
+   ran ALL requested shots. `ExportProvenance` now carries
+   `precisionTarget`, read server-authoritatively from the sampled
+   step's `distribution.precision_target` (never the toolbar's current
+   selection); the generated `sampledFidelityEstimator` call re-sends
+   `precision_target=` and the header stamps `stop_target`. The claim
+   in item 12 is updated to now-true. Shape verification lane:
+   `frontend/scripts/check_export_python.test.ts` (exportPython pulls
+   in anon.ts's module-scope `import.meta.env`, so it runs as an
+   esbuild bundle + node — command in the header; 5 assertion groups
+   covering seed+target threading and the absence cases).
+2. **Health version alignment.** `/api/health` (and the FastAPI
+   OpenAPI metadata) hardcoded 0.1.0 while every run stamps
+   app_version from `app/_version.py` — the liveness probe disagreed
+   with the provenance stamp about which build was serving. Both now
+   import APP_VERSION from the single source of truth.
+3. **Archive export/import** (marker `archive-io`). runStore's header
+   promised cross-device archive hand-off; now implemented.
+   `exportArchive(runIds?)` downloads `{schema: 1, exported_at,
+   records}` (oldest first, ancestors before forks);
+   `importArchive(file)` validates the top-level shape, re-normalizes
+   EVERY record through buildRunRecord (the file's config_hash /
+   headline / derived fields are never trusted — same path a live run
+   takes), preserves created_at + the demo flag verbatim, skips
+   run_id collisions, reports {imported, skipped, invalid}, bumps
+   historyVersion once. UI: an archive-io strip under the History
+   tab's legend key ("export archive" / "import" + a report line);
+   import is also reachable in the zero-runs empty state (a fresh
+   device is exactly where a handed-off file arrives). This is the
+   user-study data-collection channel: the server is stateless by
+   design, so a participant's evidence lives only in their browser
+   until exported.
+4. **Theater overlay comparison** (marker `theater-overlay`) + **F7**.
+   When two archived runs share a config_hash and both persisted
+   per-batch traces, the Compare tab offers "overlay in theater ↗":
+   the theater renders both funnels on ONE axis pair — run A
+   accent/blue, run B warn/amber, envelopes at .07 alpha, constant
+   ∓3.5 px x-dodge on the shared batch grid (sub-batch-width,
+   identical per batch, so convergence shapes compare honestly),
+   per-run stop annotations in stacked top-band rows, a shared target
+   corridor ONLY when both runs executed the same rule (anchored at
+   the midpoint of the two final points — the corridor states the
+   rule's width, not two rules), per-run id+seed legend in the
+   context strip, tagline "two replays of one configuration — same
+   rule, different draws". The scrubber drives both series in
+   lockstep (per-series clamp). Store: `theaterOverlayIds`; closing
+   the theater or starting a new run exits; deleting either record
+   mid-view exits instead of rendering a stale pair. Export takes the
+   true-SVG path as `evidence-theater-overlay_<slug>.svg`; provenance
+   carries both run_ids/root_seeds (runsForView branch).
+   `?scenario=F7`: deterministic picker (largest traced budget with
+   ≥2 ok replicates = the bundled bell-2048 config), A =
+   0b485ca23b88 (983/2048, 48.00% ±2.16pp, seed 1892016523), B =
+   ca3a5193e0f1 (1032/2048, 50.39% ±2.16pp, seed 2072686634), both
+   8-batch traces ±6.1pp → ±2.16pp; final intervals overlap —
+   consistent with one underlying configuration. Expected visuals
+   documented at the scenario definition. Multi-sampled-node
+   pipelines overlay their first sampled step only (paired panels are
+   the honest extension if a case study needs it).
+5. **Multiverse orientation strip** (marker `multiverse-hint`) — the
+   last open UX item from the comprehension wave. A slim dismissable
+   one-liner pinned above the grid ("Each card is one configuration —
+   its pipeline, its outcome distribution, Δ vs the baseline card.
+   Open rebuilds it; A/B sends two cards to Compare."), localStorage
+   `quda.multiverseHintDismissed`, reopened via a small "?" in the
+   board header — the lineage-legend recoverability contract.
+6. **README rewrite.** The repo front door now describes the evidence
+   workbench (claims, docker quickstart, F0–F7 scenario table,
+   pointer here, test lanes, deployment); HF Space YAML frontmatter
+   kept intact. The old product-era copy (upload button, sign-in,
+   mirrors) is gone.
+7. **Claims→features map** (marker `claims-map`). A static overlay
+   next to the TopBar Tour button: one row per paper claim → where to
+   see it → the ?scenario= URL that boots its figure state. Content
+   mirrors this doc's shipped list.
+
+Verification bar met per change: tsc + build (+ VITE_ANON=1 build),
+backend unit lane 86 green (test_provenance_phase0 27, gate_diff 14,
+anytime_evidence 20, workflow_helpers 11, seed_coverage 8,
+run_cache 6), export-script shape lane, live marker checks after
+deploy (archive-io, theater-overlay, multiverse-hint, claims-map) +
+/api/health version + F7 code-path review over the bundled archive.

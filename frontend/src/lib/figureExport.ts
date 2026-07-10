@@ -61,7 +61,7 @@ export interface FigureProvenance {
   app_version: string | null;
   exported_at: string;
   view: string;
-  /** Scenario key (?scenario=F0..F6) active at export time, if any —
+  /** Scenario key (?scenario=F0..F7) active at export time, if any —
    *  the one-URL recipe that regenerates this figure's app state. */
   scenario: string | null;
   /** Evidence-theater trace scrubber position at export time: the
