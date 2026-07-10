@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app._version import APP_VERSION
 from app.config import FRONTEND_DIST, get_settings
 from app.routes import auth as auth_route
 from app.routes import backends as backends_route
@@ -46,7 +47,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="QuDA Studio",
     description="Interactive pipeline over QuCAD / QuBound / CompressVQC / Qshot.",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 

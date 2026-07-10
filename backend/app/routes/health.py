@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from app._version import APP_VERSION
 from app.config import get_settings
 from app.schemas import HealthResponse
 
@@ -17,8 +18,6 @@ def _safe_version(mod_name: str) -> str:
         return f"unavailable ({exc.__class__.__name__})"
     return getattr(mod, "__version__", "unknown")
 
-
-APP_VERSION = "0.1.0"
 
 
 @router.get("/health", response_model=HealthResponse)
