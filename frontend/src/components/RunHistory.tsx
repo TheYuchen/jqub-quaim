@@ -804,8 +804,12 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                           ⏹
                         </span>
                       )}
+                      {/* Glyph + 9px word: ⚲/∿ alone proved cryptic
+                          (understanding lived in hover only); the word
+                          is the smallest visible disambiguator. No-seed
+                          records keep the bare glyph + tooltip. */}
                       <span
-                        className={`shrink-0 ${r.seed_mode === "pinned" ? "text-accent" : "text-mute"}`}
+                        className={`shrink-0 inline-flex items-center gap-0.5 ${r.seed_mode === "pinned" ? "text-accent" : "text-mute"}`}
                         title={
                           r.root_seed != null
                             ? r.seed_mode === "pinned"
@@ -815,6 +819,11 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                         }
                       >
                         {r.seed_mode === "pinned" ? "⚲" : "∿"}
+                        {r.root_seed != null && (
+                          <span className="text-[9px]">
+                            {r.seed_mode === "pinned" ? "pinned" : "fresh"}
+                          </span>
+                        )}
                       </span>
                       </span>
                       <span className="ml-auto flex items-center gap-1 shrink-0">
