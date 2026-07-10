@@ -63,7 +63,11 @@ export interface NodeSpec {
   kind: NodeKind;
   label: string;
   family: "source" | "backend" | "algorithm" | "metric" | "sink";
-  /** Short human-friendly caption (~3-5 words) shown under the label. */
+  /** Palette-tile microcopy. BUDGET: must read complete within two
+   *  9px lines at the tile's 108px width (≈12 chars/line) — the tile
+   *  clamps at 2 lines, so anything longer ellipsizes mid-thought
+   *  ("predict today's erro…"). The full thought belongs in
+   *  `description`, which is the tile's hover tooltip. */
   tagline: string;
   /** Long-form description: hover tooltip on the palette tile and
    *  subtitle text on the canvas node. */
@@ -97,7 +101,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "input_circuit",
     label: "Input circuit",
     family: "source",
-    tagline: "your quantum program",
+    tagline: "your circuit",
     description:
       "The program under test — a quantum circuit, possibly with trainable parameters (uploaded .qpy or a built-in sample).",
     icon: Atom,
@@ -109,7 +113,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "fake_backend",
     label: "Noisy simulator",
     family: "backend",
-    tagline: "local IBM-chip simulator",
+    tagline: "simulated IBM chip",
     description:
       "Simulates a real IBM quantum chip with its measured noise. Runs locally, no IBM account needed.",
     icon: Server,
@@ -236,7 +240,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "qubound",
     label: "QuBound",
     family: "algorithm",
-    tagline: "predict today's error bound",
+    tagline: "error bound",
     description:
       "Predicts today's error bound from the machine's last 14 days of measured error rates (a small learned model). Set a threshold to get a pass/fail decision.",
     icon: LineChart,
@@ -280,7 +284,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "compvqc",
     label: "CompressVQC",
     family: "algorithm",
-    tagline: "fold redundant gates",
+    tagline: "fold gates",
     description:
       "Circuit compression: merges redundant rotation operations via a precomputed lookup table, so the same computation uses fewer operations.",
     icon: Shrink,
@@ -310,7 +314,7 @@ export const NODE_CATALOG: NodeSpec[] = [
     kind: "qshot",
     label: "Qshot",
     family: "algorithm",
-    tagline: "recommend shot count",
+    tagline: "shot count",
     description:
       "Recommends how many repeated measurements (shots) are needed to meet a target accuracy, with statistical confidence, on a chosen day's machine noise. Self-contained — no upstream backend required.",
     icon: Target,
