@@ -1647,10 +1647,30 @@ function RibbonLegend() {
       return false;
     }
   });
-  if (dismissed) return null;
+  // Visual-calm contract: the key teaches, then leaves. It only mounts
+  // after the session's FIRST run (the parent gates on `run`, which is
+  // in-memory store state — a fresh session starts without it), fades
+  // out on its own after 20 s and unmounts a second later so it stops
+  // occluding the canvas. The timer is mount-scoped, so later runs in
+  // the same session don't resurrect it. The × dismissal stays the
+  // only PERSISTED state — an auto-faded key returns next session
+  // until explicitly dismissed.
+  const [fading, setFading] = useState(false);
+  const [expired, setExpired] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setFading(true), 20_000);
+    const t2 = setTimeout(() => setExpired(true), 21_000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
+  if (dismissed || expired) return null;
   return (
     <div
-      className="absolute left-16 z-10 panel-alt px-2.5 py-2 text-[10px] leading-relaxed text-mute shadow-md max-w-[250px] space-y-1"
+      className={`absolute left-16 z-10 panel-alt px-2.5 py-2 text-[10px] leading-relaxed text-mute shadow-md max-w-[250px] space-y-1 transition-opacity duration-1000 ${
+        fading ? "opacity-0 pointer-events-none" : "opacity-100"
+      }`}
       style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
       role="note"
       aria-label="Canvas encoding key"

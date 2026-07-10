@@ -108,27 +108,35 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
               view={`evidence-${tab}`}
             />
           )}
-          {run?.seed_mode && (
+          {/* Chip budget (visual-calm pass): at most TWO chips in this
+              header — the seed-state chip and the step count. The seed
+              chip ABSORBS the cached state ("cached · no seed" — a
+              precomputed-cache response is exactly a response no seed
+              was drawn for), instead of stacking a third chip that
+              overflowed narrow panes. */}
+          {run && (run.seed_mode || run.from_cache) && (
             <span
-              className={`chip ${run.seed_mode === "pinned" ? "!border-accent/40 !text-accent" : ""}`}
+              className={`chip ${
+                run.seed_mode === "pinned" || run.from_cache
+                  ? "!border-accent/40 !text-accent"
+                  : ""
+              }`}
               title={
-                run.seed_mode === "pinned"
-                  ? `Replayed with pinned root seed ${run.root_seed} — stochastic steps reproduce exactly.`
-                  : run.root_seed != null
-                    ? `Fresh draw. Recorded root seed ${run.root_seed} — replay it any time from the “This configuration” tab.`
-                    : "Served from the precomputed cache — no seed was drawn for this response."
+                run.from_cache
+                  ? "Served from a precomputed cache (this circuit + pipeline combo was run ahead of time) — no seed was drawn for this response. Swap in your own circuit or tweak the graph to trigger a fresh, seeded run."
+                  : run.seed_mode === "pinned"
+                    ? `Replayed with pinned root seed ${run.root_seed} — stochastic steps reproduce exactly.`
+                    : run.root_seed != null
+                      ? `Fresh draw. Recorded root seed ${run.root_seed} — replay it any time from the “This configuration” tab.`
+                      : "No seed was drawn for this response."
               }
             >
-              {run.seed_mode === "pinned" ? `seed ${run.root_seed}` : "fresh"}
+              {run.from_cache
+                ? "cached · no seed"
+                : run.seed_mode === "pinned"
+                  ? `seed ${run.root_seed}`
+                  : "fresh"}
               <TipIcon hint={gloss("seed")} size={10} position="below" />
-            </span>
-          )}
-          {run?.from_cache && (
-            <span
-              className="chip !border-accent/40 !text-accent"
-              title="Served from a precomputed cache (this circuit + pipeline combo was run ahead of time). Swap in your own circuit or tweak the graph to trigger a fresh run."
-            >
-              cached
             </span>
           )}
           {run && (

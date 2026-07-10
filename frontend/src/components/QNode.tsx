@@ -369,7 +369,18 @@ function LiveEvidenceStrip({
 /** After-run strip at the bottom of the node tile: headline metric +
  *  duration chip + cache indicator. None of these are interactive,
  *  but they make the canvas itself a glanceable dashboard once a run
- *  has happened. */
+ *  has happened.
+ *
+ *  Layout contract (visual-calm audit, 2026-07-10): the strip is at
+ *  most the stretched glyph + TWO further rows — (1) headline+chips,
+ *  (2) the 3px micro-CI bar — at ANY tile width. The chips row cannot
+ *  wrap: it is flex-nowrap, the headline block is min-w-0 + truncate
+ *  (it gives way first), the chips are shrink-0, and at most three
+ *  small chips can coexist (⏹ shots · one cached/live chip —
+ *  RunStatusChips renders at most one — · duration). Worst case
+ *  ≈130px of chips against the 180px min tile width, so the headline
+ *  truncates rather than the row wrapping. If a chip is ever added
+ *  here, re-audit against that budget. */
 function RunResultStrip({
   kind,
   step,

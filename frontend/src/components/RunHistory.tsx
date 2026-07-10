@@ -371,9 +371,36 @@ function KeyItem({
  *  fields in the file are never trusted) and skips run_ids already
  *  present, so importing twice — or importing on top of the bundled
  *  demo records — is safe. */
-function ArchiveIO({ count }: { count: number }) {
+function ArchiveIO({
+  count,
+  collapsed = false,
+}: {
+  count: number;
+  collapsed?: boolean;
+}) {
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Guidance-strip budget (visual-calm pass): at most ONE strip at a
+  // time in this tab, and the demo banner outranks this one. While the
+  // banner is up the parent passes collapsed=true and the strip
+  // shrinks to a single reopen affordance; expanding it back is
+  // explicit user intent, so it wins for the session.
+  const [userOpened, setUserOpened] = useState(false);
+  if (collapsed && !userOpened)
+    return (
+      <div className="archive-io flex justify-end border-b border-edge/40 px-1.5 py-0.5">
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-mute hover:text-ink hover:bg-surfaceAlt"
+          title="Show the archive hand-off controls: export this browser's runs to a JSON file, or import one from another device"
+          aria-label="Show archive export/import controls"
+          onClick={() => setUserOpened(true)}
+        >
+          <Download className="w-3 h-3" />
+          archive…
+        </button>
+      </div>
+    );
   const onExport = () => {
     exportArchive()
       .then((n) => setMsg(`exported ${n} run${n === 1 ? "" : "s"}`))
@@ -640,7 +667,12 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
             configuration.
           </div>
           <LineageLegend />
-          <ArchiveIO count={records.length} />
+          {/* One guidance strip at a time: when the demo banner below
+              renders, the archive-io strip starts collapsed. */}
+          <ArchiveIO
+            count={records.length}
+            collapsed={records.some((r) => r.demo)}
+          />
           {records.some((r) => r.demo) && <DemoArchiveBanner />}
           {/* Compare needs TWO runs, but nothing used to acknowledge the
               first checkbox beyond a "1" on a tab the user may never

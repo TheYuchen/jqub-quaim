@@ -392,6 +392,12 @@ export function MultiverseBoard() {
       return false;
     }
   });
+  // Guidance-strip budget (visual-calm pass): at most ONE strip at a
+  // time on this board, priority demo banner > orientation hint. While
+  // the demo banner is up the hint collapses to its "?" reopen
+  // affordance; clicking "?" is explicit intent, so it force-shows the
+  // hint for the session (hintForced) even alongside the banner.
+  const [hintForced, setHintForced] = useState(false);
   useEffect(() => {
     let alive = true;
     listRuns(200)
@@ -408,6 +414,10 @@ export function MultiverseBoard() {
 
   const groups = useMemo(() => buildGroups(runs ?? []), [runs]);
   const baseline = useMemo(() => pickBaseline(groups), [groups]);
+
+  const demoBannerVisible = runs != null && runs.some((r) => r.demo);
+  const hintVisible =
+    groups.length > 0 && (hintForced || (!hintDismissed && !demoBannerVisible));
 
   const openConfig = (g: ConfigGroup) => {
     const src = g.latestOk;
@@ -447,13 +457,16 @@ export function MultiverseBoard() {
             </>
           )}
         </div>
-        {hintDismissed && (
+        {!hintVisible && (
           <button
             type="button"
             className="shrink-0 p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
             title="Show the board orientation hint (what a card is and what Open / A/B do)"
             aria-label="Show multiverse orientation hint"
             onClick={() => {
+              // Explicit reopen beats the one-strip rule AND any
+              // persisted dismissal.
+              setHintForced(true);
               setHintDismissed(false);
               try {
                 localStorage.removeItem(MULTIVERSE_HINT_LS_KEY);
@@ -481,14 +494,16 @@ export function MultiverseBoard() {
         />
       </div>
 
-      {runs != null && runs.some((r) => r.demo) && <DemoArchiveBanner />}
+      {demoBannerVisible && <DemoArchiveBanner />}
 
       {/* Orientation one-liner (marker: multiverse-hint): the board's
           only guidance once cards exist — the empty state teaches, the
           tour is skippable, and the header key is lg-only. One line,
           task language, pinned above the grid; dismissal persists and
-          the header "?" brings it back. */}
-      {!hintDismissed && groups.length > 0 && (
+          the header "?" brings it back. Suppressed while the demo
+          banner is up (one guidance strip at a time) unless the user
+          explicitly reopened it. */}
+      {hintVisible && (
         <div
           className="multiverse-hint flex items-center gap-2 border-b border-edge/60 bg-surfaceAlt/40 px-3 py-1.5 text-[11px] text-mute"
           role="note"
@@ -506,6 +521,7 @@ export function MultiverseBoard() {
             title="Dismiss (remembered on this device — the ? in the header brings it back)"
             aria-label="Dismiss multiverse orientation hint"
             onClick={() => {
+              setHintForced(false);
               setHintDismissed(true);
               try {
                 localStorage.setItem(MULTIVERSE_HINT_LS_KEY, "1");
