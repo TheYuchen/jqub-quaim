@@ -330,9 +330,9 @@ function NextStepsHint() {
       <div className="flex items-start gap-1.5 text-mute">
         <Code2 className="w-3 h-3 mt-0.5 text-accent shrink-0" />
         <span>
-          <span className="text-ink">Export .py</span> to keep iterating in
-          your own Jupyter / slurm setup, or tweak parameters and re-run
-          to compare.
+          <span className="text-ink">Export .py</span> (in the toolbar's ⋯
+          menu) to keep iterating in your own Jupyter / slurm setup, or
+          tweak parameters and re-run to compare.
         </span>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Code2,
   Link as LinkIcon,
@@ -9,21 +9,18 @@ import {
 import { useDismissOn } from "../lib/useDismissOn";
 
 /**
- * Mobile-only overflow menu for the canvas toolbar.
+ * Overflow menu for the canvas toolbar's AUTHORING cluster — rendered
+ * at EVERY width since the authoring-vs-evidence cluster split.
  *
- * Bundles Auto-connect / Share / Clear into a single "⋮" dropdown so
- * narrow viewports (< md, i.e. <768px) keep the toolbar to three visible
- * controls (Load preset, More, Run pipeline) instead of five. Desktop
- * renders each action as its own toolbar button and hides this
- * component entirely via `md:hidden` on the wrapper `className`.
+ * Contents by width:
+ *   * always: Share + Export .py — rarely-used authoring actions,
+ *     demoted out of permanent chrome but one click away;
+ *   * < md only: Auto-connect + Clear join the menu (their standalone
+ *     toolbar buttons are md-gated), keeping the phone toolbar to
+ *     three visible controls. The rows carry `md:hidden` so exactly
+ *     one reachable copy of each action exists at any width.
  *
- * The component closes itself on:
- *   - outside click
- *   - Escape keypress
- *   - viewport growing past `md` (i.e. the menu's wrapper flips to
- *     `display:none`; without this guard the React `open` state would
- *     silently stay `true` and the menu would pop back open if the
- *     user shrinks the viewport again)
+ * Closes itself on outside click and Escape (useDismissOn).
  */
 export function MoreMenu({
   className = "",
@@ -51,22 +48,6 @@ export function MoreMenu({
 
   useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
 
-  // Responsive guard: if the viewport grows past the `md` breakpoint
-  // while the menu is open, the wrapper becomes `display:none` but the
-  // React `open` state is unchanged. Resizing back to mobile would then
-  // re-reveal the menu in an "open" state the user never asked for.
-  // `matchMedia` fires the moment the breakpoint is crossed so we can
-  // close the menu eagerly.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(min-width: 768px)");
-    const onChange = () => {
-      if (mq.matches) setOpen(false);
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-
   const items: {
     key: string;
     icon: React.ReactNode;
@@ -74,6 +55,9 @@ export function MoreMenu({
     sub?: string;
     disabled?: boolean;
     tone?: "default" | "danger";
+    /** true = this action has its own toolbar button at ≥md, so its
+     *  menu row hides there (md:hidden) — one reachable copy only. */
+    mobileOnly?: boolean;
     onClick: () => void;
   }[] = [
     {
@@ -84,6 +68,7 @@ export function MoreMenu({
         ? "Re-wire all blocks (replaces existing links)"
         : "Wire all blocks into a sensible chain",
       disabled: !canAutoConnect,
+      mobileOnly: true,
       onClick: onAutoConnect,
     },
     {
@@ -108,6 +93,7 @@ export function MoreMenu({
       sub: "Remove every block and link",
       disabled: !canClear,
       tone: "danger",
+      mobileOnly: true,
       onClick: onClear,
     },
   ];
@@ -145,7 +131,7 @@ export function MoreMenu({
                 it.onClick();
                 setOpen(false);
               }}
-              className={`flex items-start gap-3 px-3 py-2 rounded-md text-left transition-colors border border-transparent disabled:opacity-40 disabled:cursor-not-allowed ${
+              className={`${it.mobileOnly ? "md:hidden " : ""}flex items-start gap-3 px-3 py-2 rounded-md text-left transition-colors border border-transparent disabled:opacity-40 disabled:cursor-not-allowed ${
                 it.tone === "danger"
                   ? "hover:bg-danger/10 hover:border-danger/40 text-ink"
                   : "hover:bg-surfaceAlt hover:border-edge/60 text-ink"
