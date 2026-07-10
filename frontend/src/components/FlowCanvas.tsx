@@ -327,7 +327,7 @@ export function FlowCanvas() {
       return merged;
     });
 
-    requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300 }));
+    requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }));
   }, [pendingBlockKinds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-load a sample circuit on boot so the canvas has something to chew
@@ -357,7 +357,7 @@ export function FlowCanvas() {
       // Debounce one frame so the new viewport dimensions are
       // computed before fitView measures.
       requestAnimationFrame(() => {
-        fitView({ padding: 0.25, duration: 200 });
+        fitView({ padding: 0.25, duration: 200, maxZoom: 1 });
       });
     };
     window.addEventListener("orientationchange", onChange);
@@ -753,7 +753,7 @@ export function FlowCanvas() {
     // Different presets have different widths; re-fit the view so the user
     // sees the whole new chain instead of a zoomed-in slice.
     requestAnimationFrame(() => {
-      fitView({ padding: 0.25, duration: 300 });
+      fitView({ padding: 0.25, duration: 300, maxZoom: 1 });
     });
   };
 
@@ -977,6 +977,14 @@ export function FlowCanvas() {
     }));
     setNodes(restoredNodes);
     setEdges(restoredEdges);
+    // Re-fit to the restored graph: its coordinates come from whatever
+    // screen it was authored on, and the boot-time fitView measured
+    // the BOOT graph — without this, short viewports (~450px-tall
+    // canvases) show the restored row half below the fold. Same rAF
+    // pattern as loadPreset; maxZoom 1 = never past natural size.
+    requestAnimationFrame(() => {
+      fitView({ padding: 0.25, duration: 300, maxZoom: 1 });
+    });
     // Strip the pulse class after the animation ends (functional update:
     // must not clobber a drag that happened inside the window) so the
     // NEXT restore re-triggers the animation on reused DOM nodes.
@@ -1487,8 +1495,14 @@ export function FlowCanvas() {
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
-          fitViewOptions={{ padding: 0.25 }}
-          minZoom={0.4}
+          // Boot-fit contract (short-viewport clipping fix): fits cap
+          // at 1:1 (nodes never render past natural size just to fill
+          // a big canvas) and may zoom OUT to minZoom so the whole
+          // graph is always in frame — 0.15 exists for exactly that (a
+          // 4-block chain in a ~500px-wide center column fits at ~0.3;
+          // the old 0.4 floor clipped it).
+          fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
+          minZoom={0.15}
           maxZoom={1.6}
           defaultEdgeOptions={{ animated: !prefersReducedMotion }}
           proOptions={{ hideAttribution: false }}
