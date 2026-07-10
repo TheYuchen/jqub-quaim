@@ -790,16 +790,14 @@ export function MultiverseBoard() {
             <HelpCircle className="w-3.5 h-3.5" />
           </button>
         )}
-        <div className="ml-auto hidden lg:flex items-center gap-2 text-[10px] text-mute shrink-0">
-          <span>squares = pipeline stages</span>
-          <span className="text-edge">·</span>
-          <span>dot above = differs from baseline</span>
-          <span className="text-edge">·</span>
-          <span>strip = one dot per replicate (0–100%)</span>
-        </div>
+        {/* Board-header-density pass: the encoding key lives in the
+            header TipIcon and in the "?" hint strip below — the old
+            lg-only inline note said the same thing a third time and
+            crowded the 768-1200 band. Header keeps: title · counts ·
+            New configuration · ? · export. */}
         {/* Paper-figure export of the whole board (hybrid path). */}
         <FigureExportButton
-          className="ml-2 lg:ml-0 shrink-0"
+          className="ml-auto shrink-0"
           getTarget={() => boardRef.current}
           name="multiverse"
           view="multiverse"
@@ -823,10 +821,12 @@ export function MultiverseBoard() {
           aria-label="Board orientation hint"
         >
           <span className="min-w-0">
-            Each card is one configuration — its pipeline, its outcome
-            distribution, Δ vs its circuit's baseline card. Expand (⌄) for recent
-            runs and quick actions; Open rebuilds it in the Pipeline
-            editor; A/B sends two cards to Between configurations.
+            Each card is one configuration — its pipeline (squares =
+            stages, dot above = differs from baseline), its outcome
+            distribution (one dot per replicate, 0–100%), Δ vs its
+            circuit's baseline card. Expand (⌄) for recent runs and
+            quick actions; Open rebuilds it in the Pipeline editor; A/B
+            sends two cards to Between configurations.
           </span>
           <button
             type="button"
