@@ -31,6 +31,15 @@ import { FigureExportButton } from "./FigureExportButton";
 import { TipIcon } from "./TipIcon";
 import { gloss } from "../lib/glossary";
 
+// Internal tab ids are STABLE KEYS — they ride in scenario uiState
+// (lib/scenarios.ts evidenceTab), the store bridge (pendingEvidenceTab)
+// and figure-export view names/provenance ("evidence-current" etc.), so
+// renaming them would orphan recorded figures and scenario URLs. The
+// user-visible LABELS carry the narrative instead: the three tabs ARE
+// the paper's three scales of sequential evidence —
+//   current → "This run"               (scale 1: within a run)
+//   history → "This configuration"     (scale 2: across replicates)
+//   compare → "Between configurations" (scale 3: between configurations)
 type EvidenceTab = "current" | "history" | "compare";
 
 export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
@@ -106,7 +115,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
                 run.seed_mode === "pinned"
                   ? `Replayed with pinned root seed ${run.root_seed} — stochastic steps reproduce exactly.`
                   : run.root_seed != null
-                    ? `Fresh draw. Recorded root seed ${run.root_seed} — replay it any time from the History tab.`
+                    ? `Fresh draw. Recorded root seed ${run.root_seed} — replay it any time from the “This configuration” tab.`
                     : "Served from the precomputed cache — no seed was drawn for this response."
               }
             >
@@ -148,21 +157,21 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
         aria-label="Evidence views"
       >
         <TabButton
-          label="Current run"
-          title="One card per pipeline step of the run on the canvas — what each step did, with uncertainty where the result is sampled"
+          label="This run"
+          title="Scale 1 — steer a single estimate: one card per pipeline step; the funnel card expands into the Evidence Theater"
           active={tab === "current"}
           onClick={() => setTab("current")}
         />
         <TabButton
-          label="History"
-          title="Every archived run in this browser, drawn as a lineage — restore, replay (exact numbers), delete, or tick two to compare"
+          label="This configuration"
+          title="Scale 2 — pool replicates of one configuration: every archived run as a lineage; restore, replay (exact numbers), tick two to compare"
           active={tab === "history"}
           onClick={() => setTab("history")}
           badge={archived > 0 ? archived : null}
         />
         <TabButton
-          label="Compare"
-          title="Two selected runs side by side: configuration diff, fidelity as 95% intervals, step-aligned signatures"
+          label="Between configurations"
+          title="Scale 3 — compare configurations: two runs side by side as 95% intervals, plus the difference funnel (sequential A/B)"
           active={tab === "compare"}
           onClick={() => setTab("compare")}
           badge={compareIds.length > 0 ? compareIds.length : null}
@@ -229,8 +238,9 @@ function TabButton({
   );
 }
 
-/** Compare tab, fewer than two runs selected: the checkboxes live in
- *  the History tab, so point there instead of rendering nothing. */
+/** Between-configurations tab, fewer than two runs selected: the
+ *  checkboxes live in the This-configuration tab, so point there
+ *  instead of rendering nothing. */
 function CompareEmptyHint({
   selected,
   onGoToHistory,
@@ -248,11 +258,11 @@ function CompareEmptyHint({
           className="text-accent hover:underline"
           onClick={onGoToHistory}
         >
-          History tab
+          “This configuration” tab
         </button>{" "}
         — tick two runs there and this panel lays out their configuration
-        diff, fidelity as confidence intervals, and step-aligned
-        transformation signatures.
+        diff, fidelity as confidence intervals, step-aligned
+        transformation signatures, and the difference funnel.
         {selected === 1 && (
           <span className="text-ink"> One run selected — pick one more.</span>
         )}
@@ -282,8 +292,8 @@ function EmptyHint() {
       </p>
       <p className="mt-2 text-[11px]">
         Every run is archived with its seed — replay, fork, and compare
-        runs from the <span className="text-ink">History</span> tab;
-        sampled results show confidence intervals, not bare numbers.
+        runs from the <span className="text-ink">This configuration</span>{" "}
+        tab; sampled results show confidence intervals, not bare numbers.
       </p>
     </div>
   );

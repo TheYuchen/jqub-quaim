@@ -432,7 +432,8 @@ function ArchiveIO({ count }: { count: number }) {
   );
 }
 
-/** Always-visible encoding key pinned at the top of the History tab.
+/** Always-visible encoding key pinned at the top of the
+ *  This-configuration tab (internal id: history).
  *  The lineage view fronts five visual channels, and tooltips + a
  *  skippable tour slide proved discoverable-once at best. Same
  *  pattern as the canvas RibbonLegend (mini replicas of the real
@@ -631,6 +632,13 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
       )}
       {(embedded || open) && (
         <>
+          {/* Scale statement (three-scales IA): this tab is scale 2 —
+              the archive as replicates of configurations. One quiet
+              line; the legend key below carries the decoding. */}
+          <div className="border-b border-edge/40 bg-surfaceAlt/20 px-2.5 py-1 text-[10px] text-mute">
+            Every archived run; same-color runs are replicates of one
+            configuration.
+          </div>
           <LineageLegend />
           <ArchiveIO count={records.length} />
           {records.some((r) => r.demo) && <DemoArchiveBanner />}
@@ -646,8 +654,8 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
             >
               <GitCompareArrows className="w-3 h-3 shrink-0" />
               <span>
-                1 of 2 picked — tick one more run to compare, or A/B a
-                card in Multiverse.
+                1 of 2 picked — tick one more run for Between
+                configurations, or A/B a card in Multiverse.
               </span>
             </div>
           )}

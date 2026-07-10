@@ -498,7 +498,7 @@ export function MultiverseBoard() {
           <span className="min-w-0">
             Each card is one configuration — its pipeline, its outcome
             distribution, Δ vs the baseline card. Open rebuilds it; A/B
-            sends two cards to Compare.
+            sends two cards to Between configurations.
           </span>
           <button
             type="button"

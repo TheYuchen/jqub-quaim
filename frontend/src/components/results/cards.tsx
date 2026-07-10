@@ -6,6 +6,7 @@
 // visualise them using the primitives from `./viz`.
 
 import { useEffect, useState } from "react";
+import { Maximize2 } from "lucide-react";
 import type { StepResult } from "../../lib/api";
 import { useApp } from "../../lib/store";
 import { listRunsByConfig } from "../../lib/runStore";
@@ -452,14 +453,20 @@ function UncertaintyBlock({
               seed {seedUsed}
             </span>
           )}
+          {/* THE theater entry point (three-scales IA): the theater is
+              this tab's expanded mode, so its affordance lives on the
+              funnel card itself — the toolbar button it replaces sat a
+              panel away from the funnel it enlarged. Auto-open on
+              streaming runs is unchanged. */}
           <button
             type="button"
             data-marker="open-theater"
-            className="text-accent hover:underline"
+            className="flex items-center gap-1 rounded border border-accent/50 px-1.5 py-0.5 text-accent hover:bg-accent/10"
             onClick={() => useApp.getState().setTheaterOpen(true)}
-            title="Open the evidence theater — this funnel, large: per-batch intervals on a shots axis, stopping target, cost row."
+            title="Expand this funnel into the Evidence Theater — the large steering view: per-batch intervals on a shots axis, stopping target, cost row. (Opens by itself when a run streams.)"
           >
-            open theater ↗
+            <Maximize2 className="w-3 h-3" />
+            expand · theater
           </button>
         </span>
       </div>
@@ -476,7 +483,7 @@ function UncertaintyBlock({
           className="evidence-funnel space-y-px"
           role="img"
           aria-label={`evidence funnel: ${trace.length} shot batches, interval narrowing from ${((trace[0].ci95[1] - trace[0].ci95[0]) * 100).toFixed(1)} to ${((hi - lo) * 100).toFixed(1)} percentage points wide`}
-          title={`Each line = the 95% CI after one more batch of shots (top = first batch). ${trace.length} batches; width ${((trace[0].ci95[1] - trace[0].ci95[0]) * 100).toFixed(1)}pp → ${((hi - lo) * 100).toFixed(1)}pp. Same funnel motif as the History lineage: here shot batches accumulate inside ONE run; there whole runs accumulate across a replicate group.`}
+          title={`Each line = the 95% CI after one more batch of shots (top = first batch). ${trace.length} batches; width ${((trace[0].ci95[1] - trace[0].ci95[0]) * 100).toFixed(1)}pp → ${((hi - lo) * 100).toFixed(1)}pp. Same funnel motif as the lineage in “This configuration”: here shot batches accumulate inside ONE run; there whole runs accumulate across a replicate group.`}
         >
           {trace.map((t, i) => (
             <div key={t.shots_done} className="relative h-[3px]" aria-hidden>
@@ -646,7 +653,7 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
           data-marker="compare-vs-previous"
           className="text-[10px] text-accent hover:underline"
           onClick={() => useApp.getState().setCompareIds(latestPair)}
-          title="Open the Compare tab with this configuration's two most recent archived runs side by side."
+          title="Open “Between configurations” with this configuration's two most recent archived runs side by side."
         >
           compare vs previous run of this configuration ↗
         </button>

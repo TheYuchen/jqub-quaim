@@ -120,6 +120,11 @@ export interface Scenario {
   /** Run the pipeline automatically once graph + circuit are ready. */
   autoRun?: boolean;
   workspaceMode: "compose" | "multiverse";
+  /** STABLE internal tab ids (see ResultsPane's EvidenceTab note):
+   *  current = "This run" (scale 1), history = "This configuration"
+   *  (scale 2), compare = "Between configurations" (scale 3). Figure
+   *  provenance and these scenario definitions key on the ids, so the
+   *  three-scales rename changed only the user-visible labels. */
   evidenceTab?: "current" | "history" | "compare";
   /** Expand the right (Evidence) pane / open its mobile drawer. */
   expandEvidence?: boolean;
@@ -239,7 +244,8 @@ export const SCENARIOS: Record<string, Scenario> = {
     evidenceTab: "current",
     expandEvidence: true,
   },
-  // F4 — provenance lineage: History tab over the bundled archive,
+  // F4 — provenance lineage: the This-configuration tab (id: history)
+  // over the bundled archive,
   // which contains a pinned replay forked from an earlier bell run
   // (curved fork edge + seed ring) plus replicate bands/strips.
   F4: {
@@ -273,7 +279,8 @@ export const SCENARIOS: Record<string, Scenario> = {
   // bundled archive the top two ARE the two bell configs (512 vs
   // 2048 shots) — an earlier version of this comment claimed bell vs
   // vqc+QuCAD, stale since the config hash started separating the
-  // shots param. Since the difference-funnel wave the Compare tab
+  // shots param. Since the difference-funnel wave the
+  // Between-configurations tab (id: compare)
   // also draws the Δ(B−A) funnel below the bars (see F8, which pins
   // the expected numbers).
   F6: {
@@ -300,7 +307,7 @@ export const SCENARIOS: Record<string, Scenario> = {
   // crossing through each other's intervals, per-run id+seed legend
   // in the context strip, final readouts dodged in the right margin
   // (A 48.00%, B 50.39% — final intervals overlap: consistent with
-  // one underlying configuration), Compare tab open behind the
+  // one underlying configuration), Between-configurations tab open behind the
   // theater with the "overlay in theater" chip visible. No target
   // corridor (these archive runs executed their full budget with no
   // stopping rule). Scrubbing to batch k truncates BOTH funnels in
@@ -317,7 +324,8 @@ export const SCENARIOS: Record<string, Scenario> = {
     overlayPair: true,
   },
   // F8 — DIFFERENCE FUNNEL (marker: difference-funnel): sequential
-  // A/B evidence steering in the Compare tab. compareTopConfigs lands
+  // A/B evidence steering in the Between-configurations tab.
+  // compareTopConfigs lands
   // on the bundled archive's two most-replicated configurations,
   // which differ ONLY in the fake_backend shots param (512 vs 2048),
   // so the funnel answers a real tuning question: "did raising shots
@@ -467,7 +475,7 @@ export async function activateScenario(rawKey: string): Promise<boolean> {
   if (sc.overlayPair) {
     const ids = await pickOverlayPairRunIds();
     if (ids.length === 2) {
-      // Compare tab shows the pair (with the overlay chip); the
+      // The Between-configurations tab shows the pair (overlay chip); the
       // theater opens on top in overlay-comparison mode.
       useApp.setState({ compareIds: ids });
       app.setTheaterOverlay([ids[0], ids[1]]);

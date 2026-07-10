@@ -21,7 +21,6 @@ import {
   AlertTriangle,
   Box,
   Check,
-  Clapperboard,
   Code2,
   Link2,
   Loader2,
@@ -1309,21 +1308,11 @@ export function FlowCanvas() {
             <option value={0.02}>±2pp</option>
             <option value={0.01}>±1pp</option>
           </select>
-          {/* Evidence theater reopen: the theater auto-opens when a
-              sampled step starts streaming (dismissable); this button
-              brings it back — also for archived/replayed runs, whose
-              persisted per-batch trace renders the same funnel. */}
-          <button
-            type="button"
-            data-marker="evidence-theater-open"
-            onClick={() => useApp.getState().setTheaterOpen(true)}
-            className="btn hidden md:inline-flex"
-            title="Evidence theater — a large live view of the 95% interval narrowing as shot batches stream in (opens by itself when a run streams; reopen it here)"
-            aria-label="Open evidence theater"
-          >
-            <Clapperboard className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Theater</span>
-          </button>
+          {/* Evidence theater: NO toolbar button. The theater is the
+              This-run tab's expanded mode (three-scales IA), so its
+              reopen affordance lives on the funnel card itself
+              (results/cards.tsx, marker open-theater); it still
+              auto-opens when a sampled step starts streaming. */}
           {/* cost-estimate chip: what will pressing Run cost, judged
               from this browser's own archived step timings. Sits next
               to Run so the price tag is read together with the
