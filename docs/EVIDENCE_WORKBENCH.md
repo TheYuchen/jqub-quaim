@@ -938,3 +938,41 @@ provenance-backed (scenario key + pinned seed + trace_position) and
 bit-exactly regenerable from the live app, so re-export is a replay,
 not a re-measurement. Data, seeds, traces, and every number in the
 F0/F3 recipes are untouched.
+
+## History lineage: always-visible legend key (SHIPPED 2026-07-10)
+
+The lineage view fronts five visual channels (dot hue = configuration,
+dot area = shots of evidence, ring = pinned seed, band = replicate
+group, curved edge = fork lineage — plus the distribution strip and
+the certainty funnel), but its only decoding aids were hover tooltips,
+a one-line footer legend below the scroll, and a skippable tour slide.
+That failed the owner test: even the project owner had to ask what the
+circles and lines mean.
+
+Now (`LineageLegend` in RunHistory.tsx, marker class
+`lineage-legend`): a compact, always-visible key pinned at the TOP of
+the History tab body, above the demo banner — one wrap-row of six
+items, each a mini SVG replica of the real mark (24×14, accent-toned
+so no specific configuration hue is implied) beside a 2–4 word label:
+color = configuration · size = shots · ring = pinned seed · band =
+replicates · curve = forked from · strip = results + mean. Same
+pattern as the canvas RibbonLegend (teach by resemblance, localStorage
+dismissal — `quda.lineageLegendDismissed`) plus the affordance that
+one lacks: after dismissal a small "key" chip stays in the same top
+strip and brings the legend back — a key you can lose forever is
+barely better than none.
+
+The old one-line footer legend is deleted — one source of truth. Its
+disclosure clauses moved into the key items' tooltips: the
+evidence-radius floor/cap (≤69 shots read as the 3px floor, ≥2048 as
+the cap) on the size item, hollow+slash = error on the color item,
+and the funnel's per-group normalization (compare widths within a
+band, not across bands) on the band item. The ⚲/∿ seed-glyph row
+tooltip now also decodes the glyph per mode (⚲ pinned = deterministic
+replay; ∿ fresh = drawn at random and recorded); the ⏹ stopped-early
+tooltip was verified descriptive as-is. The standalone (collapsible)
+RunHistory hosting mode shares the same body, so it gets the key for
+free — though it is currently unmounted (ResultsPane's History tab is
+the only usage). Since the key renders inside the panel body it is
+captured by figure export while visible — figure-makers keep it,
+daily users dismiss it once (the RibbonLegend contract).

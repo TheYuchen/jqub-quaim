@@ -45,9 +45,18 @@
 // collapsible header. Hovering a row (or its dot) highlights the full
 // lineage chain — ancestors via forked_from plus every descendant —
 // by dimming unrelated rows, nodes and edges.
+//
+// Decoding aid: LineageLegend -- an always-visible, dismissable key
+// pinned at the TOP of the panel, one mini SVG replica of each real
+// mark + a 2-4 word label. Its tooltips carry the encoding
+// disclosures the old one-line footer legend held (evidence-radius
+// floor/cap, funnel per-group scale, hollow+slash = error), so the
+// footer is gone -- one source of truth. Dismissal persists in
+// localStorage (quda.lineageLegendDismissed); a small "key" chip in
+// the same top strip brings it back.
 
-import { useEffect, useMemo, useState } from "react";
-import { GitCompareArrows, History, Play, RotateCcw, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { GitCompareArrows, History, KeyRound, Play, RotateCcw, Trash2, X } from "lucide-react";
 import { useApp } from "../lib/store";
 import { deleteRun, listRuns, type RunRecord } from "../lib/runStore";
 import { hashHue, hueCss } from "../lib/hues";
@@ -323,6 +332,147 @@ function lineageOf(
   return chain;
 }
 
+// --- lineage legend (encoding key) ----------------------------------------
+
+const LINEAGE_LEGEND_LS_KEY = "quda.lineageLegendDismissed";
+
+/** One item of the lineage key: a mini SVG replica of the real mark
+ *  (24x14 box, accent-toned so no specific configuration color is
+ *  implied) beside a 2-4 word label. The full explanation -- including
+ *  the disclosures the removed footer line carried -- lives in the
+ *  native tooltip. */
+function KeyItem({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className="flex items-center gap-1 cursor-help" title={hint}>
+      <svg width={24} height={14} viewBox="0 0 24 14" aria-hidden className="shrink-0">
+        {children}
+      </svg>
+      <span>{label}</span>
+    </span>
+  );
+}
+
+/** Always-visible encoding key pinned at the top of the History tab.
+ *  The lineage view fronts five visual channels, and tooltips + a
+ *  skippable tour slide proved discoverable-once at best. Same
+ *  pattern as the canvas RibbonLegend (mini replicas of the real
+ *  marks, localStorage dismissal) plus the affordance that one lacks:
+ *  a compact "key" chip in the same top strip that brings the legend
+ *  back -- a key you can lose forever is barely better than none. */
+function LineageLegend() {
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LINEAGE_LEGEND_LS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const ACC = "rgb(var(--color-accent))";
+  if (dismissed)
+    return (
+      <div className="lineage-legend flex justify-end border-b border-edge/40 px-1.5 py-0.5">
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-mute hover:text-ink hover:bg-surfaceAlt"
+          title="Show the encoding key for this view (what the dots, rings, bands, curves and strips mean)"
+          aria-label="Show lineage encoding key"
+          onClick={() => {
+            setDismissed(false);
+            try {
+              localStorage.removeItem(LINEAGE_LEGEND_LS_KEY);
+            } catch {
+              /* private mode -- reopening is session-scoped anyway */
+            }
+          }}
+        >
+          <KeyRound className="w-3 h-3" />
+          key
+        </button>
+      </div>
+    );
+  return (
+    <div
+      className="lineage-legend flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-edge/60 bg-surfaceAlt/40 px-2.5 py-1.5 text-[10px] text-mute"
+      role="note"
+      aria-label="Lineage encoding key"
+    >
+      <KeyItem
+        label="color = configuration"
+        hint="Every dot is one archived run; its hue is derived from the configuration hash, so replicates of the same experiment share a color across panels, sessions and screenshots. Errored runs draw hollow with a red slash."
+      >
+        <circle cx={12} cy={7} r={4} fill={ACC} fillOpacity={0.95} />
+      </KeyItem>
+      <KeyItem
+        label="size = shots"
+        hint="Dot area grows with the shots of evidence the run actually executed (area proportional to sqrt(shots) against a fixed 2048-shot reference). Clamped: 69 shots or fewer all read as the 3px floor, 2048 or more as the cap; runs with no sampled step keep the floor."
+      >
+        <circle cx={6.5} cy={7} r={2} fill={ACC} fillOpacity={0.95} />
+        <circle cx={16.5} cy={7} r={4.5} fill={ACC} fillOpacity={0.95} />
+      </KeyItem>
+      <KeyItem
+        label="ring = pinned seed"
+        hint="A ring around a dot marks a pinned (replayed) seed -- the run is deterministic and reproduces its numbers exactly. Bare dots are fresh random draws."
+      >
+        <circle cx={12} cy={7} r={3} fill={ACC} fillOpacity={0.95} />
+        <circle cx={12} cy={7} r={5.5} fill="none" stroke={ACC} strokeWidth={1.2} />
+      </KeyItem>
+      <KeyItem
+        label="band = replicates"
+        hint="A translucent band + spine groups a contiguous block of replicate runs of one configuration (what the xN runner produces). The two thin lines flaring around a band are its certainty funnel: the pooled 95% CI half-width narrowing as replicates accumulate -- scaled per group, so compare funnel widths within a band, not across bands."
+      >
+        <rect x={1} y={2.5} width={22} height={9} rx={4.5} fill={ACC} fillOpacity={0.15} />
+        <line x1={5} y1={7} x2={19} y2={7} stroke={ACC} strokeOpacity={0.4} strokeWidth={1.5} />
+        <circle cx={7.5} cy={7} r={2.6} fill={ACC} fillOpacity={0.95} />
+        <circle cx={16.5} cy={7} r={2.6} fill={ACC} fillOpacity={0.95} />
+      </KeyItem>
+      <KeyItem
+        label="curve = forked from"
+        hint="A curved edge links a run to the ancestor it was forked from (restore or replay), drawn in the child's hue -- follow a color upward through time to trace where a configuration came from. A short dashed stub means the ancestor was deleted or lies outside the 50-run window."
+      >
+        <circle cx={4.5} cy={3.5} r={2.2} fill={ACC} fillOpacity={0.95} />
+        <circle cx={19.5} cy={10.5} r={2.2} fill={ACC} fillOpacity={0.55} />
+        <path d="M 6 5 C 10 9.5 14 4.5 18 9.5" fill="none" stroke={ACC} strokeOpacity={0.7} strokeWidth={1.2} />
+      </KeyItem>
+      <KeyItem
+        label="strip = results + mean"
+        hint="The mini strip above a replicate block plots the headline values (0-1 scale) of every run of that configuration archived up to that moment: bright dots = the block below, faint dots = older replicates, tick = the running mean."
+      >
+        <line x1={2} y1={7} x2={22} y2={7} stroke="rgb(var(--color-edge))" strokeWidth={1} />
+        <line x1={2} y1={4.5} x2={2} y2={9.5} stroke="rgb(var(--color-edge))" strokeWidth={1} />
+        <line x1={22} y1={4.5} x2={22} y2={9.5} stroke="rgb(var(--color-edge))" strokeWidth={1} />
+        <line x1={13} y1={3} x2={13} y2={11} stroke="rgb(var(--color-ink))" strokeOpacity={0.6} strokeWidth={1} />
+        <circle cx={7} cy={7} r={1.8} fill={ACC} fillOpacity={0.95} />
+        <circle cx={10.5} cy={7} r={1.8} fill={ACC} fillOpacity={0.4} />
+        <circle cx={17} cy={7} r={1.8} fill={ACC} fillOpacity={0.95} />
+      </KeyItem>
+      <button
+        type="button"
+        className="ml-auto shrink-0 self-start text-mute hover:text-ink transition-colors"
+        title="Dismiss (remembered on this device -- the small 'key' button brings it back)"
+        aria-label="Dismiss lineage encoding key"
+        onClick={() => {
+          setDismissed(true);
+          try {
+            localStorage.setItem(LINEAGE_LEGEND_LS_KEY, "1");
+          } catch {
+            /* private mode etc. -- the key just reappears next visit */
+          }
+        }}
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
 /** Provenance lineage panel.
  *
  * Hosting modes:
@@ -403,6 +553,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
       )}
       {(embedded || open) && (
         <>
+          <LineageLegend />
           {records.some((r) => r.demo) && <DemoArchiveBanner />}
           {/* Compare needs TWO runs, but nothing used to acknowledge the
               first checkbox beyond a "1" on a tab the user may never
@@ -547,7 +698,9 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                         className={`shrink-0 ${r.seed_mode === "pinned" ? "text-accent" : "text-mute"}`}
                         title={
                           r.root_seed != null
-                            ? `${r.seed_mode} seed — root ${r.root_seed}. Replay reproduces this draw exactly.`
+                            ? r.seed_mode === "pinned"
+                              ? `⚲ pinned seed — root ${r.root_seed}. This run was replayed deterministically; replaying it again reproduces the same numbers.`
+                              : `∿ fresh seed — root ${r.root_seed}, drawn at random and recorded. Replay pins it to reproduce these exact numbers.`
                             : "no seed recorded (pre-provenance run or cached response)"
                         }
                       >
@@ -772,24 +925,6 @@ cumulative Wilson CI half-width of this configuration's pooled counts, widest (o
                 })}
               </svg>
             </div>
-          </div>
-          {/* legend: one line, doubles as the figure caption key */}
-          <div className="px-3 py-1 border-t border-edge/60 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[9px] text-mute">
-            <span>hue = configuration</span>
-            {/* floor/cap disclosure: evidenceRadius clamps to
-                [R_MIN, R_MAX], i.e. ≤69 shots all read as the 3px
-                floor and ≥2048 as the cap (audit MINOR — the clamp
-                was silent). */}
-            <span>area = shots of evidence (floor ≤69, cap 2048)</span>
-            <span>ring = pinned seed</span>
-            <span>slash = error</span>
-            <span>curve = forked from</span>
-            <span>strip = replicate metrics (0–1)</span>
-            {/* per-group scale disclosure: each band's funnel is
-                normalized to its own widest row, so funnel widths are
-                comparable WITHIN a band, not across bands (audit
-                MINOR). */}
-            <span>funnel = pooled CI narrowing (per-group scale)</span>
           </div>
         </>
       )}
