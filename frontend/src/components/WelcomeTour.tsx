@@ -345,31 +345,33 @@ function ComposeSVG() {
   );
 }
 
-/** Slide 3 — replicates, lineage, funnel, precision target. */
+/** Slide 3 — scales 1 & 2: steering one run, pooling its replicates. */
 function EvidenceSlide() {
   return (
     <SlideShell
-      kicker="Evidence accumulates"
-      title="One run is one draw — collect more"
+      kicker="Scales 1 & 2 — evidence accumulates"
+      title="Steer one run, then pool its replicates"
       visual={<EvidenceSVG />}
     >
       <p>
-        Run ×N replicates
+        Inside a run (scale 1), the interval narrows as shot batches
+        stream in — the funnel. Set a precision target
+        <TipIcon
+          className="mx-0.5 align-text-top"
+          hint={gloss("precisionTarget")}
+        />{" "}
+        and the run stops itself once it is precise enough. Across ×N
+        replicates
         <TipIcon className="mx-0.5 align-text-top" hint={gloss("replicate")} />{" "}
-        and History becomes a lineage: hue = configuration
+        (scale 2), <span className="text-ink font-medium">This
+        configuration</span> becomes a lineage: hue = configuration
         <TipIcon
           className="mx-0.5 align-text-top"
           hint={gloss("configuration")}
         />
         , dot size = shots
         <TipIcon className="mx-0.5 align-text-top" hint={gloss("shots")} /> of
-        evidence. Inside a run, the interval narrows as shot batches stream
-        in — the funnel. Set a precision target
-        <TipIcon
-          className="mx-0.5 align-text-top"
-          hint={gloss("precisionTarget")}
-        />{" "}
-        and the run stops itself once it is precise enough.
+        evidence.
       </p>
     </SlideShell>
   );
@@ -426,22 +428,23 @@ function EvidenceSVG() {
   );
 }
 
-/** Slide 4 — multiverse + honest A/B. */
+/** Slide 4 — scale 3: between configurations (multiverse + honest A/B). */
 function CompareSlide() {
   return (
     <SlideShell
-      kicker="Compare & explore"
+      kicker="Scale 3 — between configurations"
       title="Every configuration, side by side"
       visual={<CompareSVG />}
     >
       <p>
         The Multiverse board gives each configuration a card: pipeline strip,
-        outcome dots, Δ versus the baseline. Pick any two runs for an A/B
-        comparison — estimates render as 95% intervals
+        outcome dots, Δ versus the baseline. Pick any two runs for{" "}
+        <span className="text-ink font-medium">Between configurations</span> —
+        estimates render as 95% intervals
         <TipIcon className="mx-0.5 align-text-top" hint={gloss("ci")} />, and
         the verdict stays honest: overlapping intervals are{" "}
-        <span className="text-ink font-medium">not</span> evidence of a
-        difference.
+        <span className="text-ink font-medium">not</span> evidence, and the
+        difference funnel accumulates the sequential A/B verdict.
       </p>
     </SlideShell>
   );
@@ -519,8 +522,11 @@ function TrySlide({ onDone }: { onDone: () => void }) {
           every demo configuration side by side.
         </li>
         <li>
-          In <span className="text-ink font-medium">Evidence → History</span>,
-          press ▶ on a run: same seed, same numbers, bit-exact.
+          In{" "}
+          <span className="text-ink font-medium">
+            Evidence → This configuration
+          </span>
+          , press ▶ on a run: same seed, same numbers, bit-exact.
         </li>
         <li>
           Set <span className="kbd">target: ±2pp</span> in the toolbar and

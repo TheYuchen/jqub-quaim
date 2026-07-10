@@ -12,7 +12,7 @@
 // state only): the TopBar mounts it next to the Tour button and no
 // other surface needs to know it exists.
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ListChecks, X } from "lucide-react";
 import { APP_NAME } from "../lib/anon";
 
@@ -22,46 +22,78 @@ interface ClaimRow {
   scenarios: string[]; // scenario keys, rendered as ?scenario= links
 }
 
-const ROWS: ClaimRow[] = [
+/** Rows grouped under the paper's three contributions (mirrors the
+ *  contribution map at the top of docs/EVIDENCE_WORKBENCH.md — if a
+ *  claim moves there, move it here). */
+interface ClaimSection {
+  id: string;
+  label: string;
+  rows: ClaimRow[];
+}
+
+const SECTIONS: ClaimSection[] = [
   {
-    claim: "Seeded replay — every run is archived with its root seed and replays bit-exactly",
-    where: "History tab: replay (⚲) any row; seed chip on the fidelity card",
-    scenarios: ["F4"],
+    id: "C1",
+    label: "C1 — one funnel grammar, three scales (evidence steering)",
+    rows: [
+      {
+        claim: "Scale 1, within a run — the 95% interval narrows live; a precision target stops the run",
+        where: "Evidence Theater (auto-opens on streaming runs; “expand · theater” on the funnel card); toolbar “target ±pp”",
+        scenarios: ["F0", "F3"],
+      },
+      {
+        claim: "Scale 2, across replicates — same rule, different draws: two replays of one configuration overlaid",
+        where: "“Between configurations” tab → “overlay in theater” (same configuration, both runs traced)",
+        scenarios: ["F7"],
+      },
+      {
+        claim: "Scale 3, between configurations — the interval of the difference Δ(B−A) accumulates across replicates",
+        where: "“Between configurations” tab: difference funnel below the interval bars",
+        scenarios: ["F8"],
+      },
+      {
+        claim: "Multiverse analysis — every configuration as a small multiple with Δ vs the baseline (the scale-3 portfolio)",
+        where: "Multiverse workspace (toggle top-left of the canvas)",
+        scenarios: ["F2"],
+      },
+    ],
   },
   {
-    claim: "Anytime evidence steering — the 95% interval narrows live; a precision target stops the run",
-    where: "Evidence theater (auto-opens on streaming runs); toolbar “target ±pp”; funnel on the fidelity card",
-    scenarios: ["F0", "F3"],
+    id: "C2",
+    label: "C2 — stochastic-provenance substrate",
+    rows: [
+      {
+        claim: "Seeded replay — every run is archived with its root seed and replays bit-exactly",
+        where: "“This configuration” tab: replay (⚲) any row; seed chip on the fidelity card",
+        scenarios: ["F4"],
+      },
+      {
+        claim: "Uncertainty in provenance — lineage nodes are distributions (evidence mass, certainty funnels)",
+        where: "“This configuration” tab: dot area = shots executed, replicate bands with pooled-CI funnels, fork edges",
+        scenarios: ["F4"],
+      },
+      {
+        claim: "Transformation vocabulary — uniform before→after signatures define what “a configuration” is, plugins included",
+        where: "Delta-strip glyphs on canvas nodes and result cards; gate-level circuit diff in the signature card",
+        scenarios: ["F1", "F5"],
+      },
+    ],
   },
   {
-    claim: "Transformation vocabulary — uniform before→after signatures for every step, plugins included",
-    where: "Delta-strip glyphs on canvas nodes and result cards; gate-level circuit diff in the signature card",
-    scenarios: ["F1", "F5"],
-  },
-  {
-    claim: "Uncertainty in provenance — lineage nodes are distributions (evidence mass, certainty funnels)",
-    where: "History tab: dot area = shots executed, replicate bands with pooled-CI funnels, fork edges",
-    scenarios: ["F4"],
-  },
-  {
-    claim: "Multiverse analysis — every configuration as a small multiple with Δ vs the baseline",
-    where: "Multiverse workspace (toggle top-left of the canvas)",
-    scenarios: ["F2"],
-  },
-  {
-    claim: "Honest comparison — intervals instead of scalars; overlap is called out as not-evidence",
-    where: "Compare tab (tick two runs in History, or A/B two multiverse cards)",
-    scenarios: ["F6"],
-  },
-  {
-    claim: "Same rule, different draws — two replays of one configuration overlaid in the theater",
-    where: "Compare tab → “overlay in theater” (same configuration, both runs traced)",
-    scenarios: ["F7"],
-  },
-  {
-    claim: "Provenance-backed figures — every export regenerates bit-exactly from its own metadata",
-    where: "Camera buttons on the canvas, multiverse board, evidence pane and theater (SVG + PNG + sidecar)",
-    scenarios: ["F0"],
+    id: "C3",
+    label: "C3 — honesty devices",
+    rows: [
+      {
+        claim: "Honest comparison — intervals instead of scalars; overlap is called out as not-evidence",
+        where: "“Between configurations” tab (tick two runs in This configuration, or A/B two multiverse cards)",
+        scenarios: ["F6"],
+      },
+      {
+        claim: "Provenance-backed figures — every export regenerates bit-exactly from its own metadata",
+        where: "Camera buttons on the canvas, multiverse board, evidence pane and theater (SVG + PNG + sidecar)",
+        scenarios: ["F0"],
+      },
+    ],
   },
 ];
 
@@ -129,24 +161,39 @@ export function ClaimsMapButton() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ROWS.map((r) => (
-                    <tr key={r.claim} className="border-t border-edge/50 align-top">
-                      <td className="py-2 pr-3 text-ink">{r.claim}</td>
-                      <td className="py-2 pr-3 text-mute">{r.where}</td>
-                      <td className="py-2 whitespace-nowrap">
-                        {r.scenarios.map((k, i) => (
-                          <a
-                            key={k}
-                            href={`?scenario=${k}`}
-                            className="text-accent hover:underline font-mono"
-                            title={`Boot ?scenario=${k} (reloads the app into that figure state)`}
-                          >
-                            {i > 0 ? " · " : ""}
-                            {k}
-                          </a>
-                        ))}
-                      </td>
-                    </tr>
+                  {SECTIONS.map((sec) => (
+                    <React.Fragment key={sec.id}>
+                      <tr className="border-t border-edge/50">
+                        <td
+                          colSpan={3}
+                          className="pt-3 pb-1 text-[10px] uppercase tracking-wider text-accent"
+                        >
+                          {sec.label}
+                        </td>
+                      </tr>
+                      {sec.rows.map((r) => (
+                        <tr
+                          key={r.claim}
+                          className="border-t border-edge/50 align-top"
+                        >
+                          <td className="py-2 pr-3 text-ink">{r.claim}</td>
+                          <td className="py-2 pr-3 text-mute">{r.where}</td>
+                          <td className="py-2 whitespace-nowrap">
+                            {r.scenarios.map((k, i) => (
+                              <a
+                                key={k}
+                                href={`?scenario=${k}`}
+                                className="text-accent hover:underline font-mono"
+                                title={`Boot ?scenario=${k} (reloads the app into that figure state)`}
+                              >
+                                {i > 0 ? " · " : ""}
+                                {k}
+                              </a>
+                            ))}
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
