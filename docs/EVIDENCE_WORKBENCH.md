@@ -54,6 +54,123 @@ detail). Internal ids stay frozen ("compose"/"multiverse" in scenario
 uiState, localStorage, provenance); only labels speak the new language
 ("Pipeline editor"/"Evidence board").
 
+### 1.2 Grounding in documented practice
+
+The task analysis behind the three scales is corpus-grounded (two
+literature passes, 2026-07): each scale answers a *documented*
+practice, a *documented* pain, or a *documented* absence, so the
+paper cites its way through the taxonomy — the corpus substitutes
+for formative interviews. Use EXACTLY the citations listed at the
+end of this section; nothing here is folklore.
+
+**Scale 1 (within a run) ← codified precision (P1) + adaptivity
+hidden in optimizers (P4) + hard costs (T2).** Precision-gated
+evidence is codified practice at the protocol layer: Quantum Volume
+requires n_c ≥ 100 circuits and gates acceptance on a z = 2 "97.5%
+one-sided confidence interval" (Cross et al. 2019, Appendix C);
+randomized benchmarking has confidence-bounded prescriptions
+(Wallman & Flammia 2014); Google's XEB claim sized its samples for
+5σ (Arute et al. 2019); and Qiskit Runtime's EstimatorV2 exposes
+`precision` as a first-class request parameter (default 0.015625 =
+1/√4096 shots). Adaptive shot allocation exists too — but INSIDE
+optimizers: iCANS (Kübler et al. 2020) and Rosalin (Arrasmith et
+al. 2020) adapt shots per iteration under the hood, invisible to the
+person running the experiment; our move is to surface that
+shot-frugality to the interaction layer, where a human decides. And
+the stopping decision is economically real, not a stylized cost
+axis: IBM pay-as-you-go hardware bills $1.60 per second and the Open
+Plan grants 10 minutes per 28-day window — unspent budget is money
+and quota (surfaced in the theater's cost-anchor line, marker
+`cost-anchor`, and in the cost chip tooltip).
+
+**Scale 2 (across replicates) ← documented irreproducibility (P3) +
+the tracking void (T1) + history fragility (T5).** Repetition is
+normal and instability is documented, not anecdotal: Dasgupta &
+Humble characterize run-to-run non-reproducibility and temporal
+drift across calibration cycles (arXiv:2008.09612; Entropy
+24(2):244); barren plateaus make any single trace an
+unrepresentative draw (McClean et al. 2018); Qiskit's own docs state
+the transpiler is stochastic and require seed_transpiler /
+seed_simulator for reproducibility — seeds scattered across API
+layers (P2: repetition is normal, reporting of it is chaotic). Yet
+the tooling for replicates is a void: official VQE tutorials track
+convergence with an in-memory list and matplotlib (T1); Gamage et
+al. (QCE'25) had to graft MLflow onto quantum workflows to get any
+experiment tracking at all; and platform history is fragile — IBM's
+2025 classic-platform retirement made old job records inaccessible
+(T5). Scale 2 is the missing replicate-level record: the archive,
+lineage-as-distributions, pooled/certainty funnels.
+
+**Scale 3 (between configurations) ← no difference-CI convention
+(P5) + the benchmark-lottery critique (P2).** Bowles, Ahmed & Schuld
+(2024) document the "benchmark lottery" in quantum ML — top-of-20
+reporting, comparisons published without any interval on the
+difference; QED-C's volumetric benchmarking (arXiv:2110.03137)
+standardizes reporting — but at the DEVICE level, static, published
+once. No difference-CI convention exists for configuration
+comparison. (T3 wording fix, folded in: existing benchmark
+ecosystems are device-level and static; ours is experiment-level and
+single-user, a person steering their own comparisons in the loop.)
+Scale 3 supplies exactly the missing convention: one Newcombe
+interval on Δ(B−A), accumulated chronologically across both sides'
+replicates, verdict watchable, priced, and revocable.
+
+**The gap, stated once.** Statistical rigor for shot-bought evidence
+is codified at the PROTOCOL layer (QV's one-sided CI gate, RB
+confidence bounds, XEB's 5σ sizing) and automated at the OPTIMIZER
+layer (iCANS/Rosalin shot-frugality), but it has never been surfaced
+at the INTERACTIVE layer — where practitioners actually watch, stop,
+replicate, and compare runs. That stratified absence — rigor above
+the human in the protocols, rigor below the human in the optimizers,
+nothing at the human — is the design opportunity the three scales
+fill.
+
+Grounding corpus (cite exactly these):
+
+* Cross, Bishop, Sheldon, Nation, Gambetta. "Validating quantum
+  computers using randomized model circuits." Phys. Rev. A 100,
+  032328 (2019); arXiv:1811.12926. — QV: n_c ≥ 100 circuits, z = 2
+  "97.5% one-sided CI" acceptance gate (Appendix C).
+* Wallman, Flammia. "Randomized benchmarking with confidence." New
+  J. Phys. 16, 103032 (2014).
+* Arute et al. "Quantum supremacy using a programmable
+  superconducting processor." Nature 574, 505–510 (2019). — XEB
+  sample sizing for 5σ.
+* Qiskit Runtime EstimatorV2 API docs — `precision` as a first-class
+  request parameter, default 0.015625 = 1/√4096.
+* Kübler, Arrasmith, Cincio, Coles. "An Adaptive Optimizer for
+  Measurement-Frugal Variational Algorithms" (iCANS). Quantum 4, 263
+  (2020).
+* Arrasmith, Cincio, Somma, Coles. "Operator Sampling for Shot-frugal
+  Optimization in Variational Algorithms" (Rosalin). arXiv:2004.06252
+  (2020); PennyLane tutorial implementation.
+* Dasgupta, Humble. Stability/reproducibility series:
+  arXiv:2008.09612 (2020) and Entropy 24(2), 244 (2022). —
+  documented run-to-run irreproducibility, drift across calibration
+  cycles.
+* McClean, Boixo, Smelyanskiy, Babbush, Neven. "Barren plateaus in
+  quantum neural network training landscapes." Nat. Commun. 9, 4812
+  (2018).
+* Qiskit documentation — transpiler passes are stochastic;
+  seed_transpiler / seed_simulator required for reproducibility.
+* Bowles, Ahmed, Schuld. "Better than classical? The subtle art of
+  benchmarking quantum machine learning models." arXiv:2403.07059
+  (2024). — "benchmark lottery", top-of-20 reporting critique.
+* Lubinski et al. (QED-C). "Application-Oriented Performance
+  Benchmarks for Quantum Computing." arXiv:2110.03137. — volumetric
+  plots; device-level, static.
+* Gamage et al. arXiv:2507.06990 (IEEE QCE 2025). — grafting MLflow
+  onto quantum experiment workflows (the tracking void, made
+  explicit).
+* IBM Quantum plans documentation
+  (quantum.cloud.ibm.com/docs/en/guides/plans-overview) —
+  Pay-As-You-Go $1.60/second; Open Plan 10 minutes per 28-day window.
+* Qiskit issues #3689 and #13972; Trebugger
+  (medium.com/qiskit/qiskit-trebugger) — documented demand for
+  transpile-level diffing.
+* IBM classic-platform deprecation announcement (2025) — jobs on the
+  retired platform inaccessible (history fragility).
+
 ## 2. Contributions
 
 * **C1 — the grammar + the paradigm** (one funnel, three scales;
@@ -123,7 +240,18 @@ search, 2026-07). Provenance work assumes deterministic states; our
 lineage nodes ARE distributions (Wave J). Optional stopping and
 sequential A/B bring the statistics literature (Wilson/Newcombe
 intervals, coverage-under-stopping caveats) into the visualization
-loop instead of leaving it in the appendix.
+loop instead of leaving it in the appendix. The nearest statistical
+relatives are the shot-frugal optimizers — iCANS (Kübler et al. 2020)
+and Rosalin (Arrasmith et al. 2020) — which adapt shots per iteration
+INSIDE the optimization loop; evidence steering surfaces the same
+frugality one layer up, as a human-facing visual stopping decision
+(§1.2). On configuration identity: demand for transformation-level
+diffing is documented (Qiskit issues #3689/#13972; Trebugger, the
+third-party transpiler-debugging diff tool), but Trebugger diffs the
+transpiler's own internal passes for debugging; our signatures + gate
+diff give one uniform before→after vocabulary across ARBITRARY
+pipeline steps, plugins included, in service of a stable notion of
+"the same configuration".
 
 ## 5. System = paper structure
 
