@@ -241,3 +241,41 @@ const ev = (
 console.log(
   "check_difference_funnel: all assertions passed (newcombe95, dedupeDraws, differenceTrace, differenceVerdict, F8 demo-archive numbers)",
 );
+
+// -- 5. cross-circuit gate (regression note) -----------------------------------
+//
+// differenceTrace / newcombe95 are circuit-agnostic by design: they
+// pool whatever counts they are handed. The guard that keeps
+// CROSS-CIRCUIT pools from ever being assembled lives UPSTREAM in
+// trace assembly: useDifferenceEvidence (components/
+// DifferenceFunnel.tsx) returns status "different-circuit" when the
+// two selected runs' circuit identities differ (sample_key ??
+// upload:circuit_name — the computeConfigHash circuitTag convention),
+// and the view renders "different circuits — fidelity differences are
+// not comparable" instead of a plot. A plain-node lane cannot mount
+// the hook, so this asserts the gate's load-bearing strings exist in
+// the source — a tripwire against the gate being refactored away
+// while the pure stats layer keeps passing.
+{
+  const src = readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../src/components/DifferenceFunnel.tsx",
+    ),
+    "utf8",
+  );
+  assert.ok(
+    src.includes('"different-circuit"'),
+    "cross-circuit gate: status literal present in trace assembly",
+  );
+  assert.ok(
+    src.includes("aCircuitId !== bCircuitId"),
+    "cross-circuit gate: keyed on circuit identity, not config hash",
+  );
+  assert.ok(
+    src.includes(
+      "different circuits — fidelity differences are not comparable",
+    ),
+    "cross-circuit gate: honest refusal line present in the view",
+  );
+}

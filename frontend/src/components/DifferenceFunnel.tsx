@@ -49,6 +49,11 @@
 //     the two selected runs merely name the configurations. Pinned
 //     replays are deduped (same root seed = bit-identical draw; see
 //     stats.dedupeDraws) so the same evidence is never pooled twice.
+//   * CROSS-CIRCUIT GATE: fidelity is defined per circuit, so when
+//     the two named configurations executed DIFFERENT circuits the
+//     assembly refuses (status "different-circuit") and the view
+//     renders an honest one-liner instead of a plot — Δ between two
+//     different quantities is not an inferential object at all.
 //
 // The chart is ONE <svg> subtree (svgPaper conventions: colors via
 // rgb(var(--color-*)) resolved at export time, real <text> nodes), so
@@ -92,6 +97,11 @@ export type DifferenceData =
   /** Same configuration on both sides — Δ of a config against itself
    *  is vacuous; that pair's instrument is the theater overlay. */
   | { status: "same-config" }
+  /** Different CIRCUITS on the two sides — fidelity is defined per
+   *  circuit, so an interval on Δ(B−A) would compare two different
+   *  quantities. Trace assembly refuses before pooling anything;
+   *  regression tripwire in scripts/check_difference_funnel.test.ts. */
+  | { status: "different-circuit"; a: string; b: string }
   /** Configs differ but a side lacks replicates for a trace. */
   | { status: "insufficient"; nA: number; nB: number }
   | {
@@ -122,6 +132,13 @@ export function useDifferenceEvidence(
   const bId = b?.run_id ?? null;
   const aHash = a?.config_hash ?? null;
   const bHash = b?.config_hash ?? null;
+  // Circuit identity — the computeConfigHash circuitTag convention
+  // (lib/runStore.ts), so this gate can never disagree with config
+  // identity. Human-readable labels ride along for the refusal line.
+  const aCircuitId = a ? a.sample_key ?? `upload:${a.circuit_name ?? "?"}` : null;
+  const bCircuitId = b ? b.sample_key ?? `upload:${b.circuit_name ?? "?"}` : null;
+  const aCircuitLabel = a ? a.sample_key ?? a.circuit_name ?? "uploaded circuit" : null;
+  const bCircuitLabel = b ? b.sample_key ?? b.circuit_name ?? "uploaded circuit" : null;
   useEffect(() => {
     if (aHash == null || bHash == null) {
       setData(null);
@@ -129,6 +146,18 @@ export function useDifferenceEvidence(
     }
     if (aHash === bHash) {
       setData({ status: "same-config" });
+      return;
+    }
+    if (aCircuitId !== bCircuitId) {
+      // Cross-circuit gate: refuse to assemble a difference trace at
+      // all. Plotting Δ fidelity across two different circuits would
+      // be statistically meaningless; an honest instrument says so
+      // instead of drawing something.
+      setData({
+        status: "different-circuit",
+        a: aCircuitLabel ?? "?",
+        b: bCircuitLabel ?? "?",
+      });
       return;
     }
     let cancelled = false;
@@ -187,7 +216,17 @@ export function useDifferenceEvidence(
     return () => {
       cancelled = true;
     };
-  }, [aId, bId, aHash, bHash, historyVersion]);
+  }, [
+    aId,
+    bId,
+    aHash,
+    bHash,
+    aCircuitId,
+    bCircuitId,
+    aCircuitLabel,
+    bCircuitLabel,
+    historyVersion,
+  ]);
   return data;
 }
 
@@ -541,6 +580,29 @@ export function DifferenceFunnel({ data }: { data: DifferenceData }) {
   );
 
   if (data == null || data.status === "same-config") return null;
+
+  if (data.status === "different-circuit") {
+    return (
+      <div
+        data-marker="different-circuits-gate"
+        className="text-[10px] border border-warn/40 rounded p-2 space-y-0.5"
+      >
+        <div className="flex items-center gap-1 text-mute">
+          <span className="uppercase tracking-wider">difference funnel</span>
+          <TipIcon hint={GLOSSARY.differenceInterval} />
+        </div>
+        <div className="text-warn">
+          different circuits — fidelity differences are not comparable
+        </div>
+        <div className="text-mute">
+          A ran {data.a}, B ran {data.b}. Fidelity is defined per circuit, so
+          an interval on Δ(B−A) would compare two different quantities. Select
+          two configurations of the same circuit to accumulate an A/B verdict
+          here.
+        </div>
+      </div>
+    );
+  }
 
   if (insufficient) {
     return (

@@ -22,13 +22,18 @@
 //     Topology order, not canvas x/y — at thumbnail scale layout
 //     jitter is noise, the stage sequence is the signal.
 //   * DOT above a square = this stage's params differ from the
-//     BASELINE configuration (the most-tried one). Diff is computed
-//     per node kind with the same canonicalization the config hash
-//     uses, so node ids and layout never produce false positives.
+//     BASELINE configuration — the most-tried config OF THE SAME
+//     CIRCUIT (baselines are per circuit identity; see pickBaselines).
+//     Diff is computed per node kind with the same canonicalization
+//     the config hash uses, so node ids and layout never produce
+//     false positives.
 //   * OUTCOME STRIP = every archived headline value on a shared 0-1
 //     scale, mean tick, latest run emphasized. Shared scale across
 //     all cards is the point of small multiples.
-//   * Δmean vs baseline is stated in percentage points and flagged
+//   * Δmean is stated in percentage points against the SAME-CIRCUIT
+//     baseline only (fidelities of different circuits are different
+//     quantities — a cross-circuit Δ would be meaningless), names its
+//     reference inline ("vs #hash (same circuit)") and is flagged
 //     "(n small)" below 3 replicates on either side — a difference
 //     built on one draw is not evidence, and the UI says so.
 //   * POOLED BAND (Wave J) = when ≥2 runs carry binomial payloads,
@@ -91,8 +96,18 @@ interface ConfigGroup {
   pooled: PooledEvidence | null;
   nErr: number;
   circuitTag: string;
+  /** Circuit identity (computeConfigHash's circuitTag convention) —
+   *  the scope within which baseline and Δ are defined. */
+  circuitId: string;
   /** Representative graph: latest ok run's, else latest run's. */
   graph: SharePayload;
+}
+
+/** Circuit identity key — the exact convention computeConfigHash uses
+ *  for its circuitTag component (lib/runStore.ts), so "same circuit"
+ *  here can never disagree with configuration identity. */
+function circuitIdOf(r: RunRecord): string {
+  return r.sample_key ?? `upload:${r.circuit_name ?? "?"}`;
 }
 
 function buildGroups(runs: RunRecord[]): ConfigGroup[] {
@@ -129,6 +144,7 @@ function buildGroups(runs: RunRecord[]): ConfigGroup[] {
       nErr: sorted.filter((r) => !r.ok).length,
       circuitTag:
         latest.sample_key ?? latest.circuit_name ?? "uploaded circuit",
+      circuitId: circuitIdOf(latest),
       graph: (latestOk ?? latest).graph,
     });
   });
@@ -137,15 +153,40 @@ function buildGroups(runs: RunRecord[]): ConfigGroup[] {
   return groups;
 }
 
-/** Baseline = the most-populous configuration (most archived runs);
- *  ties break toward the most recently active. "The one you kept
- *  coming back to" is the natural reference point of the multiverse. */
-function pickBaseline(groups: ConfigGroup[]): ConfigGroup | null {
-  if (groups.length === 0) return null;
-  return [...groups].sort(
-    (a, b) =>
-      b.runs.length - a.runs.length || b.latest.created_at - a.latest.created_at,
-  )[0];
+/** Baselines are PER CIRCUIT identity. Fidelity is only comparable
+ *  between configurations that ran the SAME circuit — a bell_state
+ *  config as reference for a vqc_2q_small card would put two different
+ *  quantities on one Δ line. Within each circuit's groups the baseline
+ *  is the most-populous configuration (most archived runs); ties break
+ *  toward the most recently active — "the one you kept coming back to"
+ *  stays the natural reference point, just scoped to the circuit it
+ *  measured. A circuit with a single configuration gets NO baseline:
+ *  there is nothing same-circuit to compare against, so its card shows
+ *  neither the chip nor a Δ line. */
+function pickBaselines(groups: ConfigGroup[]): {
+  byCircuit: Map<string, ConfigGroup>;
+  configCounts: Map<string, number>;
+} {
+  const byId = new Map<string, ConfigGroup[]>();
+  groups.forEach((g) => {
+    const arr = byId.get(g.circuitId) ?? [];
+    arr.push(g);
+    byId.set(g.circuitId, arr);
+  });
+  const byCircuit = new Map<string, ConfigGroup>();
+  const configCounts = new Map<string, number>();
+  byId.forEach((list, id) => {
+    configCounts.set(id, list.length);
+    byCircuit.set(
+      id,
+      [...list].sort(
+        (a, b) =>
+          b.runs.length - a.runs.length ||
+          b.latest.created_at - a.latest.created_at,
+      )[0],
+    );
+  });
+  return { byCircuit, configCounts };
 }
 
 // --- structural diff vs baseline (light version of CompareView's) ----------
@@ -281,11 +322,11 @@ function PipelineStrip({
           return (
             <g key={n.i}>
               <rect x={x} y={10} width={SZ} height={SZ} rx={2} fill={FAMILY_FILL[fam]}>
-                <title>{`${spec?.label ?? n.k} (${fam})${differs ? " — settings differ from baseline" : ""}`}</title>
+                <title>{`${spec?.label ?? n.k} (${fam})${differs ? " — settings differ from this circuit's baseline" : ""}`}</title>
               </rect>
               {differs && (
                 <circle cx={x + SZ / 2} cy={5} r={2} fill="rgb(var(--color-warn))">
-                  <title>settings differ from baseline</title>
+                  <title>settings differ from this circuit's baseline</title>
                 </circle>
               )}
             </g>
@@ -610,7 +651,10 @@ export function MultiverseBoard() {
   }, [historyVersion]);
 
   const groups = useMemo(() => buildGroups(runs ?? []), [runs]);
-  const baseline = useMemo(() => pickBaseline(groups), [groups]);
+  const { byCircuit: baselines, configCounts } = useMemo(
+    () => pickBaselines(groups),
+    [groups],
+  );
 
   const hasCards = groups.length > 0;
   useEffect(() => {
@@ -700,7 +744,7 @@ export function MultiverseBoard() {
           <span className="text-ink font-medium">Evidence board</span>
           <TipIcon
             className="ml-1"
-            hint={`${gloss("configuration")} Card key: squares = pipeline stages · dot above = settings differ from baseline · strip dots = one per replicate (0-100%) · filled band = pooled 95% interval.`}
+            hint={`${gloss("configuration")} Card key: squares = pipeline stages · dot above = settings differ from this circuit's baseline · strip dots = one per replicate (0-100%) · filled band = pooled 95% interval. Baseline and Δ are per circuit — cards of different circuits are never compared.`}
           />
           {runs != null && (
             <>
@@ -780,7 +824,7 @@ export function MultiverseBoard() {
         >
           <span className="min-w-0">
             Each card is one configuration — its pipeline, its outcome
-            distribution, Δ vs the baseline card. Expand (⌄) for recent
+            distribution, Δ vs its circuit's baseline card. Expand (⌄) for recent
             runs and quick actions; Open rebuilds it in the Pipeline
             editor; A/B sends two cards to Between configurations.
           </span>
@@ -841,11 +885,15 @@ export function MultiverseBoard() {
             }}
           >
             {groups.map((g) => {
-              const isBaseline = baseline != null && g.hash === baseline.hash;
+              // Same-circuit reference only (see pickBaselines): a
+              // card whose circuit has no other configuration gets no
+              // baseline chip, no diff dots and no Δ line.
+              const circuitBaseline = baselines.get(g.circuitId) ?? null;
+              const isBaseline =
+                circuitBaseline != null && g.hash === circuitBaseline.hash;
+              const baseline = isBaseline ? null : circuitBaseline;
               const differing =
-                baseline != null && !isBaseline
-                  ? diffKinds(g.graph, baseline.graph)
-                  : null;
+                baseline != null ? diffKinds(g.graph, baseline.graph) : null;
               // Wave J: when BOTH sides carry pooled binomial counts,
               // Δ compares POOLED means (shot-weighted, the honest
               // estimator) instead of unweighted per-run means, and
@@ -855,7 +903,7 @@ export function MultiverseBoard() {
               // rationale in lib/stats.ts). Without pools the old
               // replicate-count heuristic stands.
               const pooledBoth =
-                !isBaseline && g.pooled != null && baseline?.pooled != null;
+                baseline != null && g.pooled != null && baseline.pooled != null;
               const nSmall = pooledBoth
                 ? (g.pooled as PooledEvidence).shots < POOLED_SMALL_N_SHOTS ||
                   (baseline?.pooled as PooledEvidence).shots < POOLED_SMALL_N_SHOTS
@@ -865,7 +913,7 @@ export function MultiverseBoard() {
                 ? ((g.pooled as PooledEvidence).point -
                     (baseline?.pooled as PooledEvidence).point) *
                   100
-                : !isBaseline && g.mean != null && baseline?.mean != null
+                : baseline != null && g.mean != null && baseline.mean != null
                   ? (g.mean - baseline.mean) * 100
                   : null;
               const abSelected =
@@ -903,14 +951,15 @@ export function MultiverseBoard() {
                       {g.circuitTag}
                     </span>
                     <span className="ml-auto flex items-center gap-1 shrink-0">
-                      {isBaseline && (
-                        <span
-                          className="chip !border-accent/50 !text-accent shrink-0"
-                          title="Most-tried configuration — other cards report Δmean against this one."
-                        >
-                          baseline
-                        </span>
-                      )}
+                      {isBaseline &&
+                        (configCounts.get(g.circuitId) ?? 0) > 1 && (
+                          <span
+                            className="chip !border-accent/50 !text-accent shrink-0"
+                            title={`Most-tried configuration of ${g.circuitTag} — other ${g.circuitTag} cards report Δmean against this one. Baselines are per circuit: fidelities of different circuits are not comparable, so a circuit with a single configuration shows no baseline and no Δ.`}
+                          >
+                            baseline
+                          </span>
+                        )}
                       <button
                         type="button"
                         className="p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
@@ -979,17 +1028,18 @@ export function MultiverseBoard() {
                           μ={((g.mean as number) * 100).toFixed(1)}%
                         </span>
                         <span className="tabular-nums">×{g.values.length}</span>
-                        {delta != null && (
+                        {delta != null && baseline != null && (
                           <span
                             className={`tabular-nums ${delta >= 0 ? "text-ok" : "text-warn"}`}
                             title={
                               pooledBoth
-                                ? "Difference of POOLED means (shot-weighted, Wilson-pooled counts) vs the baseline configuration, in percentage points."
-                                : "Difference of mean headline metric vs the baseline configuration, in percentage points."
+                                ? `Difference of POOLED means (shot-weighted, Wilson-pooled counts) vs #${baseline.hash}, this circuit's baseline configuration, in percentage points. Baselines are per circuit — Δ is never taken across different circuits.`
+                                : `Difference of mean headline metric vs #${baseline.hash}, this circuit's baseline configuration, in percentage points. Baselines are per circuit — Δ is never taken across different circuits.`
                             }
                           >
                             Δ {delta >= 0 ? "+" : ""}
-                            {delta.toFixed(1)}pp vs baseline
+                            {delta.toFixed(1)}pp vs #{baseline.hash.slice(0, 6)}{" "}
+                            (same circuit)
                             {nSmall ? " (n small)" : ""}
                           </span>
                         )}
@@ -1002,12 +1052,13 @@ export function MultiverseBoard() {
                         {(g.values[0] * 100).toFixed(1)}%
                       </span>{" "}
                       · single draw — run more replicates for a distribution
-                      {delta != null && (
+                      {delta != null && baseline != null && (
                         <span
                           className={`ml-1 tabular-nums ${delta >= 0 ? "text-ok" : "text-warn"}`}
                         >
                           Δ {delta >= 0 ? "+" : ""}
-                          {delta.toFixed(1)}pp{nSmall ? " (n small)" : ""}
+                          {delta.toFixed(1)}pp vs #{baseline.hash.slice(0, 6)}{" "}
+                          (same circuit){nSmall ? " (n small)" : ""}
                         </span>
                       )}
                     </div>
