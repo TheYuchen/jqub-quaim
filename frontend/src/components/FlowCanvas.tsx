@@ -1340,18 +1340,21 @@ export function FlowCanvas() {
             Everything here shapes or prices the evidence the next Run
             buys: pinned seed, replicate count, optional-stopping
             target, cost estimate, and Run itself. Visually separated
-            from authoring (divider + faint group label at ≥md) so the
+            from authoring (divider + faint group label at ≥lg) so the
             toolbar reads as two questions — "what am I composing?" vs
             "what will the next run measure?". min-w-0 (NOT shrink-0)
             is what lets flex-wrap actually engage; justify-end keeps
             continuation lines right-aligned, so Run stays in the
-            bottom-right corner where the eye expects it. Below md
-            every control here is hidden (the Run FAB takes over), so
-            the divider is md-gated too. */}
+            bottom-right corner where the eye expects it. The divider
+            is lg-gated: in the 768-1024 band the wrapped cluster made
+            the border-l + pl-3 read as a clipped stray rule next to
+            the label, so below lg the grouping is implied by spacing
+            alone; below md every control here is hidden anyway (the
+            Run FAB takes over). */}
         <div
           role="group"
           aria-label="Evidence controls for the next run"
-          className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 gap-y-1 min-w-0 md:border-l md:border-edge/60 md:pl-3"
+          className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 gap-y-1 min-w-0 lg:border-l lg:border-edge/60 lg:pl-3"
         >
           <span
             className="hidden lg:inline text-[9px] uppercase tracking-wider text-mute/70 select-none"
