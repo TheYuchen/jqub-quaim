@@ -1,21 +1,156 @@
-# Evidence Workbench — rework state & design rationale
+# Evidence Workbench — the paper, stated as a system
 
-Target: an IEEE VIS submission built around QuDA Studio. Framing under
-consideration: **compositional algorithm analysis of stochastic,
-costly computational experiments** (NISQ quantum pipelines as the
-driving domain), with three contribution layers: (1) task
-theory/taxonomy grounded in a formative study, (2) a uniform visual
-vocabulary for pipeline transformations + distribution-first
-provenance, (3) empirical evaluation (comparative study vs
-Jupyter+Qiskit baseline, case studies, live deployment).
+This file is the single source of truth for the IEEE VIS submission
+built around QuDA Studio. The sections below ARE the paper's skeleton;
+the system's structure mirrors them one-to-one. The test every future
+pixel must pass: **does it serve a scale?** If a proposed view, chip,
+button or hint cannot name its scale (or its contribution) below, it
+does not ship.
 
-Positioning vs prior art: VACSEN (backend noise), Quantivine (large
-circuits), QuantumEyes/VIOLET (circuit/QNN interpretability) are all
-single-point; CHI'25 "Toward HQCI" is an interface-technique design
-space; QCE tooling (QuBridge, CircInspect) is engineering without a
-vis-research framing. Nobody treats the *composition* as the object
-of analysis. Comparative + provenance layers of the quantum stack are
-open in vis venues (verified via adversarial search, 2026-07).
+## 1. The narrative
+
+**Evidence steering: sequential visual analysis of stochastic, costly
+computational experiments — one grammar, three scales.** QuDA Studio
+treats every pipeline execution as what it physically is: a stochastic
+experiment whose evidence is bought shot by shot, minute by minute.
+One visual grammar — a 95% interval narrowing as evidence
+accumulates, drawn as a funnel against the cost axis — is
+instantiated at three scales. **Scale 1, within a run:** the Evidence
+Theater shows the Wilson interval narrowing over streaming shot
+batches, and a precision target turns optional stopping into a visual
+interaction ("stop when it's precise enough — keep the unspent
+budget"). **Scale 2, across replicates of one configuration:** the
+lineage renders every archived run as a distribution-weighted dot,
+and pooled/certainty funnels show replicates compounding to a
+1/√N-tighter interval; the theater overlay compares two draws of one
+rule. **Scale 3, between configurations:** the difference funnel puts
+one Newcombe interval on Δ(B−A) and accumulates it chronologically
+across both sides' replicates — sequential A/B analysis whose verdict
+can be watched, priced, and revoked. Everything else is supporting
+cast: transformation signatures and the gate-level diff define what
+"a configuration" IS (so replicates and comparisons have a stable
+identity); the multiverse board is the portfolio entry point to
+scale 3; circuit ribbons are context, not claim.
+
+## 2. Contributions
+
+* **C1 — the grammar + the paradigm** (one funnel, three scales;
+  steering instead of monitoring). Where in the system: the Evidence
+  Theater with precision-target stopping and trace scrubbing
+  (scale 1); the lineage's per-band certainty funnels and the theater
+  overlay (scale 2); the Compare tab's difference funnel with
+  established/not-sustained verdicts, plus the multiverse board as
+  the scale-3 portfolio. Figures: **F0 (teaser) + F0 filmstrip, F3,
+  F7, F8, F2.**
+* **C2 — the stochastic-provenance substrate** that makes steering
+  replayable. Where: root/per-node/per-batch seed derivation with
+  bit-exact pinned replay (early stops included); the IndexedDB run
+  archive + archive import/export; lineage-as-distributions (evidence
+  mass, fork edges); configuration identity via the structural config
+  hash, made legible by transformation signatures and the gate-level
+  circuit diff; per-batch traces persisted as provenance, so funnels
+  render identically live, archived, and replayed. Figures: **F4,
+  F1, F5.**
+* **C3 — honesty devices** for sequential evidence. Where: intervals
+  instead of scalars everywhere a quantity is sampled; "intervals
+  overlap: not evidence" and the funnel-owned verdict line;
+  optional-stopping coverage disclosure (M2) and the multiple-looks
+  caveat on the difference funnel; replay-deduped pooling; "(n
+  small)" suffixes and pooled-shots gates; the demo-data banner; and
+  provenance-backed figure export (every figure regenerates from its
+  own metadata). Figures: **F6, F8 (a deliberate null result), F0
+  filmstrip panels.**
+
+## 3. Figure plan
+
+| fig | boots via | shows (scale · contribution) | export path |
+|---|---|---|---|
+| F0 teaser | `?scenario=F0` | theater funnel, ±2pp stop at 2,560 of 4,096 shots, unspent budget (1 · C1) | true-SVG `evidence-theater_F0.svg` |
+| F0 filmstrip | F0 + scrub batch 2 / 4 / final | optional stopping as an interaction sequence (1 · C1+C3) | true-SVG ×3, `_batchK` suffixes |
+| F1 | `?scenario=F1` | ribbon canvas post-run: √gates ribbons, delta-strip glyph faces (context · C2) | hybrid PNG |
+| F2 | `?scenario=F2` | multiverse board: configuration small multiples, pooled bands, baseline Δ (3 · C1) | hybrid PNG |
+| F3 | `?scenario=F3` | funnel on the fidelity card + early stop, This-run tab (1 · C1) | hybrid PNG |
+| F4 | `?scenario=F4` | lineage: evidence mass, replicate bands + certainty funnels, fork edge (2 · C2) | hybrid PNG |
+| F5 | `?scenario=F5` | gate-level circuit diff on the QuCAD card (config identity · C2) | hybrid PNG |
+| F6 | `?scenario=F6` | interval comparison + aligned signatures, Between-configurations tab (3 · C3) | hybrid PNG |
+| F7 | `?scenario=F7` | theater overlay: two replays of one configuration, one axis pair (2 · C1) | true-SVG `evidence-theater-overlay_F7.svg` |
+| F8 | `?scenario=F8` | difference funnel: established at 5,120 shots, NOT sustained — the multiple-looks trap on real draws (3 · C1+C3) | true-SVG funnel camera / hybrid tab |
+| planned | F7 + lockstep scrub | overlay filmstrip: two funnels truncated in lockstep (2 · C1) | true-SVG ×k |
+| planned | F8 recompute at t=2 vs t=8 | "early win withdrawn" pair for the discussion section (3 · C3) | true-SVG ×2 |
+
+Vector-vs-raster rationale and the per-camera table live in the
+Wave Q section of the wave history below.
+
+## 4. Related-work positioning
+
+VACSEN (backend noise), Quantivine (large circuits), QuantumEyes /
+VIOLET (circuit/QNN interpretability) are single-point tools; CHI'25
+"Toward HQCI" is an interface-technique design space; QCE tooling
+(QuBridge, CircInspect) is engineering without a vis-research
+framing. Nobody treats the *composition* as the object of analysis,
+and nothing in the quantum stack — or in progressive/anytime
+visualization generally — offers sequential-analysis steering:
+progressive vis approximates a fixed answer ever better, while
+evidence steering makes the stopping decision itself a first-class,
+replayable, honestly-disclosed interaction (verified via adversarial
+search, 2026-07). Provenance work assumes deterministic states; our
+lineage nodes ARE distributions (Wave J). Optional stopping and
+sequential A/B bring the statistics literature (Wilson/Newcombe
+intervals, coverage-under-stopping caveats) into the visualization
+loop instead of leaving it in the appendix.
+
+## 5. System = paper structure
+
+| paper section | system surface (internal id) |
+|---|---|
+| teaser | Evidence Theater over F0 |
+| §3 grammar: the funnel | UncertaintyBlock funnel + theater (one motif, stated once, reused) |
+| §4 scale 1 — within a run | Evidence pane tab "This run" (`current`) + theater as its expanded mode |
+| §5 scale 2 — across replicates | tab "This configuration" (`history`): lineage, evidence mass, certainty funnels; theater overlay |
+| §6 scale 3 — between configurations | tab "Between configurations" (`compare`): interval bars, prefix folding, difference funnel; Multiverse board as entry |
+| §7 substrate (C2) | seeds/archive/replay, signatures + gate diff, ribbons as context |
+| §8 honesty (C3) | disclosure devices across all tabs + provenance-backed figures |
+
+The Evidence pane's three tabs carry the scales in the user's face:
+tab labels are the narrative ("This run" / "This configuration" /
+"Between configurations"), tab tooltips name the scales, and the
+internal ids (`current`/`history`/`compare`) stay frozen because
+scenario URLs and figure provenance key on them.
+
+## Not done yet (ordered backlog)
+
+* **Phase 3.5 leftovers** — pick-which-fidelity-node in comparison,
+  dual-canvas visual diff, >2-way comparison.
+* **Phase 4 leftovers** — opt-in interaction logging (schema first —
+  needed for the user study). Reproducible export and the cost
+  preview are DONE.
+* **Gate-diff niceties** — pair remove+add of the same op with only a
+  param change into a "modified" state; column-align lanes across
+  qubits by circuit moment.
+* ~~Distribution payloads for QuBound/Qshot~~ — CLOSED 2026-07-06,
+  decided AGAINST adding payloads (rationale in the leftover-clearing
+  wave section below and in both handlers).
+* ~~Prewarm decision~~ — CLOSED 2026-07-06: cache schema gate +
+  live-API regeneration (leftover-clearing wave below).
+* **Formative study** — interview protocol before locking the task
+  taxonomy (Meyer-Dykes INFORMED). Blocked on user's go-ahead.
+
+## Conventions
+
+Push to `github` + `hf` (jqub21/quaim) only; qudastudio/app is a
+mirror synced ONLY on explicit request. After push: ~2-4 min rebuild,
+smoke = /api/health + a pinned-seed run. Unit lane:
+backend/tests/*.py runnable directly, no torch needed
+(29 tests green as of d105dc7).
+
+---
+
+# — wave history —
+
+Everything below is the chronological engineering log (shipped
+items, encoding rationale, audits, verification numbers). It is
+kept verbatim as the project's memory; the sections ABOVE are the
+current truth and the paper skeleton.
 
 ## Shipped (commits 2efd890 → d105dc7)
 
@@ -313,32 +448,6 @@ minimal honest version, no decoration without a task.
     The fidelity card's across-runs ReplicateStrip carries the same
     pooled summary line. Frontend-only: no server change, archived
     responses already carry the counts.
-
-## Not done yet (ordered backlog)
-
-* **Phase 3.5 leftovers** — pick-which-fidelity-node in comparison,
-  dual-canvas visual diff, >2-way comparison.
-* **Phase 4 leftovers** — opt-in interaction logging (schema first —
-  needed for the user study). Reproducible export and the cost
-  preview are DONE.
-* **Gate-diff niceties** — pair remove+add of the same op with only a
-  param change into a "modified" state; column-align lanes across
-  qubits by circuit moment.
-* ~~Distribution payloads for QuBound/Qshot~~ — CLOSED 2026-07-06,
-  decided AGAINST adding payloads (rationale in the leftover-clearing
-  wave section below and in both handlers).
-* ~~Prewarm decision~~ — CLOSED 2026-07-06: cache schema gate +
-  live-API regeneration (leftover-clearing wave below).
-* **Formative study** — interview protocol before locking the task
-  taxonomy (Meyer-Dykes INFORMED). Blocked on user's go-ahead.
-
-## Conventions
-
-Push to `github` + `hf` (jqub21/quaim) only; qudastudio/app is a
-mirror synced ONLY on explicit request. After push: ~2-4 min rebuild,
-smoke = /api/health + a pinned-seed run. Unit lane:
-backend/tests/*.py runnable directly, no torch needed
-(29 tests green as of d105dc7).
 
 ## Novelty roadmap (full-system review, 2026-07-05)
 
@@ -1208,3 +1317,54 @@ the structural config hash started separating the shots param. The
 top-two configs are bell-512 (×9) and bell-2048 (×5); comments and
 F6's expect string now match reality (F6's picker behavior was always
 deterministic and unchanged).
+
+## Narrative-alignment restructuring (SHIPPED 2026-07-10)
+
+Premise: the system had grown cluttered because its structure no
+longer mirrored the research narrative. This wave makes structure =
+narrative ("one grammar, three scales") and installs the skeleton at
+the top of this doc as the test every future pixel must pass.
+
+1. **Evidence tabs = the three scales.** Labels renamed to "This run"
+   / "This configuration" / "Between configurations" with one-line
+   scale tooltips; internal ids (current/history/compare) frozen —
+   scenario uiState, the pendingEvidenceTab bridge and figure-export
+   provenance key on them (mapping pinned in ResultsPane +
+   scenarios.ts comments). The toolbar Theater button is gone: the
+   theater is This-run's expanded mode, entered from the funnel
+   card's "expand · theater" affordance (marker open-theater;
+   auto-open on streaming unchanged). This-configuration opens with a
+   one-line scale statement above the legend key. All user-visible
+   cross-references updated (seed-chip tooltip, compare empty state,
+   multiverse hint, compare-vs-previous link, tour, claims map).
+2. **Toolbar calm-down.** Two clusters: LEFT authoring (toggle,
+   counters, preset, Auto-connect, camera, Clear, ⋯ menu), RIGHT
+   evidence (pinned seed, ×N, precision target, cost chip, Run)
+   behind a md-gated divider + faint "evidence" group label. Share
+   and Export .py demoted into the ⋯ MoreMenu at EVERY width
+   (Auto-connect/Clear menu rows are md:hidden, so each action has
+   exactly one reachable copy at any width). Net chrome: −3 buttons
+   (Share, Export .py, Theater).
+3. **Visual calm pass.** RibbonLegend auto-fades 20 s after its
+   first-run mount (dismissal still the only persisted state);
+   guidance strips capped at ONE per view with demo banner > hint
+   (multiverse hint collapses to its "?", the archive-io strip to an
+   "archive…" chip, both reopenable = explicit intent); Evidence
+   header chips capped at two (seed chip absorbs cached as "cached ·
+   no seed"); node-tile post-run strip audited ≤ glyph + 2 rows and
+   the layout contract documented at RunResultStrip.
+4. **Doc = paper skeleton.** This file now opens with the narrative,
+   C1/C2/C3 (each with where-in-system + which-figure), the F0–F8
+   figure plan (+ planned filmstrips), tightened related-work
+   positioning, and the system=paper structure map; backlog +
+   conventions follow; everything older lives verbatim under
+   "— wave history —".
+5. **Tour + claims map alignment.** Slide 3 = scales 1&2, slide 4 =
+   scale 3 (both name the tabs; slide 4 adds the difference funnel);
+   claims map reorganized under C1/C2/C3 headers and gains the
+   missing F8 row.
+
+Verification: tsc + build + VITE_ANON build green; backend 86 green;
+svg_paper / export_python (esbuild recipe) / difference_funnel node
+lanes green; F0–F8 scenario tab keys resolve unchanged (ids frozen);
+live bundle markers checked after deploy.
