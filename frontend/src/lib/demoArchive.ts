@@ -5,9 +5,9 @@
 // browser's IndexedDB run archive — which is empty on a first visit,
 // so a new visitor would see none of it until they had run several
 // pipelines themselves. Instead, the first visit imports a small
-// curated archive of REAL runs recorded against the live backend and
-// lands on the Multiverse board, so the evidence views paint populated
-// within the first seconds.
+// curated archive of REAL runs recorded against the live backend, so
+// the Evidence board — home since the IA inversion, and the store's
+// default workspace — paints populated within the first seconds.
 //
 // What the data is (and is not): every record is a genuine
 // RunResponse produced by the deployed API — real noisy-simulator
@@ -76,8 +76,9 @@ function markDecided(): void {
 /**
  * First-visit hook: if this browser has never decided about demo data
  * AND its run archive is empty, import the bundled archive.
- * Returns true iff records were imported this call — the caller uses
- * that to land the visitor on the Multiverse board.
+ * Returns true iff records were imported this call. (The IA inversion
+ * made the board the default workspace, so the import no longer needs
+ * to force a landing — the return value is informational.)
  */
 export async function ensureDemoArchive(
   opts: {

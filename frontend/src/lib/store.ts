@@ -14,6 +14,23 @@ import type { SharePayload } from "./share";
 
 const LS_USE_LIVE_IBM = "quda.useLiveIbm";
 const LS_THEATER_AUTO_OPEN = "quda.theaterAutoOpen";
+const LS_WORKSPACE_MODE = "quda.workspaceMode";
+
+/** IA inversion (board = home): the persisted workspace-mode
+ *  preference. A first-ever visit has no stored value and falls to
+ *  the "multiverse" default — the Evidence board, which the
+ *  demo-archive import populates — so first-visit landing and the
+ *  demo-import landing are one path. Returning users keep whatever
+ *  mode they last chose (setWorkspaceMode persists it). */
+function loadWorkspaceMode(): "compose" | "multiverse" {
+  if (typeof window === "undefined") return "multiverse";
+  try {
+    const v = window.localStorage.getItem(LS_WORKSPACE_MODE);
+    return v === "compose" || v === "multiverse" ? v : "multiverse";
+  } catch {
+    return "multiverse";
+  }
+}
 
 /** Evidence-theater auto-open preference (default ON). Read lazily on
  *  every progress frame instead of cached in the store so a toggle in
@@ -54,14 +71,47 @@ function loadUseLiveIbm(): boolean {
 
 interface AppState {
   /**
-   * Which workspace fills the center column. "compose" = the React
-   * Flow canvas (edit/run one pipeline). "multiverse" = the
-   * MultiverseBoard (all archived configurations as small multiples).
-   * Deliberately NOT persisted: a fresh visit should always open on
-   * the canvas, where the empty-state guidance lives.
+   * Which workspace fills the center column. IA inversion (board =
+   * home) — label ↔ id mapping, ids FROZEN:
+   *
+   *   "multiverse" = MultiverseBoard, user-visible "Evidence board":
+   *                  HOME — every configuration and its evidence.
+   *   "compose"    = the React Flow canvas, user-visible "Pipeline
+   *                  editor": the definition view of ONE configuration.
+   *
+   * Scenario uiState values, the localStorage preference and figure
+   * provenance key on the ids, so the rename touched labels only.
+   * Persisted (quda.workspaceMode): returning users boot into their
+   * last mode; a first visit has no stored value and lands on the
+   * board default. setWorkspaceMode persists; scenario boots write
+   * the field directly (useApp.setState) so scripted figure states
+   * never overwrite the preference.
    */
   workspaceMode: "compose" | "multiverse";
   setWorkspaceMode: (m: "compose" | "multiverse") => void;
+
+  /**
+   * Editor framing (marker: config-context). Non-null when the
+   * Pipeline editor was entered as the definition view of a
+   * configuration — from an Evidence-board card ("card", carrying
+   * the source card's identity) or via the board's "New
+   * configuration" button ("new"). null = editor entered some other
+   * way (plain toggle, scenario boot, first paint): the context bar
+   * stays hidden, which keeps scripted figure states pixel-identical.
+   */
+  editorContext:
+    | { source: "card"; hash: string; circuitTag: string; runCount: number }
+    | { source: "new" }
+    | null;
+  setEditorContext: (c: AppState["editorContext"]) => void;
+
+  /** Counter bridge for the board's "New configuration" button.
+   *  FlowCanvas consumes a bump by clearing the canvas plus the
+   *  pinned seed / fork parentage, so the editor opens on a truly
+   *  blank definition. Counter (not boolean) so consecutive clicks
+   *  re-fire. */
+  newConfigRequest: number;
+  requestNewConfig: () => void;
 
   circuit: CircuitInfo | null;
   setCircuit: (c: CircuitInfo | null) => void;
@@ -307,8 +357,23 @@ interface AppState {
 }
 
 export const useApp = create<AppState>((set) => ({
-  workspaceMode: "compose",
-  setWorkspaceMode: (m) => set({ workspaceMode: m }),
+  workspaceMode: loadWorkspaceMode(),
+  setWorkspaceMode: (m) => {
+    try {
+      window.localStorage.setItem(LS_WORKSPACE_MODE, m);
+    } catch {
+      /* private mode — the board default simply applies next visit */
+    }
+    set({ workspaceMode: m });
+  },
+  editorContext: null,
+  setEditorContext: (c) => set({ editorContext: c }),
+  newConfigRequest: 0,
+  requestNewConfig: () =>
+    set((s) => ({
+      newConfigRequest: s.newConfigRequest + 1,
+      editorContext: { source: "new" },
+    })),
   circuit: null,
   setCircuit: (c) => set({ circuit: c }),
   sampleKey: null,

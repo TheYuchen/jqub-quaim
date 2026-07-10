@@ -454,7 +454,10 @@ export async function activateScenario(rawKey: string): Promise<boolean> {
   if (sc.needsArchive) await ensureDemoArchive({ force: true });
   if (sc.openGateDiff) app.setGateDiffDefaultOpen(true);
   if (sc.openTheater) app.setTheaterOpen(true);
-  app.setWorkspaceMode(sc.workspaceMode);
+  // Scripted figure state, not a user preference: write the mode
+  // directly so a scenario boot never overwrites the persisted
+  // quda.workspaceMode (setWorkspaceMode would persist it).
+  useApp.setState({ workspaceMode: sc.workspaceMode });
 
   if (sc.graph) {
     app.requestRestore({

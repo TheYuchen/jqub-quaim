@@ -249,16 +249,22 @@ export default function App() {
 
   // Boot sequencing: (1) first visit seeds the browser's empty run
   // archive with the bundled demo evidence (real seeded runs; see
-  // lib/demoArchive.ts) and lands on the Multiverse board; (2) a
-  // ?scenario=Fn URL (Wave P figure states) takes over the whole UI
-  // state afterwards — scenario wins over the demo-import landing.
+  // lib/demoArchive.ts); (2) a ?scenario=Fn URL (Wave P figure
+  // states) takes over the whole UI state afterwards. IA inversion
+  // (board = home): the Evidence board is the STORE's default
+  // workspace — a first visit has no quda.workspaceMode preference
+  // and the mode is read synchronously at store creation, so the
+  // board paints from the very first frame and the demo import no
+  // longer forces a landing (the fresh-import path and the plain
+  // first-visit path are the same path). Returning users boot into
+  // their persisted mode the same way. A scenario's mode write lands
+  // after this effect resolves, so scenario still wins over both.
   useEffect(() => {
     const scenarioKey = new URLSearchParams(window.location.search).get(
       "scenario",
     );
-    void ensureDemoArchive().then(async (imported) => {
-      if (scenarioKey && (await activateScenario(scenarioKey))) return;
-      if (imported) useApp.getState().setWorkspaceMode("multiverse");
+    void ensureDemoArchive().then(async () => {
+      if (scenarioKey) await activateScenario(scenarioKey);
     });
   }, []);
 

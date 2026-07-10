@@ -1,13 +1,20 @@
-// Segmented Compose | Multiverse switch.
+// Segmented workspace switch — the IA-inversion control (board = home).
 //
-// Lives in BOTH canvas headers (FlowCanvas toolbar and the
+// Label ↔ internal-id mapping (ids FROZEN — scenario uiState, the
+// persisted quda.workspaceMode preference and figure provenance key
+// on them; only the user-visible language changed):
+//
+//   id "multiverse" → label "Evidence board"  — HOME: every
+//                     configuration ever tried and its evidence.
+//   id "compose"    → label "Pipeline editor" — the subordinate
+//                     definition view of ONE configuration.
+//
+// Board segment renders first: home leads, the editor is entered.
+//
+// Lives in BOTH workspace headers (FlowCanvas toolbar and the
 // MultiverseBoard header) so the user can always flip back — when the
 // board covers the canvas, the canvas toolbar's copy of this control
 // is unreachable.
-//
-// "Compose" = the React Flow editor (one pipeline at a time).
-// "Multiverse" = the set of all configurations ever tried, as small
-// multiples — the archive promoted from a side panel to a workspace.
 
 import { LayoutGrid, Workflow } from "lucide-react";
 import { useApp } from "../lib/store";
@@ -30,26 +37,26 @@ export function WorkspaceToggle({ className = "" }: { className?: string }) {
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "compose"}
-        title="Compose: edit and run one pipeline on the canvas"
-        className={seg(mode === "compose")}
-        onClick={() => setMode("compose")}
-      >
-        <Workflow className="w-3 h-3" aria-hidden="true" />
-        <span className="hidden sm:inline">Compose</span>
-        <span className="sr-only sm:hidden">Compose</span>
-      </button>
-      <button
-        type="button"
-        role="tab"
         aria-selected={mode === "multiverse"}
-        title="Multiverse: every configuration you've tried, side by side with its outcome distribution"
+        title="Evidence board: home — every configuration and its evidence"
         className={seg(mode === "multiverse")}
         onClick={() => setMode("multiverse")}
       >
         <LayoutGrid className="w-3 h-3" aria-hidden="true" />
-        <span className="hidden sm:inline">Multiverse</span>
-        <span className="sr-only sm:hidden">Multiverse</span>
+        <span className="hidden sm:inline">Evidence board</span>
+        <span className="sr-only sm:hidden">Evidence board</span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "compose"}
+        title="Pipeline editor: define or modify one configuration"
+        className={seg(mode === "compose")}
+        onClick={() => setMode("compose")}
+      >
+        <Workflow className="w-3 h-3" aria-hidden="true" />
+        <span className="hidden sm:inline">Pipeline editor</span>
+        <span className="sr-only sm:hidden">Pipeline editor</span>
       </button>
     </div>
   );
