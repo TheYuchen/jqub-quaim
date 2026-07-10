@@ -782,6 +782,18 @@ export function FlowCanvas() {
     // (run_id / seed_mode / root_seed / app_version) + per-node seed
     // derivation, so the exported script reproduces that run exactly.
     const lastRun = useApp.getState().run;
+    // Server-authoritative stopping rule: the target the run actually
+    // executed with is stamped into the sampled step's distribution
+    // payload (never the toolbar's CURRENT selection, which the user
+    // may have changed since the run finished).
+    const lastTarget =
+      lastRun?.steps
+        ?.map(
+          (s) =>
+            (s.distribution as { precision_target?: number | null } | null | undefined)
+              ?.precision_target,
+        )
+        .find((v): v is number => typeof v === "number") ?? null;
     const provenance =
       lastRun && (lastRun.run_id || lastRun.root_seed != null)
         ? {
@@ -789,6 +801,7 @@ export function FlowCanvas() {
             seedMode: lastRun.seed_mode ?? null,
             rootSeed: lastRun.root_seed ?? null,
             appVersion: lastRun.app_version ?? null,
+            precisionTarget: lastTarget,
           }
         : null;
     const script = generatePythonScript(nodes, edges, sampleKey, provenance);

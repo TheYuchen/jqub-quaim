@@ -38,6 +38,12 @@ interface EmitContext {
    *  preamble emitted the _derive_seed helper — emitters may then
    *  thread per-node seeds into stochastic calls. */
   rootSeed: number | null;
+  /** Optional-stopping target the exported run executed with (95%-CI
+   *  half-width, absolute fidelity units). Part of the run's
+   *  provenance: without it an early-stopped run's script would run
+   *  ALL requested shots and reproduce a different draw sequence
+   *  length than the archived record. */
+  precisionTarget: number | null;
 }
 
 /** Provenance envelope of the run this export descends from (the
@@ -48,6 +54,8 @@ export interface ExportProvenance {
   seedMode: "fresh" | "pinned" | null;
   rootSeed: number | null;
   appVersion: string | null;
+  /** RunRequest.precision_target the run was executed with, if any. */
+  precisionTarget?: number | null;
 }
 
 type Emitter = (b: PipelineNode, stepNum: number, ctx: EmitContext) => string[];
@@ -261,6 +269,19 @@ const emitFidelity: Emitter = (b, _step, ctx) => {
       ctx.rootSeed != null
         ? [`    seed=_derive_seed(ROOT_SEED, "${b.id}"),  # -> seed_simulator`]
         : [];
+    // Optional stopping is part of the run's identity: an archived
+    // early-stopped run executed FEWER shots than requested, so the
+    // exported script must re-send the same stopping rule or it would
+    // run the full budget and report a different (narrower) interval
+    // than the archived one. With the seed above, seeded per-batch
+    // draws + the same rule reproduce the archived stopping point
+    // bit-exactly.
+    const targetLines =
+      ctx.precisionTarget != null
+        ? [
+            `    precision_target=${ctx.precisionTarget},  # stop at ±${(ctx.precisionTarget * 100).toFixed(1)}pp (95%-CI half-width)`,
+          ]
+        : [];
     return [
       `from qlib.qiskit_utils import sampledFidelityEstimator`,
       ``,
@@ -270,6 +291,7 @@ const emitFidelity: Emitter = (b, _step, ctx) => {
       `    shots=shots if 'shots' in dir() else 1024,`,
       `    unbound_param_policy="${policy}",`,
       ...seedLines,
+      ...targetLines,
       `)`,
       `print(f"Fidelity (sampled, shots={meta['shots']}): {fidelity:.6f}")`,
     ];
@@ -364,6 +386,10 @@ export function generatePythonScript(
       lines.push(`  root_seed   : ${provenance.rootSeed}`);
     if (provenance.appVersion)
       lines.push(`  app_version : ${provenance.appVersion}`);
+    if (provenance.precisionTarget != null)
+      lines.push(
+        `  stop_target : ${provenance.precisionTarget}  # 95%-CI half-width — run stopped early once met`,
+      );
     lines.push(`  exported    : ${new Date().toISOString()}`);
   }
   lines.push(`"""`);
@@ -403,6 +429,7 @@ export function generatePythonScript(
   const ctx: EmitContext = {
     sampleKey,
     rootSeed: needsSeedHelper ? rootSeed : null,
+    precisionTarget: provenance?.precisionTarget ?? null,
   };
   blocks.forEach((b, i) => {
     const stepNum = i + 1;

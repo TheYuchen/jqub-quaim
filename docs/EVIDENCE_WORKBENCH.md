@@ -86,8 +86,14 @@ vqc_2q_small showed P-2; interval-overlap callout fires).
 12. **Reproducible export** — exported Python embeds the provenance
     header (run_id/seed_mode/root_seed/app_version) and a
     _derive_seed helper reproducing the backend's per-node seed
-    derivation, threaded into sampled fidelity as seed_simulator; the
+    derivation, threaded into sampled fidelity as seed_simulator, AND
+    (since the 2026-07-10 improvement wave) the run's
+    precision_target re-sent as the `precision_target=` kwarg plus a
+    `stop_target` header stamp — so an early-stopped run's script
+    stops at the same batch instead of running the full budget; the
     exported script reproduces the archived run's exact draw.
+    Shape-verified by scripts/check_export_python.test.ts (esbuild
+    bundle + node, command in its header).
 
 Backend test lane: 57 green (test_provenance_phase0 24,
 test_gate_diff 14, test_workflow_helpers 11, test_seed_coverage 8).
