@@ -1,6 +1,7 @@
 import { useApp } from "../lib/store";
 import { Activity, Compass, PanelLeft, PanelRight, Zap } from "lucide-react";
 import { APP_NAME, APP_TAGLINE } from "../lib/anon";
+import { ClaimsMapButton } from "./ClaimsMap";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { TipIcon } from "./TipIcon";
 
@@ -139,6 +140,7 @@ export function TopBar({
             <span className="hidden sm:inline">Tour</span>
           </button>
         )}
+        <ClaimsMapButton />
         <ThemeSwitcher />
         {mobile && onOpenRightDrawer && (
           <button
