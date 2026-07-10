@@ -1,9 +1,16 @@
-// Multiverse board — the archive promoted from a side panel to a
-// workspace. The analyst's real object of study is not one pipeline
+// Evidence board (internal id: "multiverse") — HOME since the IA
+// inversion. The analyst's real object of study is not one pipeline
 // but the SET of configurations they have tried; this view makes that
 // set first-class: one card per configuration (config_hash group),
 // laid out as small multiples so outcome distributions are comparable
-// at a glance (multiverse-analysis framing).
+// at a glance (multiverse-analysis framing). Since the IA-inversion
+// wave the board is the DEFAULT workspace (store default + persisted
+// preference), and a card expands IN PLACE into a scale-2 summary
+// (marker: card-expand) — recent-run dots, pooled interval, quick
+// actions — so working the evidence never requires leaving home. The
+// Pipeline editor is the subordinate definition view of one
+// configuration, entered from a card's "Open in editor" or the
+// header's "New configuration" (marker: config-context).
 //
 // Encoding decisions, one channel per field:
 //   * card HUE (chip + border tint + dots) = config_hash, same
@@ -33,13 +40,25 @@
 //     line compares pooled means when both sides have pools.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GitCompare, HelpCircle, RotateCcw, Workflow, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  GitCompare,
+  HelpCircle,
+  Play,
+  Plus,
+  Repeat,
+  RotateCcw,
+  Workflow,
+  X,
+} from "lucide-react";
 import { useApp } from "../lib/store";
 import { listRuns, type RunRecord } from "../lib/runStore";
 import type { SharePayload, ShareNode } from "../lib/share";
 import { resolveNodeSpec, type NodeSpec } from "../lib/nodeCatalog";
 import type { PluginManifest } from "../lib/api";
 import { hashHue, hueCss } from "../lib/hues";
+import { evidenceRadius } from "../lib/evidenceMass";
 import {
   POOLED_SMALL_N_SHOTS,
   poolEvidence,
@@ -356,6 +375,169 @@ function OutcomeStrip({
   );
 }
 
+// --- expanded card: in-place scale-2 summary (marker: card-expand) ----------
+
+/** Newest runs of one configuration as a compact chronological dot
+ *  timeline — the lineage's row-dot encoding, miniaturized and shared
+ *  via lib/evidenceMass.ts so "dot area = shots of evidence" stays ONE
+ *  encoding across panels: ring = pinned seed (deterministic replay),
+ *  hollow + red slash = errored run, ink outline = newest. y is flat
+ *  (time only): the outcome axis already lives in the card's 0-1
+ *  strip, and duplicating it here would imply two value axes. */
+const MAX_DOTS = 12;
+
+function RunDotsStrip({ runs, hue }: { runs: RunRecord[]; hue: number }) {
+  const shown = runs.slice(-MAX_DOTS);
+  const earlier = runs.length - shown.length;
+  const H = 24;
+  const STEP = 19;
+  const PADX = 10;
+  const w = PADX * 2 + Math.max(0, shown.length - 1) * STEP;
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      {earlier > 0 && (
+        <span className="text-[10px] text-mute shrink-0">+{earlier} earlier</span>
+      )}
+      <svg
+        width={w}
+        height={H}
+        role="img"
+        aria-label={`${shown.length} most recent runs, oldest to newest; dot area is shots of evidence, a ring marks a pinned (replayed) seed`}
+        className="shrink-0"
+      >
+        {shown.length > 1 && (
+          <line
+            x1={PADX}
+            x2={PADX + (shown.length - 1) * STEP}
+            y1={H / 2}
+            y2={H / 2}
+            stroke="rgb(var(--color-edge))"
+            strokeWidth={1}
+          />
+        )}
+        {shown.map((r, i) => {
+          const ev = runEvidence(r.response);
+          const rad = evidenceRadius(ev?.shots ?? 0);
+          const cx = PADX + i * STEP;
+          const pinned = r.seed_mode === "pinned";
+          const newest = i === shown.length - 1;
+          const label = r.ok
+            ? r.headline_value != null
+              ? `${(Math.min(1, Math.max(0, r.headline_value)) * 100).toFixed(1)}%`
+              : "no metric"
+            : "errored";
+          const title = `${label} · ${ev ? `${ev.shots} shots` : "no sampled evidence"}${
+            r.root_seed != null
+              ? ` · ${pinned ? "replayed seed" : "seed"} ${r.root_seed}`
+              : ""
+          } · ${relTime(r.created_at)}`;
+          return (
+            <g key={r.run_id}>
+              {r.ok ? (
+                <circle
+                  cx={cx}
+                  cy={H / 2}
+                  r={rad}
+                  fill={hueCss(hue, newest ? 0.95 : 0.55)}
+                  stroke={newest ? "rgb(var(--color-ink))" : "none"}
+                  strokeWidth={newest ? 1 : 0}
+                >
+                  <title>{title}</title>
+                </circle>
+              ) : (
+                <g>
+                  <circle
+                    cx={cx}
+                    cy={H / 2}
+                    r={rad}
+                    fill="none"
+                    stroke={hueCss(hue, 0.55)}
+                    strokeWidth={1.2}
+                  >
+                    <title>{title}</title>
+                  </circle>
+                  <line
+                    x1={cx - rad}
+                    y1={H / 2 + rad}
+                    x2={cx + rad}
+                    y2={H / 2 - rad}
+                    stroke="rgb(var(--color-danger))"
+                    strokeWidth={1.2}
+                  />
+                </g>
+              )}
+              {pinned && (
+                <circle
+                  cx={cx}
+                  cy={H / 2}
+                  r={rad + 2}
+                  fill="none"
+                  stroke={hueCss(hue, 0.8)}
+                  strokeWidth={1}
+                >
+                  <title>pinned seed — deterministic replay</title>
+                </circle>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/** The pooled 95% interval as its own labeled line — the same Wilson
+ *  pool the collapsed card draws as a band under the dots, promoted to
+ *  a readable statement when the card is expanded. */
+function PooledLine({ pooled, hue }: { pooled: PooledEvidence; hue: number }) {
+  const H = 18;
+  const X0 = 8;
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <svg
+        viewBox={`0 0 220 ${H}`}
+        className="w-full max-w-[220px]"
+        height={H}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={`Pooled 95% interval ${(pooled.ci95[0] * 100).toFixed(1)} to ${(pooled.ci95[1] * 100).toFixed(1)} percent over ${pooled.shots} shots`}
+      >
+        <line x1={X0} x2={212} y1={H / 2} y2={H / 2} stroke="rgb(var(--color-edge))" strokeWidth={1} />
+        {(() => {
+          const px = (v: number) => X0 + v * (212 - X0);
+          return (
+            <>
+              <rect
+                x={px(pooled.ci95[0])}
+                y={H / 2 - 3}
+                width={Math.max(2, px(pooled.ci95[1]) - px(pooled.ci95[0]))}
+                height={6}
+                rx={3}
+                fill={hueCss(hue, 0.35)}
+                stroke={hueCss(hue, 0.7)}
+                strokeWidth={0.75}
+              >
+                <title>{`pooled 95% interval: ${(pooled.ci95[0] * 100).toFixed(1)}–${(pooled.ci95[1] * 100).toFixed(1)}% (${pooled.successes}/${pooled.shots} counts over ${pooled.nRuns} runs)`}</title>
+              </rect>
+              <line
+                x1={px(pooled.point)}
+                x2={px(pooled.point)}
+                y1={H / 2 - 6}
+                y2={H / 2 + 6}
+                stroke={hueCss(hue, 0.95)}
+                strokeWidth={1.5}
+              />
+            </>
+          );
+        })()}
+      </svg>
+      <span className="text-[10px] text-mute tabular-nums whitespace-nowrap shrink-0">
+        {(pooled.ci95[0] * 100).toFixed(1)}–{(pooled.ci95[1] * 100).toFixed(1)}%
+      </span>
+    </div>
+  );
+}
+
 // --- misc -------------------------------------------------------------------
 
 function relTime(ts: number): string {
@@ -380,10 +562,25 @@ export function MultiverseBoard() {
   const plugins = useApp((s) => s.plugins);
   const requestRestore = useApp((s) => s.requestRestore);
   const setWorkspaceMode = useApp((s) => s.setWorkspaceMode);
+  const setEditorContext = useApp((s) => s.setEditorContext);
+  const requestNewConfig = useApp((s) => s.requestNewConfig);
+  const setReplicateCount = useApp((s) => s.setReplicateCount);
+  const setPinnedSeed = useApp((s) => s.setPinnedSeed);
   const compareIds = useApp((s) => s.compareIds);
   const toggleCompare = useApp((s) => s.toggleCompare);
 
   const boardRef = useRef<HTMLDivElement>(null);
+  // In-place card expansion (marker: card-expand): at most ONE card at
+  // a time — the expansion is a focused reading of one configuration,
+  // not a second grid density. Keyed by config hash so it survives
+  // archive refreshes (run counts change, identity doesn't).
+  const [expandedHash, setExpandedHash] = useState<string | null>(null);
+  // Whether the grid is wide enough for an expanded card to span two
+  // columns. Guarded because `grid-column: span 2` in a ONE-column
+  // auto-fill grid would mint a phantom implicit column and shrink
+  // every card; measured on the grid element itself.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [canSpan, setCanSpan] = useState(false);
   const [runs, setRuns] = useState<RunRecord[] | null>(null);
   const [hintDismissed, setHintDismissed] = useState<boolean>(() => {
     try {
@@ -415,6 +612,18 @@ export function MultiverseBoard() {
   const groups = useMemo(() => buildGroups(runs ?? []), [runs]);
   const baseline = useMemo(() => pickBaseline(groups), [groups]);
 
+  const hasCards = groups.length > 0;
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    // Two 240px columns + the 12px gap must fit the grid content box.
+    const update = () => setCanSpan(el.clientWidth >= 240 * 2 + 12);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasCards]);
+
   const demoBannerVisible = runs != null && runs.some((r) => r.demo);
   const hintVisible =
     groups.length > 0 && (hintForced || (!hintDismissed && !demoBannerVisible));
@@ -429,14 +638,58 @@ export function MultiverseBoard() {
       sourceRunId: src.run_id,
       precisionTarget: src.precision_target ?? null,
     });
+    // The editor opens as this configuration's DEFINITION VIEW: the
+    // context bar (marker: config-context) names the identity being
+    // edited and live-rehashes it as params change.
+    setEditorContext({
+      source: "card",
+      hash: g.hash,
+      circuitTag: g.circuitTag,
+      runCount: g.runs.length,
+    });
     setWorkspaceMode("compose");
+  };
+
+  // Quick actions of an expanded card (marker: card-expand). Both stay
+  // ON the board: the canvas underneath rebuilds and auto-runs (the
+  // same pendingRestore/pendingAutoRun bridge scenario boots ride),
+  // the theater overlays the board while the sampled step streams,
+  // and the archive bump repaints this card. Disabled for runs on
+  // uploaded circuits — auto-run needs a reloadable sample.
+  const replayLatest = (g: ConfigGroup) => {
+    const src = g.latestOk;
+    if (!src || src.sample_key == null || src.root_seed == null) return;
+    requestRestore({
+      graph: src.graph,
+      sampleKey: src.sample_key,
+      pinSeed: src.root_seed,
+      sourceRunId: src.run_id,
+      precisionTarget: src.precision_target ?? null,
+      autoRunAfter: true,
+    });
+  };
+  const runThreeReplicates = (g: ConfigGroup) => {
+    const src = g.latestOk;
+    if (!src || src.sample_key == null) return;
+    // Fresh draws: clear any stale pinned seed (a pin forces ×1 and
+    // identical numbers) and ask for 3 replicates.
+    setPinnedSeed(null);
+    setReplicateCount(3);
+    requestRestore({
+      graph: src.graph,
+      sampleKey: src.sample_key,
+      pinSeed: null,
+      sourceRunId: src.run_id,
+      precisionTarget: src.precision_target ?? null,
+      autoRunAfter: true,
+    });
   };
 
   return (
     <div
       ref={boardRef}
       className="multiverse-board flex-1 flex flex-col min-h-0 bg-canvas"
-      aria-label="Multiverse board: all configurations as small multiples"
+      aria-label="Evidence board: all configurations as small multiples"
     >
       {/* Header mirrors the FlowCanvas toolbar height so flipping modes
           doesn't jump the layout. The toggle is duplicated here because
@@ -444,7 +697,7 @@ export function MultiverseBoard() {
       <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center gap-3">
         <WorkspaceToggle />
         <div className="text-xs text-mute truncate">
-          <span className="text-ink font-medium">Multiverse</span>
+          <span className="text-ink font-medium">Evidence board</span>
           <TipIcon
             className="ml-1"
             hint={`${gloss("configuration")} Card key: squares = pipeline stages · dot above = settings differ from baseline · strip dots = one per replicate (0-100%) · filled band = pooled 95% interval.`}
@@ -457,12 +710,27 @@ export function MultiverseBoard() {
             </>
           )}
         </div>
+        {/* IA inversion: composing starts FROM home. The button clears
+            the canvas (newConfigRequest bridge) and frames the editor
+            as "New configuration — not yet run" (config-context). */}
+        <button
+          type="button"
+          className="btn shrink-0"
+          title="Define a new configuration in the Pipeline editor (opens a blank canvas)"
+          onClick={() => {
+            requestNewConfig();
+            setWorkspaceMode("compose");
+          }}
+        >
+          <Plus className="w-3 h-3" />
+          <span className="hidden sm:inline">New configuration</span>
+        </button>
         {!hintVisible && (
           <button
             type="button"
             className="shrink-0 p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
             title="Show the board orientation hint (what a card is and what Open / A/B do)"
-            aria-label="Show multiverse orientation hint"
+            aria-label="Show board orientation hint"
             onClick={() => {
               // Explicit reopen beats the one-strip rule AND any
               // persisted dismissal.
@@ -508,18 +776,19 @@ export function MultiverseBoard() {
           className="multiverse-hint flex items-center gap-2 border-b border-edge/60 bg-surfaceAlt/40 px-3 py-1.5 text-[11px] text-mute"
           role="note"
           data-marker="multiverse-hint"
-          aria-label="Multiverse orientation hint"
+          aria-label="Board orientation hint"
         >
           <span className="min-w-0">
             Each card is one configuration — its pipeline, its outcome
-            distribution, Δ vs the baseline card. Open rebuilds it; A/B
-            sends two cards to Between configurations.
+            distribution, Δ vs the baseline card. Expand (⌄) for recent
+            runs and quick actions; Open rebuilds it in the Pipeline
+            editor; A/B sends two cards to Between configurations.
           </span>
           <button
             type="button"
             className="ml-auto shrink-0 p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
             title="Dismiss (remembered on this device — the ? in the header brings it back)"
-            aria-label="Dismiss multiverse orientation hint"
+            aria-label="Dismiss board orientation hint"
             onClick={() => {
               setHintForced(false);
               setHintDismissed(true);
@@ -545,23 +814,27 @@ export function MultiverseBoard() {
                 No configurations archived yet
               </div>
               <p className="text-sm text-mute leading-relaxed mb-4">
-                The Multiverse view treats every configuration you try as
-                evidence: one card per configuration, with its pipeline
-                schematic and the distribution of outcomes across
-                replicates. Switch to Compose, run a pipeline (try the ×5
-                replicate runner), then flip back here to compare.
+                The Evidence board is home: every configuration you try
+                becomes a card, with its pipeline schematic and the
+                distribution of outcomes across replicates. Open the
+                Pipeline editor, define and run a configuration (try the
+                ×5 replicate runner), then come back here to compare.
               </p>
               <button
                 type="button"
                 className="btn"
-                onClick={() => setWorkspaceMode("compose")}
+                onClick={() => {
+                  requestNewConfig();
+                  setWorkspaceMode("compose");
+                }}
               >
-                <Workflow className="w-3.5 h-3.5" /> Go to Compose
+                <Workflow className="w-3.5 h-3.5" /> Define a configuration
               </button>
             </div>
           </div>
         ) : (
           <div
+            ref={gridRef}
             className="grid gap-3 p-3"
             style={{
               gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
@@ -597,11 +870,19 @@ export function MultiverseBoard() {
                   : null;
               const abSelected =
                 g.latestOk != null && compareIds.includes(g.latestOk.run_id);
+              const expanded = expandedHash === g.hash;
               return (
                 <div
                   key={g.hash}
                   className="rounded-lg border bg-surface p-3 flex flex-col gap-2 min-w-0"
-                  style={{ borderColor: hueCss(g.hue, 0.35) }}
+                  style={{
+                    borderColor: hueCss(g.hue, expanded ? 0.6 : 0.35),
+                    // span 2 only when the grid really has two columns:
+                    // in a 1-column grid, span 2 would mint a phantom
+                    // implicit column and shrink every card (canSpan is
+                    // measured on the grid element).
+                    ...(expanded && canSpan ? { gridColumn: "span 2" } : {}),
+                  }}
                 >
                   {/* header: circuit + config identity */}
                   <div className="flex items-center gap-1.5 min-w-0">
@@ -621,14 +902,40 @@ export function MultiverseBoard() {
                     >
                       {g.circuitTag}
                     </span>
-                    {isBaseline && (
-                      <span
-                        className="chip !border-accent/50 !text-accent shrink-0 ml-auto"
-                        title="Most-tried configuration — other cards report Δmean against this one."
+                    <span className="ml-auto flex items-center gap-1 shrink-0">
+                      {isBaseline && (
+                        <span
+                          className="chip !border-accent/50 !text-accent shrink-0"
+                          title="Most-tried configuration — other cards report Δmean against this one."
+                        >
+                          baseline
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
+                        aria-expanded={expanded}
+                        aria-label={
+                          expanded
+                            ? "Collapse configuration card"
+                            : "Expand configuration card: recent runs, pooled interval, quick actions"
+                        }
+                        title={
+                          expanded
+                            ? "Collapse"
+                            : "Expand in place: recent runs, pooled interval, quick actions"
+                        }
+                        onClick={() =>
+                          setExpandedHash(expanded ? null : g.hash)
+                        }
                       >
-                        baseline
-                      </span>
-                    )}
+                        {expanded ? (
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </span>
                   </div>
 
                   {/* pipeline schematic */}
@@ -638,7 +945,18 @@ export function MultiverseBoard() {
                     plugins={plugins}
                   />
 
-                  {/* outcome distribution */}
+                  {/* outcome distribution — the strip area doubles as
+                      the expand affordance (chevron is the accessible
+                      path; this is the big pointer target). */}
+                  <div
+                    className="cursor-pointer"
+                    title={
+                      expanded
+                        ? "Collapse"
+                        : "Expand in place: recent runs, pooled interval, quick actions"
+                    }
+                    onClick={() => setExpandedHash(expanded ? null : g.hash)}
+                  >
                   {g.values.length >= 2 ? (
                     <>
                       <OutcomeStrip values={g.values} hue={g.hue} pooled={g.pooled} />
@@ -698,6 +1016,7 @@ export function MultiverseBoard() {
                       no metric recorded
                     </div>
                   )}
+                  </div>
 
                   {/* meta */}
                   <div className="flex items-center gap-2 text-[10px] text-mute">
@@ -716,39 +1035,134 @@ export function MultiverseBoard() {
                     )}
                   </div>
 
-                  {/* actions */}
-                  <div className="flex items-center gap-1.5 mt-auto pt-1">
-                    <button
-                      type="button"
-                      className="btn disabled:opacity-40 disabled:cursor-not-allowed"
-                      disabled={g.latestOk == null}
-                      onClick={() => openConfig(g)}
-                      title={
-                        g.latestOk
-                          ? "Rebuild this configuration on the canvas (switches to Compose)"
-                          : "No successful run to restore"
-                      }
+                  {/* actions. Collapsed: the two originals. Expanded
+                      (marker: card-expand): the in-place scale-2
+                      summary + quick actions — replay/replicates stay
+                      ON the board (the canvas underneath runs, the
+                      theater overlays, the card repaints), so the
+                      board is a working surface, not a menu. */}
+                  {!expanded ? (
+                    <div className="flex items-center gap-1.5 mt-auto pt-1">
+                      <button
+                        type="button"
+                        className="btn disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled={g.latestOk == null}
+                        onClick={() => openConfig(g)}
+                        title={
+                          g.latestOk
+                            ? "Open this configuration in the Pipeline editor (its definition view)"
+                            : "No successful run to restore"
+                        }
+                      >
+                        <RotateCcw className="w-3 h-3" /> Open
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn disabled:opacity-40 disabled:cursor-not-allowed ${
+                          abSelected ? "!border-accent/60 !text-accent" : ""
+                        }`}
+                        disabled={g.latestOk == null}
+                        onClick={() =>
+                          g.latestOk && toggleCompare(g.latestOk.run_id)
+                        }
+                        title={
+                          g.latestOk
+                            ? "Select this configuration's latest run for side-by-side comparison (pick two)"
+                            : "No successful run to compare"
+                        }
+                      >
+                        <GitCompare className="w-3 h-3" /> A/B
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      data-marker="card-expand"
+                      className="mt-auto border-t border-edge/60 pt-2 flex flex-col gap-2"
                     >
-                      <RotateCcw className="w-3 h-3" /> Open
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn disabled:opacity-40 disabled:cursor-not-allowed ${
-                        abSelected ? "!border-accent/60 !text-accent" : ""
-                      }`}
-                      disabled={g.latestOk == null}
-                      onClick={() =>
-                        g.latestOk && toggleCompare(g.latestOk.run_id)
-                      }
-                      title={
-                        g.latestOk
-                          ? "Select this configuration's latest run for side-by-side comparison (pick two)"
-                          : "No successful run to compare"
-                      }
-                    >
-                      <GitCompare className="w-3 h-3" /> A/B
-                    </button>
-                  </div>
+                      <div className="text-[10px] uppercase tracking-wider text-mute/70 select-none">
+                        recent runs — oldest → newest
+                      </div>
+                      <RunDotsStrip runs={g.runs} hue={g.hue} />
+                      {g.pooled ? (
+                        <PooledLine pooled={g.pooled} hue={g.hue} />
+                      ) : (
+                        <div className="text-[10px] text-mute">
+                          no pooled interval yet — pooling needs ≥2 runs
+                          with measurement counts; +3 replicates buys them
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          className="btn disabled:opacity-40 disabled:cursor-not-allowed"
+                          disabled={
+                            g.latestOk == null ||
+                            g.latestOk.sample_key == null ||
+                            g.latestOk.root_seed == null
+                          }
+                          onClick={() => replayLatest(g)}
+                          title={
+                            g.latestOk == null
+                              ? "No successful run to replay"
+                              : g.latestOk.sample_key == null
+                                ? "This run used an uploaded circuit — open it in the editor and re-upload to replay"
+                                : g.latestOk.root_seed == null
+                                  ? "No recorded seed on the latest run"
+                                  : `Replay the latest run bit-exactly (pins seed ${g.latestOk.root_seed}, runs without leaving the board)`
+                          }
+                        >
+                          <Play className="w-3 h-3" /> Replay latest
+                        </button>
+                        <button
+                          type="button"
+                          className="btn disabled:opacity-40 disabled:cursor-not-allowed"
+                          disabled={
+                            g.latestOk == null || g.latestOk.sample_key == null
+                          }
+                          onClick={() => runThreeReplicates(g)}
+                          title={
+                            g.latestOk == null
+                              ? "No successful run to replicate"
+                              : g.latestOk.sample_key == null
+                                ? "This run used an uploaded circuit — open it in the editor and re-upload to replicate"
+                                : "Buy more evidence: 3 fresh-seed replicates of this configuration, run from the board"
+                          }
+                        >
+                          <Repeat className="w-3 h-3" /> +3 replicates
+                        </button>
+                        <button
+                          type="button"
+                          className="btn disabled:opacity-40 disabled:cursor-not-allowed"
+                          disabled={g.latestOk == null}
+                          onClick={() => openConfig(g)}
+                          title={
+                            g.latestOk
+                              ? "Open this configuration in the Pipeline editor (its definition view)"
+                              : "No successful run to restore"
+                          }
+                        >
+                          <RotateCcw className="w-3 h-3" /> Open in editor
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn disabled:opacity-40 disabled:cursor-not-allowed ${
+                            abSelected ? "!border-accent/60 !text-accent" : ""
+                          }`}
+                          disabled={g.latestOk == null}
+                          onClick={() =>
+                            g.latestOk && toggleCompare(g.latestOk.run_id)
+                          }
+                          title={
+                            g.latestOk
+                              ? "Select this configuration's latest run for side-by-side comparison (pick two)"
+                              : "No successful run to compare"
+                          }
+                        >
+                          <GitCompare className="w-3 h-3" /> A/B
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

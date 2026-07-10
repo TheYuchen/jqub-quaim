@@ -60,6 +60,7 @@ import { Download, GitCompareArrows, History, KeyRound, Play, RotateCcw, Trash2,
 import { useApp } from "../lib/store";
 import { deleteRun, exportArchive, importArchive, listRuns, type RunRecord } from "../lib/runStore";
 import { hashHue, hueCss } from "../lib/hues";
+import { R_MIN, evidenceRadius } from "../lib/evidenceMass";
 import { runEvidence, wilson95 } from "../lib/stats";
 import { DemoArchiveBanner } from "./DemoArchiveBanner";
 
@@ -72,21 +73,11 @@ const STRIP_H = 20; // height of a group distribution-strip row
 const LANE_X0 = 13; // x of lane 0 inside the gutter
 const LANE_DX = 11; // horizontal distance between lanes
 const N_LANES = 4; // lanes cycle mod 4 — enough separation for edges to read
-const R_MIN = 3; // node radius floor (runs with no sampled evidence)
-const R_MAX = 7; // node radius cap
-const SHOTS_REF = 2048; // shots that earn R_MAX = the app's default full budget
 const RING_PAD = 2.5; // pinned-seed ring sits this far outside the dot
 const FUNNEL_MAX_PX = 10; // widest half-width of a group certainty funnel
-
-/** Wave J evidence mass: dot AREA ∝ √shots ⇒ radius ∝ shots^(1/4),
- *  against a FIXED 2048-shot reference (not view-normalized) so the
- *  same run keeps the same weight across sessions and figures — the
- *  same stability argument as the hash→hue mapping. 512 shots ≈ 5px,
- *  2048 ≈ 7px; an early stop at 512 of 2048 is plainly lighter. */
-function evidenceRadius(shots: number): number {
-  if (!(shots > 0)) return R_MIN;
-  return Math.max(R_MIN, Math.min(R_MAX, R_MAX * Math.pow(shots / SHOTS_REF, 0.25)));
-}
+// Evidence-mass sizing (R_MIN/R_MAX/evidenceRadius) moved to
+// lib/evidenceMass.ts in the IA-inversion wave: the Evidence board's
+// expanded card strip shares the identical dot-area encoding.
 const STRIP_W = 92; // width of the 0-1 distribution mini strip
 
 function timeLabel(ts: number): string {
@@ -678,7 +669,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
               first checkbox beyond a "1" on a tab the user may never
               look at — the interaction just seemed to do nothing. One
               transient chip closes the loop and names the alternative
-              entry point (Multiverse A/B). Disappears at 0 or 2. */}
+              entry point (Evidence-board A/B). Disappears at 0 or 2. */}
           {compareIds.length === 1 && (
             <div
               role="status"
@@ -687,7 +678,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
               <GitCompareArrows className="w-3 h-3 shrink-0" />
               <span>
                 1 of 2 picked — tick one more run for Between
-                configurations, or A/B a card in Multiverse.
+                configurations, or A/B a card on the Evidence board.
               </span>
             </div>
           )}
