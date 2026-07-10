@@ -359,13 +359,13 @@ function EvidenceSlide() {
     >
       <p>
         Inside a run (scale 1), the interval narrows as shot batches
-        stream in — the funnel. Set a precision target
+        stream in — the funnel. A precision target
         <TipIcon
           className="mx-0.5 align-text-top"
           hint={gloss("precisionTarget")}
         />{" "}
-        and the run stops itself once it is precise enough. Across ×N
-        replicates
+        — the same knob IBM's Estimator API exposes — turns optional
+        stopping into a visual decision. Across ×N replicates
         <TipIcon className="mx-0.5 align-text-top" hint={gloss("replicate")} />{" "}
         (scale 2), <span className="text-ink font-medium">This
         configuration</span> becomes a lineage: hue = configuration

@@ -37,8 +37,16 @@ export const GLOSSARY = {
     "Pruning = deleting parameters/operations that contribute little, producing a smaller circuit that is less exposed to noise.",
   errorBound:
     "Predicted upper limit on how much error today's machine noise adds to this circuit. Lower is better.",
+  // Grounding note (evidence-grounding wave): the second sentence of
+  // the precisionTarget gloss cites the field's own precision knobs so
+  // the control speaks the practitioner's language. Our semantics stay
+  // a 95% TWO-SIDED Wilson interval — the system-wide convention every
+  // funnel, pooled band and difference interval shares — so we note the
+  // Quantum Volume correspondence (97.5% ONE-SIDED) without adding a
+  // convention switcher; the full mapping lives in
+  // docs/EVIDENCE_WORKBENCH.md §1.2 "Grounding in documented practice".
   precisionTarget:
-    "Optional stopping rule: keep measuring in batches and stop as soon as the uncertainty interval is at most this wide (± percentage points). Because stopping depends on the data, interval coverage is approximate under early stopping.",
+    "Optional stopping rule: keep measuring in batches and stop as soon as the uncertainty interval is at most this wide (± percentage points). Because stopping depends on the data, interval coverage is approximate under early stopping. IBM's Estimator API exposes the same knob (`precision`, default 0.0156 \u2248 \u00b13.1pp at 95% two-sided); Quantum Volume gates decisions at a 97.5% one-sided interval \u2014 precision-gated evidence is codified practice, this control makes it visible and interactive.",
   replicate:
     "Replicate = run the identical configuration again with a fresh random draw. The spread across replicates is the real uncertainty.",
   configuration:

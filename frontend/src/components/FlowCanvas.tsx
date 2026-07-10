@@ -63,6 +63,7 @@ import {
 import { GLOSSARY } from "../lib/glossary";
 import { hashHue, hueCss } from "../lib/hues";
 import {
+  costAnchor,
   estimatePipeline,
   formatSeconds,
   replicateExtraS,
@@ -230,6 +231,15 @@ export function FlowCanvas() {
       `Estimated from ${costEst.sampleRuns} archived run(s) in this ` +
       `browser's own run history — median duration per block kind, ` +
       `cache hits excluded.`;
+    // cost-anchor, chip edition (shorter twin of the theater's line;
+    // constants + source in lib/costModel.ts, grounding: doc §1.2 T2).
+    const anchor = costAnchor(costEst.knownS);
+    if (anchor) {
+      title +=
+        ` On IBM pay-as-you-go ≈ ${anchor.usd} (at $1.60/s) · ` +
+        `≈${anchor.freeTierPct} of a free-tier month (10 min/28d); ` +
+        `simulator wall-time as proxy — hardware timing differs.`;
+    }
     if (unknownN > 0) {
       title += ` No history yet for: ${costEst.unknownKinds.join(", ")}.`;
     }

@@ -28,6 +28,10 @@ interface ClaimRow {
 interface ClaimSection {
   id: string;
   label: string;
+  /** Documented-practice grounding for the group — the corpus behind
+   *  the claim (docs/EVIDENCE_WORKBENCH.md §1.2). One terse line;
+   *  full citations live in the doc, not here. */
+  grounding: string;
   rows: ClaimRow[];
 }
 
@@ -35,6 +39,7 @@ const SECTIONS: ClaimSection[] = [
   {
     id: "C1",
     label: "C1 — one funnel grammar, three scales (evidence steering)",
+    grounding: "QV protocol · Estimator precision · iCANS/Rosalin",
     rows: [
       {
         claim: "Scale 1, within a run — the 95% interval narrows live; a precision target stops the run",
@@ -61,6 +66,8 @@ const SECTIONS: ClaimSection[] = [
   {
     id: "C2",
     label: "C2 — stochastic-provenance substrate",
+    grounding:
+      "documented irreproducibility (Dasgupta & Humble; stochastic transpiler)",
     rows: [
       {
         claim: "Seeded replay — every run is archived with its root seed and replays bit-exactly",
@@ -82,6 +89,7 @@ const SECTIONS: ClaimSection[] = [
   {
     id: "C3",
     label: "C3 — honesty devices",
+    grounding: "benchmark-lottery critique",
     rows: [
       {
         claim: "Honest comparison — intervals instead of scalars; overlap is called out as not-evidence",
@@ -169,6 +177,9 @@ export function ClaimsMapButton() {
                           className="pt-3 pb-1 text-[10px] uppercase tracking-wider text-accent"
                         >
                           {sec.label}
+                          <span className="block normal-case tracking-normal text-mute">
+                            grounded in: {sec.grounding}
+                          </span>
                         </td>
                       </tr>
                       {sec.rows.map((r) => (

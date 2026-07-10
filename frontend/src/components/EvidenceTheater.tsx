@@ -97,6 +97,7 @@ import {
   type PooledEvidence,
 } from "../lib/stats";
 import { hashHue, hueCss } from "../lib/hues";
+import { costAnchor } from "../lib/costModel";
 import { GLOSSARY } from "../lib/glossary";
 import { FigureExportButton } from "./FigureExportButton";
 import { TipIcon } from "./TipIcon";
@@ -306,7 +307,7 @@ function tickStep(span: number): number {
 // ---------------------------------------------------------------------------
 
 const W = 1000;
-const M = { l: 66, r: 208, t: 40, b: 66 };
+const M = { l: 66, r: 208, t: 40, b: 80 };
 
 /** Vertical label dodging for the right-margin readouts.
  *
@@ -397,6 +398,7 @@ function Panel({
       ? (last.at - first.at) / 1000
       : null;
   const totalSeconds = s.serverSeconds ?? clientSpan;
+  const anchor = costAnchor(totalSeconds);
 
   const stopX = s.stoppedEarly && s.shotsExecuted != null ? x(s.shotsExecuted) : null;
   const shotsSaved =
@@ -452,7 +454,7 @@ function Panel({
   //     and on a band shorter than the pile it lets the pile rise
   //     above the band top while KEEPING the separations, so labels
   //     never overprint and never loop. Multi-node panels (plotH ≈
-  //     144 px) fit the worst-case ~68 px pile with room to spare;
+  //     130 px) fit the worst-case ~68 px pile with room to spare;
   //     no target ⇒ 2 blocks; no archive pool ⇒ ≤ 2 blocks; both
   //     absent ⇒ the final readout alone, clamp-only.
   //
@@ -680,6 +682,30 @@ function Panel({
         {s.shotsRequested > (s.shotsExecuted ?? last.shots) ? ` of ${fmtShots(s.shotsRequested)}` : ""} shots
         {totalSeconds != null ? ` · ${totalSeconds.toFixed(1)} s` : ""}
       </text>
+
+      {/* cost-anchor (marker: cost-anchor): the same duration in the
+          field's hard cost numbers — IBM Pay-As-You-Go $1.60/s and
+          the Open Plan's 10 min/28d grant (constants + source in
+          lib/costModel.ts; grounding: doc §1.2, T2). Honesty label
+          inline: the duration is SIMULATOR wall-time, a coarse proxy
+          — hardware timing differs. Rendered only when a duration is
+          actually known, so archived traces without timing show no
+          made-up price. */}
+      {anchor != null && (
+        <text
+          data-marker="cost-anchor"
+          x={M.l}
+          y={axisY + (gaps.length > 0 ? 73 : 58)}
+          fontSize={9}
+          fill="rgb(var(--color-mute))"
+          opacity={0.9}
+        >
+          on IBM pay-as-you-go this evidence ≈ {anchor.usd} (est. at
+          $1.60/s hardware time) · ≈{anchor.freeTierPct} of a free-tier
+          month (10 min/28d) — simulator wall-time as proxy; hardware
+          timing differs
+        </text>
+      )}
     </g>
   );
 }

@@ -119,6 +119,39 @@ export function replicateExtraS(
   return (n - 1) * stochasticS;
 }
 
+// ---------------------------------------------------------------------------
+// cost-anchor: translate wall-clock seconds into the field's hard cost
+// numbers (docs/EVIDENCE_WORKBENCH.md §1.2, T2). Source: IBM Quantum
+// plans docs (quantum.cloud.ibm.com/docs/en/guides/plans-overview):
+// Pay-As-You-Go bills $1.60 per second of quantum hardware time; the
+// Open Plan grants 10 minutes per 28-day window. The translation is a
+// COARSE anchor, not a quote — callers feed it SIMULATOR wall-time as
+// a proxy, and every surface that renders it must say so ("simulator
+// wall-time as proxy; hardware timing differs").
+// ---------------------------------------------------------------------------
+
+export const IBM_USD_PER_SECOND = 1.6;
+export const FREE_TIER_SECONDS = 600; // Open Plan: 10 min per 28 days
+
+export interface CostAnchor {
+  /** "$5.12" — estimated pay-as-you-go price of this many seconds. */
+  usd: string;
+  /** "0.9%" (or "<0.1%") of the Open Plan's 10-minute monthly grant. */
+  freeTierPct: string;
+}
+
+/** null when the duration is unknown or non-positive — the anchor is
+ *  only shown when there is a real measured duration to translate. */
+export function costAnchor(seconds: number | null | undefined): CostAnchor | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return null;
+  const usd = seconds * IBM_USD_PER_SECOND;
+  const pct = (seconds / FREE_TIER_SECONDS) * 100;
+  return {
+    usd: usd >= 0.005 ? `$${usd.toFixed(2)}` : "<$0.01",
+    freeTierPct: pct < 0.1 ? "<0.1%" : `${pct.toFixed(1)}%`,
+  };
+}
+
 /** "12s" / "3.4s" / "2m 05s" — compact duration for the toolbar chip. */
 export function formatSeconds(s: number): string {
   if (s >= 90) {
