@@ -33,7 +33,7 @@
 //     line compares pooled means when both sides have pools.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GitCompare, RotateCcw, Workflow } from "lucide-react";
+import { GitCompare, HelpCircle, RotateCcw, Workflow, X } from "lucide-react";
 import { useApp } from "../lib/store";
 import { listRuns, type RunRecord } from "../lib/runStore";
 import type { SharePayload, ShareNode } from "../lib/share";
@@ -369,6 +369,12 @@ function relTime(ts: number): string {
 
 // --- board ------------------------------------------------------------------
 
+/** Orientation strip dismissal (marker: multiverse-hint). Same
+ *  contract as the lineage legend / ribbon legend: dismissal is
+ *  remembered per device, and a small "?" in the board header brings
+ *  the strip back — first-contact guidance must be recoverable. */
+const MULTIVERSE_HINT_LS_KEY = "quda.multiverseHintDismissed";
+
 export function MultiverseBoard() {
   const historyVersion = useApp((s) => s.historyVersion);
   const plugins = useApp((s) => s.plugins);
@@ -379,6 +385,13 @@ export function MultiverseBoard() {
 
   const boardRef = useRef<HTMLDivElement>(null);
   const [runs, setRuns] = useState<RunRecord[] | null>(null);
+  const [hintDismissed, setHintDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(MULTIVERSE_HINT_LS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   useEffect(() => {
     let alive = true;
     listRuns(200)
@@ -434,6 +447,24 @@ export function MultiverseBoard() {
             </>
           )}
         </div>
+        {hintDismissed && (
+          <button
+            type="button"
+            className="shrink-0 p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
+            title="Show the board orientation hint (what a card is and what Open / A/B do)"
+            aria-label="Show multiverse orientation hint"
+            onClick={() => {
+              setHintDismissed(false);
+              try {
+                localStorage.removeItem(MULTIVERSE_HINT_LS_KEY);
+              } catch {
+                /* private mode — reopening is session-scoped anyway */
+              }
+            }}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+          </button>
+        )}
         <div className="ml-auto hidden lg:flex items-center gap-2 text-[10px] text-mute shrink-0">
           <span>squares = pipeline stages</span>
           <span className="text-edge">·</span>
@@ -451,6 +482,42 @@ export function MultiverseBoard() {
       </div>
 
       {runs != null && runs.some((r) => r.demo) && <DemoArchiveBanner />}
+
+      {/* Orientation one-liner (marker: multiverse-hint): the board's
+          only guidance once cards exist — the empty state teaches, the
+          tour is skippable, and the header key is lg-only. One line,
+          task language, pinned above the grid; dismissal persists and
+          the header "?" brings it back. */}
+      {!hintDismissed && groups.length > 0 && (
+        <div
+          className="multiverse-hint flex items-center gap-2 border-b border-edge/60 bg-surfaceAlt/40 px-3 py-1.5 text-[11px] text-mute"
+          role="note"
+          data-marker="multiverse-hint"
+          aria-label="Multiverse orientation hint"
+        >
+          <span className="min-w-0">
+            Each card is one configuration — its pipeline, its outcome
+            distribution, Δ vs the baseline card. Open rebuilds it; A/B
+            sends two cards to Compare.
+          </span>
+          <button
+            type="button"
+            className="ml-auto shrink-0 p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
+            title="Dismiss (remembered on this device — the ? in the header brings it back)"
+            aria-label="Dismiss multiverse orientation hint"
+            onClick={() => {
+              setHintDismissed(true);
+              try {
+                localStorage.setItem(MULTIVERSE_HINT_LS_KEY, "1");
+              } catch {
+                /* private mode etc. — the hint just reappears next visit */
+              }
+            }}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         {runs == null ? (
