@@ -55,10 +55,10 @@
 // localStorage (quda.lineageLegendDismissed); a small "key" chip in
 // the same top strip brings it back.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { GitCompareArrows, History, KeyRound, Play, RotateCcw, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Download, GitCompareArrows, History, KeyRound, Play, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { useApp } from "../lib/store";
-import { deleteRun, listRuns, type RunRecord } from "../lib/runStore";
+import { deleteRun, exportArchive, importArchive, listRuns, type RunRecord } from "../lib/runStore";
 import { hashHue, hueCss } from "../lib/hues";
 import { runEvidence, wilson95 } from "../lib/stats";
 import { DemoArchiveBanner } from "./DemoArchiveBanner";
@@ -360,6 +360,78 @@ function KeyItem({
   );
 }
 
+/** Archive hand-off strip (marker: archive-io). The server is
+ *  stateless by design, so this browser's IndexedDB archive is the
+ *  ONLY copy of a session's evidence. "export archive" serializes it
+ *  to a JSON file — the cross-device hand-off runStore's header
+ *  promises, and the user study's data-collection channel (a
+ *  participant hands the file over; the analyst imports it and gets
+ *  the exact archive back: lineage, seeds, traces and all).
+ *  Import re-normalizes every record through buildRunRecord (derived
+ *  fields in the file are never trusted) and skips run_ids already
+ *  present, so importing twice — or importing on top of the bundled
+ *  demo records — is safe. */
+function ArchiveIO({ count }: { count: number }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const onExport = () => {
+    exportArchive()
+      .then((n) => setMsg(`exported ${n} run${n === 1 ? "" : "s"}`))
+      .catch(() => setMsg("export failed"));
+  };
+  const onImport = (file: File) => {
+    importArchive(file)
+      .then((r) => {
+        const parts = [`imported ${r.imported}`];
+        if (r.skipped > 0) parts.push(`${r.skipped} already here`);
+        if (r.invalid > 0) parts.push(`${r.invalid} invalid`);
+        setMsg(parts.join(" · "));
+      })
+      .catch((e: unknown) =>
+        setMsg(`import failed: ${e instanceof Error ? e.message : "unreadable file"}`),
+      );
+  };
+  return (
+    <div className="archive-io flex items-center gap-1.5 border-b border-edge/40 bg-surfaceAlt/20 px-2.5 py-1 text-[10px] text-mute">
+      <button
+        type="button"
+        className="flex items-center gap-1 rounded border border-edge/70 px-1.5 py-0.5 hover:text-ink hover:bg-surfaceAlt disabled:opacity-40 disabled:pointer-events-none"
+        disabled={count === 0}
+        title="Download every archived run as one JSON file — move your evidence to another device, or hand it to the study team. Each record carries its graph, seeds and full response, so the receiving browser can restore, replay and compare it exactly."
+        onClick={onExport}
+      >
+        <Download className="w-3 h-3" />
+        export archive
+      </button>
+      <button
+        type="button"
+        className="flex items-center gap-1 rounded border border-edge/70 px-1.5 py-0.5 hover:text-ink hover:bg-surfaceAlt"
+        title="Import an archive file exported from another device. Records are re-validated on the way in; runs already present are skipped."
+        onClick={() => fileRef.current?.click()}
+      >
+        <Upload className="w-3 h-3" />
+        import
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onImport(f);
+          e.target.value = ""; // allow re-selecting the same file
+        }}
+      />
+      {msg && (
+        <span role="status" className="min-w-0 truncate">
+          {msg}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** Always-visible encoding key pinned at the top of the History tab.
  *  The lineage view fronts five visual channels, and tooltips + a
  *  skippable tour slide proved discoverable-once at best. Same
@@ -514,10 +586,16 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
 
   if (records.length === 0)
     return embedded ? (
-      <div className="panel-alt p-4 text-[12px] text-mute leading-relaxed">
-        No archived runs yet. Every run is archived here automatically,
-        seed included — run the pipeline once and it will appear, ready
-        to restore, replay (exact numbers), or compare.
+      <div className="panel-alt overflow-hidden">
+        {/* Import must be reachable at zero runs — a fresh device is
+            exactly where a handed-off archive file arrives. */}
+        <ArchiveIO count={0} />
+        <div className="p-4 text-[12px] text-mute leading-relaxed">
+          No archived runs yet. Every run is archived here automatically,
+          seed included — run the pipeline once and it will appear, ready
+          to restore, replay (exact numbers), or compare. Or import an
+          archive file exported from another device.
+        </div>
       </div>
     ) : null;
 
@@ -554,6 +632,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
       {(embedded || open) && (
         <>
           <LineageLegend />
+          <ArchiveIO count={records.length} />
           {records.some((r) => r.demo) && <DemoArchiveBanner />}
           {/* Compare needs TWO runs, but nothing used to acknowledge the
               first checkbox beyond a "1" on a tab the user may never

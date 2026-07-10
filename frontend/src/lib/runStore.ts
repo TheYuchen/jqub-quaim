@@ -18,6 +18,7 @@
 
 import type { RunResponse, StepResult } from "./api";
 import type { SharePayload } from "./share";
+import { useApp } from "./store";
 
 export interface RunRecord {
   run_id: string;
@@ -304,4 +305,151 @@ export function buildRunRecord(args: {
     n_steps: response.steps.length,
     response,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Archive export / import (marker: archive-io)
+// ---------------------------------------------------------------------------
+//
+// The header above promises "Export/import of archives covers
+// cross-device hand-off" — this is that channel. It is also the
+// USER-STUDY DATA-COLLECTION channel: the server is stateless by
+// design, so a participant's session evidence lives only in their
+// browser; "export archive" turns it into a JSON file they can hand
+// to the study team, and "import" lets an analyst rebuild the exact
+// archive (lineage, seeds, traces and all) on their own machine.
+//
+// Trust boundary: the file's derived fields (config_hash, headline,
+// stopped_early, run_id synthesis) are NOT trusted — every imported
+// record is re-normalized through buildRunRecord, the same code path
+// a live run takes, so a tampered or stale-schema file cannot plant
+// wrong grouping keys. Verbatim payloads (response, graph, seeds) are
+// carried as-is: they ARE the data.
+
+/** Version stamp of the archive-file format. Bump on breaking shape
+ *  changes; import refuses unknown majors instead of guessing. */
+export const ARCHIVE_SCHEMA = 1;
+
+export interface ArchiveFile {
+  schema: number;
+  exported_at: string; // ISO
+  records: RunRecord[];
+}
+
+/** Serialize archived runs (all by default, or a run_id subset) and
+ *  trigger a browser download. Returns the number of records written. */
+export async function exportArchive(runIds?: string[]): Promise<number> {
+  let records = await listRuns(1000);
+  if (runIds && runIds.length > 0) {
+    const want = new Set(runIds);
+    records = records.filter((r) => want.has(r.run_id));
+  }
+  // Oldest first: replaying the file top-to-bottom re-creates the
+  // archive in its original order (forked_from ancestors precede
+  // children, matching how the lineage was laid down).
+  records.sort((a, b) => a.created_at - b.created_at);
+  const payload: ArchiveFile = {
+    schema: ARCHIVE_SCHEMA,
+    exported_at: new Date().toISOString(),
+    records,
+  };
+  const blob = new Blob([JSON.stringify(payload)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `quda-archive_${new Date().toISOString().slice(0, 10)}_${records.length}runs.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  return records.length;
+}
+
+/** Minimal structural gate for one imported record. Everything the
+ *  re-normalization DERIVES may be absent/wrong in the file; what it
+ *  carries verbatim must at least be shaped right. */
+function isImportableRecord(r: unknown): r is RunRecord {
+  if (typeof r !== "object" || r === null) return false;
+  const rec = r as Record<string, unknown>;
+  const resp = rec.response as Record<string, unknown> | undefined;
+  const graph = rec.graph as Record<string, unknown> | undefined;
+  return (
+    typeof resp === "object" &&
+    resp !== null &&
+    Array.isArray(resp.steps) &&
+    typeof graph === "object" &&
+    graph !== null &&
+    Array.isArray(graph.n) &&
+    Array.isArray(graph.e)
+  );
+}
+
+export interface ImportReport {
+  imported: number;
+  /** run_id collisions with records already in this archive. */
+  skipped: number;
+  /** Entries that failed the structural gate. */
+  invalid: number;
+}
+
+/** Import an archive file produced by exportArchive. Re-derives every
+ *  derived field via buildRunRecord (never trusts the file's hashes),
+ *  skips run_id collisions, bumps historyVersion once at the end. */
+export async function importArchive(file: File): Promise<ImportReport> {
+  const text = await file.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("not a JSON file");
+  }
+  const top = parsed as Partial<ArchiveFile> | null;
+  if (
+    typeof top !== "object" ||
+    top === null ||
+    top.schema !== ARCHIVE_SCHEMA ||
+    !Array.isArray(top.records)
+  ) {
+    throw new Error(
+      `not a run-archive file (expected {schema: ${ARCHIVE_SCHEMA}, records: [...]})`,
+    );
+  }
+  const report: ImportReport = { imported: 0, skipped: 0, invalid: 0 };
+  for (const entry of top.records) {
+    if (!isImportableRecord(entry)) {
+      report.invalid += 1;
+      continue;
+    }
+    // Same normalization path as a live run and the demo archive:
+    // config_hash / headline / stopped_early / run_id all fall out of
+    // buildRunRecord from the verbatim response + graph.
+    const rec = buildRunRecord({
+      response: entry.response,
+      graph: entry.graph as SharePayload,
+      sampleKey: typeof entry.sample_key === "string" ? entry.sample_key : null,
+      circuitName:
+        typeof entry.circuit_name === "string" ? entry.circuit_name : null,
+      circuitId: typeof entry.circuit_id === "string" ? entry.circuit_id : "",
+      useLiveIbm: entry.use_live_ibm === true,
+      forkedFrom:
+        typeof entry.forked_from === "string" ? entry.forked_from : null,
+      precisionTarget:
+        typeof entry.precision_target === "number"
+          ? entry.precision_target
+          : null,
+    });
+    // Preserved verbatim: the original archive timestamp (the lineage
+    // layout orders by it) and the demo honesty flag.
+    if (Number.isFinite(entry.created_at)) rec.created_at = entry.created_at;
+    if (entry.demo === true) rec.demo = true;
+    const existing = await getRun(rec.run_id);
+    if (existing) {
+      report.skipped += 1;
+      continue;
+    }
+    await saveRun(rec);
+    report.imported += 1;
+  }
+  if (report.imported > 0) useApp.getState().bumpHistoryVersion();
+  return report;
 }
