@@ -108,9 +108,18 @@ async function runsForView(
       }));
   }
   if (view === "evidence-compare") {
+    // The two selected runs PLUS, when the difference funnel is
+    // rendering, every archived replicate whose counts it pooled
+    // (marker: difference-funnel) — the funnel is a statement about
+    // ALL of that evidence, so its figure must name all of it (both
+    // config hashes ride along on each run entry).
+    const wanted = new Set([
+      ...st.compareIds,
+      ...(st.differenceRunIds ?? []),
+    ]);
     const all = await listRuns(500);
     return all
-      .filter((r) => st.compareIds.includes(r.run_id))
+      .filter((r) => wanted.has(r.run_id))
       .map((r) => ({
         run_id: r.run_id,
         root_seed: r.root_seed,

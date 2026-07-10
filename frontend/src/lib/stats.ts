@@ -124,3 +124,221 @@ export function poolEvidence(runs: Evidence[]): PooledEvidence | null {
  *  noise; 2048 is also the app's default full shot budget — "at
  *  least one full run's worth of evidence on each side". */
 export const POOLED_SMALL_N_SHOTS = 2048;
+
+// ---------------------------------------------------------------------------
+// Between-configuration difference (marker: difference-funnel)
+// ---------------------------------------------------------------------------
+
+/** 95% hybrid score interval for the difference of two independent
+ *  binomial proportions, d = p1 − p2 — method 10 of Newcombe 1998
+ *  ("Interval estimation for the difference between independent
+ *  proportions: comparison of eleven methods", Statistics in
+ *  Medicine 17:873–890).
+ *
+ *  Construction: take each side's WILSON interval (l, u) — the same
+ *  interval every other surface here draws — and combine the
+ *  one-sided score distances in quadrature:
+ *
+ *      d  = p1 − p2
+ *      lo = d − √((p1 − l1)² + (u2 − p2)²)
+ *      hi = d + √((u1 − p1)² + (p2 − l2)²)
+ *
+ *  Why not the naive Wald difference (d ± z·√(p1q1/n1 + p2q2/n2)):
+ *  the same rationale as Wilson over Wald for one proportion, which
+ *  is exactly the regime this app lives in — sampled fidelities sit
+ *  near 0 or 1 and pooled counts are small early in an accumulation
+ *  trace, where the Wald width collapses to zero at p̂ ∈ {0, 1} and
+ *  its limits escape [−1, 1]. The hybrid score interval inherits
+ *  Wilson's boundary-respecting behaviour on both sides.
+ *
+ *  Unit anchors (checked by scripts/check_difference_funnel.test.ts):
+ *    newcombe95(56, 70, 48, 80) → [0.0524, 0.3339]   (worked example
+ *      (a) of the Newcombe 1998 paper: 80% vs 60%, d = 0.20)
+ *    newcombe95(k, n, k, n)     → symmetric about 0
+ *    either n ≤ 0               → [−1, 1]  no evidence = full unknown
+ */
+export function newcombe95(
+  k1: number,
+  n1: number,
+  k2: number,
+  n2: number,
+): [number, number] {
+  if (n1 <= 0 || n2 <= 0) return [-1, 1];
+  const p1 = Math.max(0, Math.min(Math.round(k1), Math.round(n1))) / n1;
+  const p2 = Math.max(0, Math.min(Math.round(k2), Math.round(n2))) / n2;
+  const [l1, u1] = wilson95(k1, n1);
+  const [l2, u2] = wilson95(k2, n2);
+  const d = p1 - p2;
+  const lo = d - Math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2);
+  const hi = d + Math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2);
+  return [Math.max(-1, lo), Math.min(1, hi)];
+}
+
+/** Evidence plus the archive metadata the difference trace orders and
+ *  dedupes by. */
+export interface DatedEvidence extends Evidence {
+  created_at: number;
+  /** Root seed of the run, when known (see dedupeDraws). */
+  root_seed?: number | null;
+}
+
+/** Sort chronologically and drop exact-replay duplicates.
+ *
+ *  A pinned replay reproduces its ancestor's draw bit-exactly — same
+ *  root seed ⇒ same per-node seeds ⇒ same counts (the system's replay
+ *  guarantee) — so within one configuration a second run with the
+ *  same root seed is the SAME evidence recorded twice. A sequential
+ *  inference over accumulated counts must not pool it twice (the
+ *  bundled demo archive contains exactly this case: bell-512 run
+ *  7e401b5270b9 replays f0cb7403bbae, seed 815033775, 247/512 twice).
+ *  Runs with unknown seeds are never deduped — there is no proof they
+ *  repeat a draw. NOTE: the multiverse pooled band and the theater's
+ *  archive band do not dedupe replays; that pre-existing looseness is
+ *  documented in docs/EVIDENCE_WORKBENCH.md rather than silently
+ *  repeated here, because this view's whole claim is inferential
+ *  honesty. */
+export function dedupeDraws<T extends DatedEvidence>(runs: T[]): T[] {
+  const sorted = [...runs].sort((a, b) => a.created_at - b.created_at);
+  const seen = new Set<number>();
+  const out: T[] = [];
+  for (const r of sorted) {
+    if (r.shots <= 0) continue;
+    if (r.root_seed != null) {
+      if (seen.has(r.root_seed)) continue;
+      seen.add(r.root_seed);
+    }
+    out.push(r);
+  }
+  return out;
+}
+
+/** One accumulation step of the difference funnel. */
+export interface DifferenceStep {
+  /** 1-based step index (t-th replicate of each side pooled in). */
+  step: number;
+  /** Runs pooled so far per side (≤ step once a side has run out). */
+  nRunsA: number;
+  nRunsB: number;
+  shotsA: number;
+  shotsB: number;
+  /** Total shots consumed by BOTH sides — the x-axis quantity: what
+   *  this much certainty about the difference actually cost. */
+  shots: number;
+  successesA: number;
+  successesB: number;
+  /** Δ(B − A) of the pooled points; positive = B measured higher.
+   *  Sign convention matches the Compare view's "Δ(B−A)" readout. */
+  d: number;
+  lo: number;
+  hi: number;
+  /** The 95% interval of the difference excludes zero at this step. */
+  established: boolean;
+}
+
+/** Chronological accumulation of the difference between two
+ *  configurations' pooled evidence — the data behind the difference
+ *  funnel (the third funnel scale: within-run theater, across-run
+ *  pooling, and now between-configuration).
+ *
+ *  Semantics: each side is sorted by created_at (the order the
+ *  evidence actually arrived) and replay-deduped (dedupeDraws); at
+ *  step t side A pools its first min(t, |A|) runs and side B its
+ *  first min(t, |B|) runs — unequal run counts are fine (the shorter
+ *  side simply stops growing), and unequal shots-per-run are fine
+ *  because pooling is on raw counts (a 512-shot side and a 2048-shot
+ *  side each weigh exactly the shots they executed; see the module
+ *  comment on why summed counts are the honest pool within one
+ *  configuration). Each step gets a Newcombe interval on the pooled
+ *  difference.
+ *
+ *  Multiple-looks caveat: `established` is re-evaluated at every
+ *  step, and repeatedly checking a 95% interval as evidence
+ *  accumulates inflates the type-I error rate — the same limitation
+ *  family as the theater's optional stopping (the M2 disclosure in
+ *  docs/EVIDENCE_WORKBENCH.md). Consumers must therefore treat an
+ *  exclusion of zero that later re-includes zero as NOT sustained
+ *  (differenceVerdict computes exactly that), and the funnel says so
+ *  on the drawing instead of celebrating the transient exclusion. */
+export function differenceTrace(
+  runsA: DatedEvidence[],
+  runsB: DatedEvidence[],
+): DifferenceStep[] {
+  const A = dedupeDraws(runsA);
+  const B = dedupeDraws(runsB);
+  if (A.length === 0 || B.length === 0) return [];
+  const steps: DifferenceStep[] = [];
+  const max = Math.max(A.length, B.length);
+  let kA = 0;
+  let nA = 0;
+  let kB = 0;
+  let nB = 0;
+  let iA = 0;
+  let iB = 0;
+  for (let t = 1; t <= max; t++) {
+    while (iA < Math.min(t, A.length)) {
+      kA += A[iA].successes;
+      nA += A[iA].shots;
+      iA++;
+    }
+    while (iB < Math.min(t, B.length)) {
+      kB += B[iB].successes;
+      nB += B[iB].shots;
+      iB++;
+    }
+    const d = kB / nB - kA / nA;
+    // newcombe95 is (k1,n1,k2,n2) → p1 − p2; feed B first so the
+    // interval is for Δ(B − A), same sign as d above.
+    const [lo, hi] = newcombe95(kB, nB, kA, nA);
+    steps.push({
+      step: t,
+      nRunsA: iA,
+      nRunsB: iB,
+      shotsA: nA,
+      shotsB: nB,
+      shots: nA + nB,
+      successesA: kA,
+      successesB: kB,
+      d,
+      lo,
+      hi,
+      established: lo > 0 || hi < 0,
+    });
+  }
+  return steps;
+}
+
+/** Verdict over a difference trace — the honest summary the funnel
+ *  annotates with (and the node lane pins for the demo archive). */
+export interface DifferenceVerdict {
+  final: DifferenceStep;
+  /** First step whose interval excluded zero, if any ever did. */
+  establishedAt: DifferenceStep | null;
+  /** First LATER step that re-included zero (null = never lost). */
+  lostAt: DifferenceStep | null;
+  /** Established at some step AND at every step after it — the only
+   *  state the funnel colors green; anything else is warn/mute. */
+  sustained: boolean;
+}
+
+export function differenceVerdict(
+  steps: DifferenceStep[],
+): DifferenceVerdict | null {
+  if (steps.length === 0) return null;
+  const final = steps[steps.length - 1];
+  const firstIdx = steps.findIndex((s) => s.established);
+  if (firstIdx === -1)
+    return { final, establishedAt: null, lostAt: null, sustained: false };
+  let lostAt: DifferenceStep | null = null;
+  for (let i = firstIdx + 1; i < steps.length; i++) {
+    if (!steps[i].established) {
+      lostAt = steps[i];
+      break;
+    }
+  }
+  return {
+    final,
+    establishedAt: steps[firstIdx],
+    lostAt,
+    sustained: lostAt === null,
+  };
+}

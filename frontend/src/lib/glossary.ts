@@ -43,6 +43,10 @@ export const GLOSSARY = {
     "Replicate = run the identical configuration again with a fresh random draw. The spread across replicates is the real uncertainty.",
   configuration:
     "Configuration = the pipeline recipe: which blocks, wired how, with which settings, on which circuit. Runs with the same recipe group together.",
+  differenceInterval:
+    "To compare two configurations, put ONE 95% interval on the difference between them (Newcombe score interval on \u0394 = B \u2212 A). If it excludes zero, the data distinguish the two. Eyeballing two separate intervals answers a different, stricter question.",
+  established:
+    "'Established' = the 95% interval of the difference excludes zero at this point of the accumulation. Checking again after every new replicate inflates the chance of a false positive (multiple looks), so an exclusion that later re-includes zero is reported as not sustained.",
 } as const;
 
 export type GlossaryKey = keyof typeof GLOSSARY;

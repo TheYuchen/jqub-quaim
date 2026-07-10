@@ -125,10 +125,13 @@ export interface Scenario {
   expandEvidence?: boolean;
   /** F5: boot QuCAD cards with the gate-level diff <details> open. */
   openGateDiff?: boolean;
-  /** F2/F4/F6 render from the bundled demo archive. */
+  /** F2/F4/F6/F8 render from the bundled demo archive. */
   needsArchive?: boolean;
-  /** F6: auto-select the two most-replicated configurations' latest
-   *  successful runs for the interval comparison. */
+  /** F6/F8: auto-select the two most-replicated configurations'
+   *  latest successful runs for the comparison. Over the bundled
+   *  archive these are the two bell-state fidelity configs (512-shot
+   *  ×9 records, 2048-shot ×5 — the shots param is part of the
+   *  structural config hash, so they are distinct configurations). */
   compareTopConfigs?: boolean;
   /** F0: boot with the evidence theater overlay open (it would also
    *  auto-open on the first progress frame, but a pinned replay can
@@ -206,8 +209,9 @@ export const SCENARIOS: Record<string, Scenario> = {
     autoRun: true,
     workspaceMode: "compose",
   },
-  // F2 — multiverse board: one card per configuration (bell fidelity
-  // ×14, vqc+QuCAD ×3), shared-scale outcome strips, baseline chip,
+  // F2 — multiverse board: one card per configuration (bell-512 ×9,
+  // bell-2048 ×5, vqc+QuCAD ×3 — the shots param is part of the
+  // config hash), shared-scale outcome strips, baseline chip,
   // Δpp vs baseline. Since Wave J every archive card carries ≥2048
   // pooled shots, so the Δ compares POOLED means and the "(n small)"
   // honesty tag stays off — the pooled band + "over N shots" line say
@@ -265,11 +269,17 @@ export const SCENARIOS: Record<string, Scenario> = {
   },
   // F6 — interval comparison: the two most-replicated configurations
   // from the bundled archive side by side (config diff, CIs instead
-  // of scalars, step-aligned transformation signatures).
+  // of scalars, step-aligned transformation signatures). Over the
+  // bundled archive the top two ARE the two bell configs (512 vs
+  // 2048 shots) — an earlier version of this comment claimed bell vs
+  // vqc+QuCAD, stale since the config hash started separating the
+  // shots param. Since the difference-funnel wave the Compare tab
+  // also draws the Δ(B−A) funnel below the bars (see F8, which pins
+  // the expected numbers).
   F6: {
     key: "F6",
     expect:
-      "Compare view: bell-fidelity config vs vqc+QuCAD config, intervals + aligned signatures.",
+      "Compare view: bell-512 vs bell-2048 fidelity configs (the two most-replicated), intervals + aligned signatures + difference funnel.",
     workspaceMode: "compose",
     evidenceTab: "compare",
     expandEvidence: true,
@@ -305,6 +315,46 @@ export const SCENARIOS: Record<string, Scenario> = {
     expandEvidence: true,
     needsArchive: true,
     overlayPair: true,
+  },
+  // F8 — DIFFERENCE FUNNEL (marker: difference-funnel): sequential
+  // A/B evidence steering in the Compare tab. compareTopConfigs lands
+  // on the bundled archive's two most-replicated configurations,
+  // which differ ONLY in the fake_backend shots param (512 vs 2048),
+  // so the funnel answers a real tuning question: "did raising shots
+  // change the measured fidelity?" — it should NOT (shots buy
+  // precision, not a different underlying value), which makes the
+  // honest expected demo a null result.
+  //
+  // Expected end state, computed from src/data/demoArchive.json (the
+  // node lane scripts/check_difference_funnel.test.ts derives the
+  // same numbers from that JSON, so figure caption and data cannot
+  // drift):
+  //   A = bell-512: 9 archived records, but 7e401b5270b9 is a pinned
+  //       REPLAY of f0cb7403bbae (root seed 815033775, identical
+  //       247/512 counts) and is deduped as the same draw → 8 unique
+  //       draws pooling 1,952/4,096 (47.66%).
+  //   B = bell-2048: 5 records → 5,065/10,240 (49.46%).
+  //   Difference trace (Δ = B−A, Newcombe 95%), x = shots consumed:
+  //     t=1   2,560  Δ+1.61pp [−3.23, +6.42]
+  //     t=2   5,120  Δ+3.93pp [+0.51, +7.32]  ← first excludes 0
+  //     t=3..5       stays excluded (t=5: +2.67pp [+0.50, +4.82])
+  //     t=6  13,312  Δ+1.68pp [−0.34, +3.69]  ← re-includes 0
+  //     t=8  14,336  Δ+1.81pp [−0.00, +3.62]  final: NOT established
+  //   Verdict: "not sustained — inconclusive". An early look at
+  //   5,120 shots would have claimed a win that further evidence
+  //   withdrew — the multiple-looks trap demonstrated on real draws.
+  //   Choosing this null(ish) result as the headline demo is
+  //   deliberate: the instrument's value is preventing false wins,
+  //   not manufacturing dramatic ones.
+  F8: {
+    key: "F8",
+    expect:
+      "Difference funnel: bell-512 (8 unique draws) vs bell-2048 (5 runs) — Δ(B−A) established at 5,120 shots (+3.93pp) but NOT sustained (re-includes 0 at 13,312); final Δ+1.81pp [−0.00, +3.62] over 14,336 shots.",
+    workspaceMode: "compose",
+    evidenceTab: "compare",
+    expandEvidence: true,
+    needsArchive: true,
+    compareTopConfigs: true,
   },
 };
 

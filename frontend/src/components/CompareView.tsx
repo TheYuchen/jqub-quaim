@@ -17,6 +17,7 @@ import type { StepResult } from "../lib/api";
 import { useApp } from "../lib/store";
 import { getRun, type RunRecord } from "../lib/runStore";
 import { SignatureGlyph, transformationOf } from "./TransformationSignature";
+import { DifferenceFunnel, useDifferenceEvidence } from "./DifferenceFunnel";
 
 function sigText(step: StepResult | undefined): string {
   const t = transformationOf(step);
@@ -208,6 +209,12 @@ export function CompareView() {
     };
   }, [compareIds, historyVersion]);
 
+  // Difference-funnel data (marker: difference-funnel) — fetched via
+  // the hook here rather than inside the funnel component, so the
+  // verdict wording below can defer to the funnel exactly when the
+  // funnel will actually render.
+  const diffData = useDifferenceEvidence(recs?.[0] ?? null, recs?.[1] ?? null);
+
   if (compareIds.length !== 2 || !recs) return null;
   const [A, B] = recs;
   const diffs = paramDiff(A, B);
@@ -349,17 +356,41 @@ export function CompareView() {
           <div className="text-[10px] text-mute font-mono">
             A {(va * 100).toFixed(2)}% · B {(vb * 100).toFixed(2)}% · Δ(B−A){" "}
             {((vb - va) * 100).toFixed(2)}pp
-            {overlap === true && (
-              <span className="text-warn ml-1" title="The two 95% intervals overlap — at these shot counts this view cannot distinguish the difference from run-to-run noise (overlap is a conservative screen, not a hypothesis test: a formal test could still detect a smaller real difference). Run more replicates or raise shots before reading anything into it.">
-                — intervals overlap: not evidence
+            {/* When the difference funnel renders, IT owns the verdict:
+                the two bars above compare only the two selected runs,
+                while the funnel pools every archived replicate and puts
+                one interval on the difference itself. The overlap
+                wording survives only when the funnel cannot render. */}
+            {diffData?.status === "ready" ? (
+              <span
+                className="text-accent ml-1"
+                title="These two bars compare only the two selected runs. The difference funnel below pools every archived replicate of each configuration and puts a single 95% interval on the difference itself — that accumulating interval is the verdict to trust."
+              >
+                — see the difference funnel below: the honest verdict
+                accumulates across all archived replicates
               </span>
-            )}
-            {overlap === false && (
-              <span className="text-ok ml-1">— intervals separated</span>
+            ) : (
+              <>
+                {overlap === true && (
+                  <span className="text-warn ml-1" title="The two 95% intervals overlap — at these shot counts this view cannot distinguish the difference from run-to-run noise (overlap is a conservative screen, not a hypothesis test: a formal test could still detect a smaller real difference). Run more replicates or raise shots before reading anything into it.">
+                    — intervals overlap: not evidence
+                  </span>
+                )}
+                {overlap === false && (
+                  <span className="text-ok ml-1">— intervals separated</span>
+                )}
+              </>
             )}
           </div>
         </div>
       )}
+
+      {/* Difference funnel (marker: difference-funnel): the 95%
+          interval of Δ(B−A) narrowing as replicates of BOTH
+          configurations accumulate — the sequential A/B instrument.
+          Renders below the two-run interval bars; null for same-config
+          pairs (the theater overlay owns those). */}
+      <DifferenceFunnel data={diffData} />
 
       {/* step-by-step */}
       <table className="w-full text-[10px]">

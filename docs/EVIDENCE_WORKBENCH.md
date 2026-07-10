@@ -1074,3 +1074,137 @@ anytime_evidence 20, workflow_helpers 11, seed_coverage 8,
 run_cache 6), export-script shape lane, live marker checks after
 deploy (archive-io, theater-overlay, multiverse-hint, claims-map) +
 /api/health version + F7 code-path review over the bundled archive.
+
+## Difference funnel — the third funnel scale (SHIPPED 2026-07-10)
+
+Marker: `difference-funnel` (Compare tab, below the two-run interval
+bars). Scenario: `?scenario=F8`. Lane:
+`node --experimental-strip-types scripts/check_difference_funnel.test.ts`.
+
+The system now speaks "funnel" at three scales:
+
+1. **Within one run** — the Evidence Theater: a Wilson interval
+   narrowing over shot batches as a single run buys evidence.
+2. **Across runs of one configuration** — the lineage/multiverse
+   pooled bands: replicates pool to a 1/√N-tighter interval.
+3. **Between two configurations** — the difference funnel: the 95%
+   interval of the DIFFERENCE Δ(B−A) narrowing as replicates of both
+   configurations accumulate chronologically.
+
+Rationale: comparing two configurations honestly means watching the
+confidence interval of the difference — not eyeballing two separate
+CIs. The Compare view has called interval overlap "a conservative
+screen, not a hypothesis test" since Wave J; the difference interval
+is the actual inferential object, and plotting it against total shots
+consumed turns the Compare tab from a display into a
+sequential-inference instrument: what is the current A-vs-B verdict,
+what did it cost, and did an early "significant" excursion survive
+further evidence.
+
+### Math (frontend/src/lib/stats.ts — pure, node-testable)
+
+* `newcombe95(k1,n1,k2,n2)` — Newcombe's method-10 hybrid score
+  interval for p1−p2 (Newcombe 1998, *Statistics in Medicine*
+  17:873–890): each side's Wilson bounds combined in quadrature
+  (lo = d − √((p1−l1)² + (u2−p2)²), hi = d + √((u1−p1)² + (p2−l2)²)).
+  Chosen over the naive Wald difference for the same reason Wilson
+  replaced Wald everywhere else here: sampled fidelities sit near the
+  [0,1] edges and pooled counts are small early in a trace, where
+  Wald collapses to zero width or escapes the parameter range.
+  Anchor: `newcombe95(56,70,48,80) → [0.0524, 0.3339]` — the worked
+  example in the paper itself.
+* `dedupeDraws(runs)` — drops exact-replay duplicates before pooling:
+  a pinned replay reproduces its ancestor's draw bit-exactly (same
+  root seed ⇒ same per-node seeds ⇒ same counts — the replay
+  guarantee), so it is the SAME evidence recorded twice, and a
+  sequential inference must not pool it twice. The bundled archive
+  contains exactly this case (bell-512 run 7e401b5270b9 replays
+  f0cb7403bbae, seed 815033775, 247/512 twice). KNOWN LOOSENESS, now
+  documented rather than silent: the multiverse pooled band and the
+  theater's archive band do NOT dedupe replays — their bands are
+  descriptive summaries, but a future pass should align them.
+* `differenceTrace(runsA, runsB)` — chronological accumulation: sort
+  each side by created_at, dedupe, then step t pools each side's
+  first min(t, len) runs and puts a Newcombe interval on Δ(B−A) (sign
+  convention identical to the Compare view's "Δ(B−A)" text). Unequal
+  run counts are fine (the shorter side stops growing); unequal
+  shots-per-run are fine (pooling is on raw counts — a 512-shot side
+  and a 2048-shot side each weigh exactly the shots they executed).
+* `differenceVerdict(steps)` — first-established step, first
+  re-inclusion step, `sustained` flag.
+
+### Encoding (frontend/src/components/DifferenceFunnel.tsx)
+
+X = cumulative shots consumed by BOTH sides, linear from 0 — the
+theater's "evidence bought" axis philosophy; certainty about a
+difference is purchased on both sides at once, so the honest
+x-quantity is the sum (ticks abbreviated: 2.5k, 5k…). Y = Δ fidelity
+(B−A) in pp, auto-fit to the trace but ALWAYS including the dashed
+neutral zero line labeled "no difference" (the question must never be
+croppable). Per-step vertical Newcombe intervals + shaded convergence
+envelope + point path in accent — the theater's funnel grammar
+verbatim. Config identities ride in an in-SVG legend strip (config
+hues via hashHue + run/shot counts), so exports self-identify.
+
+Honesty affordances:
+
+* "difference established at N shots — Δx.xpp [lo, hi]" vertical
+  annotation at the FIRST step whose interval excludes 0 — green only
+  if the exclusion survives through the last step; if a later step
+  re-includes 0, that step gets a warn annotation "re-includes 0 at
+  M shots — not sustained, treat as inconclusive". MULTIPLE-LOOKS
+  CAVEAT: re-checking a 95% interval at every accumulation step
+  inflates type-I error — the same limitation family as the theater's
+  optional stopping (M2 disclosure above); the glossary entries
+  (`differenceInterval`, `established`) carry the caveat into every
+  tooltip surface.
+* Never-excluded traces end in a plain readout ("not established
+  after N shots · Δ ±w pp") — a null result stated as a result.
+* Same-configuration pairs get no funnel (Δ of a config against
+  itself is vacuous); that pair's instrument is the theater overlay
+  (F7). <2 unique draws on either side → task-language hint ("run
+  each configuration a few more times…").
+* CompareView's verdict line defers to the funnel whenever it
+  renders ("see the difference funnel below — the honest verdict
+  accumulates across all archived replicates"); the old
+  overlap/separated wording survives only when the funnel cannot
+  render.
+
+### Provenance
+
+The Evidence-pane camera captures the funnel inside the hybrid
+Compare-tab figure, and the funnel carries its own camera for the
+true-SVG path. `evidence-compare` provenance now lists the two
+selected runs PLUS every archived replicate whose counts the funnel
+pooled (store.differenceRunIds → figureExport.runsForView), so both
+config hashes and all contributing run_ids ride in every export.
+
+### Scenario F8 — and why the demo is (honestly) a null result
+
+`?scenario=F8` opens the Compare tab over the bundled archive's two
+most-replicated configurations — the two bell-state fidelity configs,
+which differ ONLY in the fake_backend shots param (512 vs 2048). The
+funnel therefore answers a real tuning question: "did raising shots
+change the measured fidelity?" Expected end state (derived from
+src/data/demoArchive.json by the lane, pinned in the F8 comment):
+
+* A = bell-512: 9 records → 8 unique draws (one pinned replay
+  deduped), pooling 1,952/4,096 (47.66%).
+* B = bell-2048: 5 records, 5,065/10,240 (49.46%).
+* Trace: established at 5,120 shots (Δ+3.93pp [+0.51, +7.32]), holds
+  through 12,800 shots, re-includes 0 at 13,312 shots, final
+  Δ+1.81pp [−0.00, +3.62] over 14,336 shots — NOT established.
+
+The honest answer is "no — shots buy precision, not a different
+value", and the trace demonstrates the multiple-looks trap on real
+draws: an early look at 5,120 shots would have claimed a win that
+accumulated evidence withdrew. Choosing a null(ish) result as the
+headline demo is deliberate: the instrument's value is preventing
+false wins, not manufacturing dramatic ones.
+
+Also fixed in this wave: the F2/F6 scenario comments still described
+the demo archive as "bell ×14" / "bell vs vqc+QuCAD" — stale since
+the structural config hash started separating the shots param. The
+top-two configs are bell-512 (×9) and bell-2048 (×5); comments and
+F6's expect string now match reality (F6's picker behavior was always
+deterministic and unchanged).

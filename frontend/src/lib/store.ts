@@ -199,6 +199,14 @@ interface AppState {
    *  ids triggers the Evidence pane's auto-switch to Compare. */
   setCompareIds: (ids: string[]) => void;
   clearCompare: () => void;
+  /** Run ids whose pooled counts feed the difference funnel currently
+   *  rendered in the Compare tab (every archived replicate of BOTH
+   *  configurations, replay-deduped) — published by DifferenceFunnel
+   *  and consumed by figure-export provenance, so an exported compare
+   *  figure names every run the funnel actually pooled, not just the
+   *  two selected runs. null = no funnel rendering. */
+  differenceRunIds: string[] | null;
+  setDifferenceRunIds: (ids: string[] | null) => void;
 
   health: HealthResponse | null;
   setHealth: (h: HealthResponse | null) => void;
@@ -395,6 +403,22 @@ export const useApp = create<AppState>((set) => ({
     }),
   setCompareIds: (ids) => set({ compareIds: ids.slice(-2) }),
   clearCompare: () => set({ compareIds: [] }),
+  differenceRunIds: null,
+  setDifferenceRunIds: (ids) =>
+    set((s) => {
+      // Referential churn guard: the funnel republishes on re-render;
+      // only store a new array when membership actually changed.
+      const a = s.differenceRunIds;
+      if (a === ids) return {};
+      if (
+        a != null &&
+        ids != null &&
+        a.length === ids.length &&
+        a.every((x, i) => x === ids[i])
+      )
+        return {};
+      return { differenceRunIds: ids };
+    }),
   health: null,
   setHealth: (h) => set({ health: h }),
   running: false,
