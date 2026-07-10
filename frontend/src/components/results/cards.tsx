@@ -635,7 +635,7 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
       {pooled && (
         <div
           className="text-[10px] text-mute tabular-nums"
-          title={`All ${pooled.nRuns} archived replicates' measurement counts pooled (${pooled.successes}/${pooled.shots}), one Wilson interval over the pooled counts — same math as the Multiverse card's pooled band.`}
+          title={`All ${pooled.nRuns} archived replicates' measurement counts pooled (${pooled.successes}/${pooled.shots}), one Wilson interval over the pooled counts — same math as the Evidence-board card's pooled band.`}
         >
           pooled μ {(pooled.point * 100).toFixed(1)}% ±
           {(pooled.halfWidth * 100).toFixed(1)}pp over {pooled.shots} shots (
@@ -643,7 +643,7 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
         </div>
       )}
       {/* One-hop route into the Compare view. Without it, comparison is
-          only reachable via two History checkboxes or a Multiverse A/B —
+          only reachable via two History checkboxes or an Evidence-board A/B —
           three panels away from the card that just made the user ask
           "is this different from last time?". Setting both ids at once
           rides the Evidence pane's existing auto-switch to Compare. */}

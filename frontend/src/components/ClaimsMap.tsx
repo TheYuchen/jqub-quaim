@@ -53,7 +53,7 @@ const SECTIONS: ClaimSection[] = [
       },
       {
         claim: "Multiverse analysis — every configuration as a small multiple with Δ vs the baseline (the scale-3 portfolio)",
-        where: "Multiverse workspace (toggle top-left of the canvas)",
+        where: "Evidence board — the home workspace (default landing; cards expand in place)",
         scenarios: ["F2"],
       },
     ],
@@ -85,12 +85,12 @@ const SECTIONS: ClaimSection[] = [
     rows: [
       {
         claim: "Honest comparison — intervals instead of scalars; overlap is called out as not-evidence",
-        where: "“Between configurations” tab (tick two runs in This configuration, or A/B two multiverse cards)",
+        where: "“Between configurations” tab (tick two runs in This configuration, or A/B two Evidence-board cards)",
         scenarios: ["F6"],
       },
       {
         claim: "Provenance-backed figures — every export regenerates bit-exactly from its own metadata",
-        where: "Camera buttons on the canvas, multiverse board, evidence pane and theater (SVG + PNG + sidecar)",
+        where: "Camera buttons on the canvas, Evidence board, evidence pane and theater (SVG + PNG + sidecar)",
         scenarios: ["F0"],
       },
     ],

@@ -32,6 +32,28 @@ cast: transformation signatures and the gate-level diff define what
 identity); the multiverse board is the portfolio entry point to
 scale 3; circuit ribbons are context, not claim.
 
+### 1.1 IA inversion (board = home)
+
+The narrative implies an information architecture, and since the
+IA-inversion wave the app enforces it: **configurations are the
+first-class objects; the Evidence board is home; the Pipeline editor
+is the subordinate definition view of one configuration.** Concretely:
+the board is the default workspace (store default; last mode persisted
+per device in `quda.workspaceMode`, so a first-ever visit and the
+demo-archive landing are one path); board cards expand IN PLACE into a
+scale-2 summary — recent-run dots on the shared evidence-mass
+encoding, the pooled interval, and quick actions (replay latest, +3
+replicates, open in editor, A/B) that run WITHOUT leaving home (marker
+`card-expand`); and entering the editor from a card or the board's
+"New configuration" button raises a context bar that names the
+configuration being defined and re-derives its structural hash live as
+the user edits — "edited: will archive as a new configuration #…" —
+making configuration identity, the thing replicates and comparisons
+key on, visible at authoring time (marker `config-context`, a C2
+detail). Internal ids stay frozen ("compose"/"multiverse" in scenario
+uiState, localStorage, provenance); only labels speak the new language
+("Pipeline editor"/"Evidence board").
+
 ## 2. Contributions
 
 * **C1 — the grammar + the paradigm** (one funnel, three scales;
@@ -87,7 +109,11 @@ VACSEN (backend noise), Quantivine (large circuits), QuantumEyes /
 VIOLET (circuit/QNN interpretability) are single-point tools; CHI'25
 "Toward HQCI" is an interface-technique design space; QCE tooling
 (QuBridge, CircInspect) is engineering without a vis-research
-framing. Nobody treats the *composition* as the object of analysis,
+framing. Every node-wire pipeline tool we know of — in the quantum
+stack and beyond it — is editor-centric: the graph canvas is home and
+results live in side surfaces; ours is evidence-centric — the evidence
+board is home and the editor is the subordinate definition view of one
+configuration (§1.1). Nobody treats the *composition* as the object of analysis,
 and nothing in the quantum stack — or in progressive/anytime
 visualization generally — offers sequential-analysis steering:
 progressive vis approximates a fixed answer ever better, while
@@ -1368,3 +1394,61 @@ Verification: tsc + build + VITE_ANON build green; backend 86 green;
 svg_paper / export_python (esbuild recipe) / difference_funnel node
 lanes green; F0–F8 scenario tab keys resolve unchanged (ids frozen);
 live bundle markers checked after deploy.
+
+## IA inversion — board = home (SHIPPED 2026-07-10)
+
+The last structural residue of the old product removed: the app was
+still canvas-centric (boot → pipeline editor; evidence in side
+surfaces) while the narrative said configurations are the objects.
+Four moves, one inversion (see §1.1 for the position statement):
+
+1. **Board is home.** Store default `workspaceMode: "multiverse"`;
+   last mode persisted per device (`quda.workspaceMode`) and read
+   synchronously at store creation, so returning users boot straight
+   into their mode and a first visit paints the board from the first
+   frame — the demo-import landing in App.tsx became redundant and was
+   removed (one path). Scenario boots write the store field directly
+   (`useApp.setState`) so scripted figure states never overwrite the
+   preference. Labels renamed, ids frozen: "Evidence board"
+   (`multiverse`) / "Pipeline editor" (`compose`); mapping pinned in
+   WorkspaceToggle + store comments; board segment now renders first.
+   Every user-visible Multiverse/Compose string updated (board header,
+   hint, empty state, tour slides 2/4/5, claims map, history
+   compare-nudge, fidelity-card pooled tooltip).
+2. **Cards expand in place** (marker `card-expand`). Chevron or the
+   strip area expands a card (span 2 columns when the grid measures
+   ≥2; one card at a time) into an inline scale-2 summary: newest-12
+   run-dots timeline on the SHARED evidence-mass encoding (lifted from
+   RunHistory into lib/evidenceMass.ts — dot area ∝ √shots, ring =
+   pinned seed, hollow slash = errored), the pooled Wilson interval as
+   a labeled line, and quick actions — ▷ replay latest (pins the seed,
+   auto-runs), +3 replicates (clears stale pin, replicateCount=3,
+   auto-runs), open in editor, A/B. Replay/replicates stay ON the
+   board: the covered canvas consumes the same pendingRestore/
+   pendingAutoRun bridge scenarios ride (the auto-run guard now
+   re-arms after each consumed request), the theater overlays the
+   board while streaming, and the archive bump repaints the card.
+3. **Editor framed as definition view** (marker `config-context`).
+   Entering from a card or the board's New-configuration button (new:
+   clears canvas + stale pin + fork parentage via the newConfigRequest
+   bridge) raises a slim bar above the toolbar: "Defining
+   configuration #hash — circuit · runs archived: N · back to board".
+   The structural config hash of the CURRENT canvas is recomputed
+   (250 ms debounce) with the exact computeConfigHash archiving uses;
+   divergence renders "edited: will archive as a new configuration
+   #newhash" — or names the EXISTING configuration it now matches,
+   with its archived count (live via historyVersion). editorContext
+   is never set by scenario boots or plain toggles, so F0–F8 figure
+   states render pixel-identically without the bar.
+4. **Docs + tour speak board-first.** §1.1 above; the related-work
+   paragraph carries the design position (editor-centric node-wire
+   tools vs our evidence-centric inversion); tour slide 2 introduces
+   authoring as "from the Evidence board (home), open the Pipeline
+   editor to define a configuration"; slide 5's button is "Go to the
+   Evidence board" (same behavior).
+
+Verification: tsc + build + VITE_ANON build green; backend tests
+green; svg_paper / export_python (esbuild recipe) / difference_funnel
+node lanes green; scenario modes re-checked (editor scenarios land in
+the editor with the theater; F2 board unchanged); live bundle carries
+the new labels + `card-expand` + `config-context` markers.

@@ -290,17 +290,21 @@ function WhatSVG() {
   );
 }
 
-/** Slide 2 — ribbons + node faces. */
+/** Slide 2 — ribbons + node faces. Board-first mental model: authoring
+ *  is introduced as entering the Pipeline editor FROM the board to
+ *  define one configuration. */
 function ComposeSlide() {
   return (
     <SlideShell
-      kicker="Compose & run"
-      title="The pipeline is the picture"
+      kicker="Define a configuration"
+      title="The Pipeline editor is the definition view"
       visual={<ComposeSVG />}
     >
       <p>
-        Drag blocks from the palette, wire them (or Auto-connect), press{" "}
-        <span className="kbd">Run pipeline</span>. Ribbons carry the circuit
+        From the Evidence board (home), open the{" "}
+        <span className="text-ink font-medium">Pipeline editor</span> to
+        define a configuration: drag blocks, wire them (or Auto-connect),
+        press <span className="kbd">Run pipeline</span>. Ribbons carry the circuit
         between blocks — a shrinking ribbon means a step compressed it (width
         tracks gate count
         <TipIcon className="mx-0.5 align-text-top" hint={gloss("gates")} />).
@@ -437,7 +441,7 @@ function CompareSlide() {
       visual={<CompareSVG />}
     >
       <p>
-        The Multiverse board gives each configuration a card: pipeline strip,
+        The Evidence board gives each configuration a card: pipeline strip,
         outcome dots, Δ versus the baseline. Pick any two runs for{" "}
         <span className="text-ink font-medium">Between configurations</span> —
         estimates render as 95% intervals
@@ -457,7 +461,7 @@ function CompareSVG() {
       height="112"
       viewBox="0 0 440 112"
       role="img"
-      aria-label="Left: two multiverse cards with outcome dot strips. Right: two overlapping confidence intervals labeled 'overlap is not evidence'"
+      aria-label="Left: two Evidence-board cards with outcome dot strips. Right: two overlapping confidence intervals labeled 'overlap is not evidence'"
     >
       {/* two config cards */}
       {[0, 1].map((i) => {
@@ -477,7 +481,7 @@ function CompareSVG() {
         );
       })}
       <text x={106} y={106} fontSize={10} textAnchor="middle" fill={C.mute}>
-        multiverse: one card per configuration
+        board: one card per configuration
       </text>
       {/* A/B intervals */}
       <line x1={252} y1={70} x2={420} y2={70} stroke={C.edge} strokeWidth={1} />
@@ -508,7 +512,7 @@ function TrySlide({ onDone }: { onDone: () => void }) {
             onDone();
           }}
         >
-          <LayoutGrid className="w-3.5 h-3.5" /> Open the Multiverse board
+          <LayoutGrid className="w-3.5 h-3.5" /> Go to the Evidence board
         </button>
       }
     >
@@ -518,8 +522,9 @@ function TrySlide({ onDone }: { onDone: () => void }) {
       </p>
       <ol className="list-decimal list-inside space-y-1 text-[13px]">
         <li>
-          Open <span className="text-ink font-medium">Multiverse</span> —
-          every demo configuration side by side.
+          The <span className="text-ink font-medium">Evidence board</span>{" "}
+          (home) shows every demo configuration side by side — expand a
+          card for its recent runs and quick actions.
         </li>
         <li>
           In{" "}
