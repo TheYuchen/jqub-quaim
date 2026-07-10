@@ -136,6 +136,9 @@ export interface Scenario {
    *  renders from the persisted trace, so it must be opened
    *  explicitly). */
   openTheater?: boolean;
+  /** F7: stage two same-configuration archived runs in the theater's
+   *  overlay-comparison mode (marker: theater-overlay). */
+  overlayPair?: boolean;
 }
 
 export const SCENARIOS: Record<string, Scenario> = {
@@ -273,6 +276,36 @@ export const SCENARIOS: Record<string, Scenario> = {
     needsArchive: true,
     compareTopConfigs: true,
   },
+  // F7 — theater overlay comparison: two archived replays of ONE
+  // configuration on one axis pair ("same rule, different draws").
+  // The deterministic picker below lands on the bundled archive's
+  // bell-state 2048-shot config (the largest traced budget with ≥2
+  // replicates) and takes its two most recent runs:
+  //   A = run 0b485ca23b88 (seed 1892016523): 983/2048 ideal, point
+  //       48.00% ±2.16pp, 8 batches ±6.08pp → ±2.16pp;
+  //   B = run ca3a5193e0f1 (seed 2072686634): 1032/2048 ideal, point
+  //       50.39% ±2.16pp, 8 batches ±6.06pp → ±2.16pp.
+  // Expected visuals: blue (A) and amber (B) funnels on the shared
+  // 256-shot batch grid (x-dodged ∓3.5 px), envelopes at low alpha
+  // crossing through each other's intervals, per-run id+seed legend
+  // in the context strip, final readouts dodged in the right margin
+  // (A 48.00%, B 50.39% — final intervals overlap: consistent with
+  // one underlying configuration), Compare tab open behind the
+  // theater with the "overlay in theater" chip visible. No target
+  // corridor (these archive runs executed their full budget with no
+  // stopping rule). Scrubbing to batch k truncates BOTH funnels in
+  // lockstep. Export: evidence-theater-overlay_F7.svg (true-SVG,
+  // AI-editable), provenance carries both run_ids + root_seeds.
+  F7: {
+    key: "F7",
+    expect:
+      "Theater overlay: two bell-2048 replays on one axis pair — A 983/2048 (48.00% ±2.16pp, seed 1892016523) vs B 1032/2048 (50.39% ±2.16pp, seed 2072686634); overlapping funnels, per-run legend, lockstep scrubber.",
+    workspaceMode: "compose",
+    evidenceTab: "compare",
+    expandEvidence: true,
+    needsArchive: true,
+    overlayPair: true,
+  },
 };
 
 // -- activation --------------------------------------------------------------
@@ -307,6 +340,49 @@ async function pickTopTwoRunIds(): Promise<string[]> {
   return groups.slice(0, 2).map((g) => g.latestOk.run_id);
 }
 
+/** F7: two archived replays of ONE configuration, both carrying
+ *  per-batch traces — deterministic over the bundled archive: among
+ *  config groups with ≥2 ok traced runs, pick the group with the
+ *  largest requested shot budget (bell-2048 in the bundled archive),
+ *  then its two most recent runs, older one as A. */
+async function pickOverlayPairRunIds(): Promise<string[]> {
+  const runs = await listRuns(500);
+  const tracedBudget = (r: (typeof runs)[number]): number => {
+    let req = 0;
+    for (const st of r.response.steps) {
+      const d = st.distribution as
+        | { kind?: string; trace?: unknown[]; shots_requested?: number; shots?: number }
+        | null
+        | undefined;
+      if (d?.kind === "binomial" && Array.isArray(d.trace) && d.trace.length > 0)
+        req = Math.max(req, d.shots_requested ?? d.shots ?? 0);
+    }
+    return req;
+  };
+  const byHash = new Map<string, Array<{ r: (typeof runs)[number]; req: number }>>();
+  for (const r of runs) {
+    if (!r.ok) continue;
+    const req = tracedBudget(r);
+    if (req === 0) continue;
+    const arr = byHash.get(r.config_hash) ?? [];
+    arr.push({ r, req });
+    byHash.set(r.config_hash, arr);
+  }
+  const groups = [...byHash.values()].filter((g) => g.length >= 2);
+  groups.sort(
+    (a, b) =>
+      Math.max(...b.map((x) => x.req)) - Math.max(...a.map((x) => x.req)),
+  );
+  const g = groups[0];
+  if (!g) return [];
+  const latestTwo = g
+    .map((x) => x.r)
+    .sort((a, b) => b.created_at - a.created_at)
+    .slice(0, 2)
+    .sort((a, b) => a.created_at - b.created_at); // A = the older one
+  return latestTwo.map((r) => r.run_id);
+}
+
 /**
  * Activate a scenario by key (case-insensitive). Returns false for
  * unknown keys so the caller can fall through to normal boot.
@@ -336,6 +412,16 @@ export async function activateScenario(rawKey: string): Promise<boolean> {
   if (sc.compareTopConfigs) {
     const ids = await pickTopTwoRunIds();
     if (ids.length === 2) useApp.setState({ compareIds: ids });
+  }
+
+  if (sc.overlayPair) {
+    const ids = await pickOverlayPairRunIds();
+    if (ids.length === 2) {
+      // Compare tab shows the pair (with the overlay chip); the
+      // theater opens on top in overlay-comparison mode.
+      useApp.setState({ compareIds: ids });
+      app.setTheaterOverlay([ids[0], ids[1]]);
+    }
   }
 
   if (sc.evidenceTab) app.setPendingEvidenceTab(sc.evidenceTab);

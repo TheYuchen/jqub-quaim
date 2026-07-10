@@ -128,6 +128,16 @@ interface AppState {
    */
   theaterOpen: boolean;
   setTheaterOpen: (v: boolean) => void;
+  /**
+   * Theater overlay comparison (marker: theater-overlay). When two
+   * archived runs of the SAME configuration both carry sampled traces,
+   * the Compare tab can stage them in the theater overlaid on one
+   * axis pair — two replays of one rule, different draws. Non-null
+   * switches the theater to comparison mode (and opens it); closing
+   * the theater or starting a new run clears it.
+   */
+  theaterOverlayIds: [string, string] | null;
+  setTheaterOverlay: (ids: [string, string] | null) => void;
   theaterTraces: Record<string, TheaterFrame[]>;
   theaterRun: {
     configHash: string | null;
@@ -334,13 +344,24 @@ export const useApp = create<AppState>((set) => ({
     }),
   clearLiveProgress: () => set({ liveProgress: null }),
   theaterOpen: false,
-  setTheaterOpen: (v) => set({ theaterOpen: v }),
+  // Closing the theater also exits overlay mode: reopening from the
+  // toolbar should show the current run's stage, not a stale pair.
+  setTheaterOpen: (v) =>
+    set({
+      theaterOpen: v,
+      ...(v ? {} : { theaterOverlayIds: null }),
+    }),
+  theaterOverlayIds: null,
+  setTheaterOverlay: (ids) =>
+    set({ theaterOverlayIds: ids, ...(ids ? { theaterOpen: true } : {}) }),
   theaterTraces: {},
   theaterRun: null,
   beginTheaterRun: (configHash) =>
     set({
       theaterTraces: {},
       liveProgress: null,
+      // A new run reclaims the stage — live streaming beats a replayed pair.
+      theaterOverlayIds: null,
       theaterRun: {
         configHash,
         startedAt: Date.now(),

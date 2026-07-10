@@ -89,7 +89,7 @@ import {
   useApp,
   type TheaterFrame,
 } from "../lib/store";
-import { listRunsByConfig } from "../lib/runStore";
+import { getRun, listRunsByConfig, type RunRecord } from "../lib/runStore";
 import {
   poolEvidence,
   runEvidence,
@@ -243,6 +243,18 @@ function scrubSeries(s: Series, k: number): Series {
     successes: Math.round(last.point * last.shots),
     shotsExecuted: last.shots,
   };
+}
+
+/** First sampled-with-trace series of an archived record — the
+ *  overlay comparison stages ONE funnel per run. Multi-sampled-node
+ *  pipelines overlay their first sampled step only (paired panels
+ *  would be the honest extension if a case study ever needs it). */
+function firstSampledSeries(rec: RunRecord): Series | null {
+  for (const step of rec.response.steps) {
+    const sr = seriesFromStep(step, undefined, false);
+    if (sr) return sr;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -673,6 +685,291 @@ function Panel({
 }
 
 // ---------------------------------------------------------------------------
+// overlay comparison panel (marker: theater-overlay)
+// ---------------------------------------------------------------------------
+//
+// Two archived runs of ONE configuration on a single axis pair — the
+// visual argument that the stopping RULE is deterministic while the
+// DRAWS are not: both funnels narrow on the same 1/√n schedule, land
+// inside each other's intervals (or visibly don't), and any early
+// stop is that run's own draw meeting the shared rule.
+//
+// Encoding deltas vs the single-run Panel (everything else reuses its
+// vocabulary — same axes, same interval/envelope/point marks):
+//   * run A = accent/blue, run B = warn/amber; hue is doubled by the
+//     A/B legend and per-mark tooltips, and the two series never rely
+//     on hue alone (they are also x-dodged, see next).
+//   * both runs share the batch grid (same configuration ⇒ same batch
+//     plan), so coincident intervals would overprint; each series is
+//     x-dodged by a constant ∓3.5 px — sub-batch-width, identical for
+//     every batch, so shapes and convergence rates compare honestly.
+//   * envelopes drop to opacity .07 (two overlapping .1 fills would
+//     read as a third hue).
+//   * shared y domain = union of both runs' single-run domains — the
+//     overlay never zooms tighter than either run would alone.
+//   * target corridor only when BOTH runs executed the SAME rule,
+//     anchored at the midpoint of the two final points (the corridor
+//     states the rule's width; per-run anchoring would draw two
+//     nearly-coincident dashed pairs and imply two rules).
+//   * stop annotations dodge into stacked top-band rows (A above B)
+//     instead of the single-run flip logic.
+function OverlayPanel({
+  a,
+  b,
+  top,
+  height,
+}: {
+  a: Series;
+  b: Series;
+  top: number;
+  height: number;
+}) {
+  const plotW = W - M.l - M.r;
+  const plotH = height - M.t - M.b;
+  const shotsRequested = Math.max(a.shotsRequested, b.shotsRequested);
+  const sharedTarget =
+    a.precisionTarget != null && a.precisionTarget === b.precisionTarget
+      ? a.precisionTarget
+      : null;
+  const [aLo, aHi] = yDomain(a.frames, sharedTarget, null);
+  const [bLo, bHi] = yDomain(b.frames, sharedTarget, null);
+  const dLo = Math.min(aLo, bLo);
+  const dHi = Math.max(aHi, bHi);
+  const x = (shots: number) =>
+    M.l + (Math.min(shots, shotsRequested) / Math.max(1, shotsRequested)) * plotW;
+  const y = (v: number) => M.t + (1 - (v - dLo) / (dHi - dLo)) * plotH;
+  const axisY = M.t + plotH;
+  const lastA = a.frames[a.frames.length - 1];
+  const lastB = b.frames[b.frames.length - 1];
+
+  const step = tickStep(dHi - dLo);
+  const gridVals: number[] = [];
+  for (let v = Math.ceil(dLo / step) * step; v <= dHi + 1e-9; v += step)
+    gridVals.push(v);
+
+  const COLORS = {
+    A: "rgb(var(--color-accent))",
+    B: "rgb(var(--color-warn))",
+  } as const;
+
+  // Right-margin readout column: A final, B final, shared-target tag —
+  // same dodge contract as the single-run Panel.
+  const midFinal = (lastA.point + lastB.point) / 2;
+  const anyStop = a.stoppedEarly || b.stoppedEarly;
+  const bandTop = M.t + (anyStop ? 66 : 8);
+  const blocks: Array<{ anchor: number; h: number }> = [
+    { anchor: y(lastA.point) + 3, h: 26 },
+    { anchor: y(lastB.point) + 3, h: 26 },
+  ];
+  if (sharedTarget != null)
+    blocks.push({ anchor: y(midFinal + sharedTarget) + 3, h: 10 });
+  const dodged = dodgeMarginLabels(blocks, bandTop, axisY - 2);
+
+  // Union of both runs' batch ticks (identical grids collapse; an
+  // early-stopped run simply contributes a prefix).
+  const tickShots = [
+    ...new Set([...a.frames, ...b.frames].map((f) => f.shots)),
+  ].sort((p2, q) => p2 - q);
+  const maxShown = Math.max(lastA.shots, lastB.shots);
+
+  const seriesMarks = (s2: Series, key: "A" | "B", dx: number) => {
+    const color = COLORS[key];
+    const env2 =
+      s2.frames.map((f) => `${x(f.shots) + dx},${y(f.hi)}`).join(" ") +
+      " " +
+      [...s2.frames]
+        .reverse()
+        .map((f) => `${x(f.shots) + dx},${y(f.lo)}`)
+        .join(" ");
+    return (
+      <g>
+        {s2.frames.length > 1 && (
+          <polygon points={env2} fill={color} opacity={0.07} />
+        )}
+        {s2.frames.map((f, i) => (
+          <line
+            key={f.shots}
+            x1={x(f.shots) + dx}
+            x2={x(f.shots) + dx}
+            y1={y(f.hi)}
+            y2={y(f.lo)}
+            stroke={color}
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            opacity={0.35 + (0.55 * (i + 1)) / s2.frames.length}
+          >
+            <title>
+              {`run ${key}, batch ${i + 1}: after ${fmtShots(f.shots)} shots — point ${fmtPct(f.point, 2)}, 95% CI ${fmtPct(f.lo, 2)}–${fmtPct(f.hi, 2)} (±${fmtPp((f.hi - f.lo) / 2, 2)})`}
+            </title>
+          </line>
+        ))}
+        {s2.frames.length > 1 && (
+          <polyline
+            points={s2.frames
+              .map((f) => `${x(f.shots) + dx},${y(f.point)}`)
+              .join(" ")}
+            fill="none"
+            stroke={color}
+            strokeWidth={1}
+            opacity={0.6}
+          />
+        )}
+        {s2.frames.map((f, i) => (
+          <circle
+            key={f.shots}
+            cx={x(f.shots) + dx}
+            cy={y(f.point)}
+            r={i === s2.frames.length - 1 ? 3.5 : 2.2}
+            fill={color}
+          />
+        ))}
+      </g>
+    );
+  };
+
+  const stopAnnotation = (s2: Series, key: "A" | "B", row: number) => {
+    if (!s2.stoppedEarly || s2.shotsExecuted == null) return null;
+    const sx = x(s2.shotsExecuted);
+    const ty = M.t + 12 + row * 30;
+    return (
+      <g>
+        <line
+          x1={sx}
+          x2={sx}
+          y1={M.t - 4}
+          y2={axisY}
+          stroke={COLORS[key]}
+          strokeWidth={1.5}
+          strokeDasharray="5 3"
+        />
+        <text
+          x={sx - 8}
+          textAnchor="end"
+          y={ty}
+          fontSize={11}
+          fontWeight={600}
+          fill={COLORS[key]}
+        >
+          ⏹ {key} stopped at {fmtShots(s2.shotsExecuted)} of {fmtShots(s2.shotsRequested)} shots
+          <title>{GLOSSARY.precisionTarget}</title>
+        </text>
+      </g>
+    );
+  };
+
+  const readout = (s2: Series, key: "A" | "B", labelY: number) => {
+    const last2 = s2.frames[s2.frames.length - 1];
+    const half2 = (last2.hi - last2.lo) / 2;
+    return (
+      <text x={W - M.r + 10} y={labelY} fontSize={11} fontWeight={600} fill={COLORS[key]}>
+        <tspan x={W - M.r + 10}>
+          {key} {s2.done ? "final" : "so far"}: {fmtPct(last2.point, 2)} ±{fmtPp(half2, 2)}
+        </tspan>
+        <tspan x={W - M.r + 10} dy={13} fontWeight={400} fill="rgb(var(--color-mute))">
+          {s2.successes != null
+            ? `${fmtShots(s2.successes)}/${fmtShots(s2.shotsExecuted ?? last2.shots)} ideal`
+            : ""}
+        </tspan>
+        <title>{GLOSSARY.ci}</title>
+      </text>
+    );
+  };
+
+  const spent = (s2: Series) =>
+    `${fmtShots(s2.shotsExecuted ?? s2.frames[s2.frames.length - 1].shots)}${
+      s2.shotsRequested > (s2.shotsExecuted ?? 0) && s2.stoppedEarly
+        ? ` of ${fmtShots(s2.shotsRequested)}`
+        : ""
+    } shots${s2.serverSeconds != null ? ` · ${s2.serverSeconds.toFixed(1)} s` : ""}`;
+
+  return (
+    <g
+      transform={`translate(0 ${top})`}
+      role="img"
+      data-marker="theater-overlay"
+      aria-label={`overlaid evidence funnels of two runs of one configuration: run A ${fmtPct(lastA.point, 2)}, run B ${fmtPct(lastB.point, 2)}`}
+    >
+      <text x={M.l} y={22} fontSize={14} fontWeight={600} fill="rgb(var(--color-ink))">
+        {a.label}
+        <title>{GLOSSARY.fidelity}</title>
+      </text>
+      <text x={M.l} y={22} dx={8 * a.label.length + 14} fontSize={11} fill="rgb(var(--color-mute))">
+        overlay — A {fmtPct(lastA.point, 2)} ±{fmtPp((lastA.hi - lastA.lo) / 2, 2)} · B {fmtPct(lastB.point, 2)} ±{fmtPp((lastB.hi - lastB.lo) / 2, 2)}
+      </text>
+
+      {/* y grid + labels */}
+      {gridVals.map((v) => (
+        <g key={v}>
+          <line x1={M.l} x2={M.l + plotW} y1={y(v)} y2={y(v)} stroke="rgb(var(--color-edge))" strokeWidth={1} opacity={0.6} />
+          <text x={M.l - 8} y={y(v) + 3} fontSize={10} textAnchor="end" fill="rgb(var(--color-mute))">
+            {fmtPct(v, step < 0.01 ? 1 : 0)}
+          </text>
+        </g>
+      ))}
+      <text
+        transform={`translate(${M.l - 46} ${M.t + plotH / 2}) rotate(-90)`}
+        fontSize={11}
+        textAnchor="middle"
+        fill="rgb(var(--color-mute))"
+      >
+        fidelity estimate
+        <title>{GLOSSARY.fidelity}</title>
+      </text>
+
+      {/* shared target corridor: only when both runs executed the SAME rule */}
+      {sharedTarget != null && (
+        <g>
+          {[midFinal - sharedTarget, midFinal + sharedTarget]
+            .filter((v) => v >= dLo && v <= dHi)
+            .map((v, i) => (
+              <line key={i} x1={M.l} x2={M.l + plotW} y1={y(v)} y2={y(v)} stroke="rgb(var(--color-ink))" strokeWidth={1.2} strokeDasharray="7 4" opacity={0.45} />
+            ))}
+          <text x={W - M.r + 10} y={dodged[2]} fontSize={10} fill="rgb(var(--color-ink))" opacity={0.8}>
+            target ±{fmtPp(sharedTarget, 1)} (both runs)
+            <title>{GLOSSARY.precisionTarget}</title>
+          </text>
+        </g>
+      )}
+
+      {/* the two funnels, constant ∓3.5px x-dodge (see module comment) */}
+      {seriesMarks(a, "A", -3.5)}
+      {seriesMarks(b, "B", 3.5)}
+      {stopAnnotation(a, "A", 0)}
+      {stopAnnotation(b, "B", a.stoppedEarly ? 1 : 0)}
+
+      {/* final readouts, dodged into the right-margin column */}
+      {readout(a, "A", dodged[0])}
+      {readout(b, "B", dodged[1])}
+
+      {/* x axis */}
+      <line x1={M.l} x2={M.l + plotW} y1={axisY} y2={axisY} stroke="rgb(var(--color-mute))" strokeWidth={1} />
+      {tickShots.map((sh) => (
+        <g key={sh}>
+          <line x1={x(sh)} x2={x(sh)} y1={axisY} y2={axisY + 4} stroke="rgb(var(--color-mute))" strokeWidth={1} />
+          <text x={x(sh)} y={axisY + 15} fontSize={9.5} textAnchor="middle" fill="rgb(var(--color-mute))">
+            {fmtShots(sh)}
+          </text>
+        </g>
+      ))}
+      {maxShown < shotsRequested && (
+        <g>
+          <line x1={x(shotsRequested)} x2={x(shotsRequested)} y1={axisY} y2={axisY + 4} stroke="rgb(var(--color-mute))" strokeWidth={1} opacity={0.6} />
+          <text x={x(shotsRequested)} y={axisY + 15} fontSize={9.5} textAnchor="middle" fill="rgb(var(--color-mute))" opacity={0.7}>
+            {fmtShots(shotsRequested)}
+          </text>
+        </g>
+      )}
+      <text x={M.l + plotW / 2} y={axisY + 30} fontSize={11} textAnchor="middle" fill="rgb(var(--color-mute))">
+        shots executed (evidence bought) →<title>{GLOSSARY.shots}</title>
+      </text>
+      <text x={M.l} y={axisY + 45} fontSize={10.5} fontWeight={600} fill="rgb(var(--color-ink))">
+        evidence spent — A: {spent(a)} · B: {spent(b)}
+      </text>
+    </g>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // the theater
 // ---------------------------------------------------------------------------
 
@@ -685,6 +982,8 @@ export function EvidenceTheater() {
   const circuit = useApp((st) => st.circuit);
   const sampleKey = useApp((st) => st.sampleKey);
   const setTheaterOpen = useApp((st) => st.setTheaterOpen);
+  const overlayIds = useApp((st) => st.theaterOverlayIds);
+  const setTheaterOverlay = useApp((st) => st.setTheaterOverlay);
   // Archive changes (a run archived elsewhere, a record deleted from
   // History) must refresh the pooled prior-evidence band below — the
   // created_at < startedAt cutoff keeps the streaming run's own
@@ -721,24 +1020,78 @@ export function EvidenceTheater() {
     return out;
   }, [run, running, theaterTraces, storeTarget, timesTrusted]);
 
+  // Overlay comparison mode (marker: theater-overlay): two archived
+  // runs of one configuration, loaded fresh from the archive on every
+  // historyVersion bump (either record can be deleted mid-view — the
+  // overlay then exits instead of rendering a stale pair).
+  const [overlayRecs, setOverlayRecs] = useState<
+    [RunRecord, RunRecord] | null
+  >(null);
+  useEffect(() => {
+    if (!overlayIds) {
+      setOverlayRecs(null);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([getRun(overlayIds[0]), getRun(overlayIds[1])])
+      .then(([ra, rb]) => {
+        if (cancelled) return;
+        if (ra && rb) setOverlayRecs([ra, rb]);
+        else setTheaterOverlay(null);
+      })
+      .catch(() => {
+        if (!cancelled) setTheaterOverlay(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [overlayIds, historyVersion, setTheaterOverlay]);
+  const overlayActive = overlayIds != null;
+  const overlayPair = useMemo(() => {
+    if (!overlayRecs) return null;
+    const a = firstSampledSeries(overlayRecs[0]);
+    const b = firstSampledSeries(overlayRecs[1]);
+    return a && b ? { a, b } : null;
+  }, [overlayRecs]);
+
   // Trace scrubbing (filmstrip support). Only when the trace is fully
   // known — every series done, nothing streaming — so the live-run
-  // path is untouched. null = final state.
+  // path is untouched. null = final state. In overlay mode the traces
+  // are archived by construction, and one scrub position drives BOTH
+  // series in lockstep (scrubSeries clamps per series, so a pair with
+  // different executed-batch counts stays valid at every k).
   const [scrub, setScrub] = useState<number | null>(null);
-  const canScrub =
-    !running && series.length > 0 && series.every((sr) => sr.done);
-  const maxB = series.reduce((m, sr) => Math.max(m, sr.frames.length), 0);
+  const canScrub = overlayActive
+    ? overlayPair != null
+    : !running && series.length > 0 && series.every((sr) => sr.done);
+  const maxB = overlayActive
+    ? Math.max(
+        overlayPair?.a.frames.length ?? 0,
+        overlayPair?.b.frames.length ?? 0,
+      )
+    : series.reduce((m, sr) => Math.max(m, sr.frames.length), 0);
   const cur = scrub == null ? maxB : Math.min(scrub, maxB);
   useEffect(() => {
-    // A new run (or a restored one) gets a fresh, unscrubbed theater.
+    // A new run (or a restored one, or a new overlay pair) gets a
+    // fresh, unscrubbed theater.
     setScrub(null);
-  }, [run?.run_id, running]);
+  }, [run?.run_id, running, overlayIds]);
   const shown = useMemo(
     () =>
-      canScrub && scrub != null
+      canScrub && scrub != null && !overlayActive
         ? series.map((sr) => scrubSeries(sr, scrub))
         : series,
-    [series, scrub, canScrub],
+    [series, scrub, canScrub, overlayActive],
+  );
+  const shownOverlay = useMemo(
+    () =>
+      overlayPair && scrub != null
+        ? {
+            a: scrubSeries(overlayPair.a, scrub),
+            b: scrubSeries(overlayPair.b, scrub),
+          }
+        : overlayPair,
+    [overlayPair, scrub],
   );
 
   // Pooled archive evidence for this configuration, restricted to
@@ -774,15 +1127,25 @@ export function EvidenceTheater() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theaterRun?.configHash, theaterRun?.startedAt, theaterRun?.runId, timesTrusted, historyVersion]);
 
-  const configHash = timesTrusted ? theaterRun?.configHash ?? null : null;
-  const rootSeed = timesTrusted
-    ? theaterRun?.rootSeed ?? run?.root_seed ?? null
-    : run?.root_seed ?? null;
+  const configHash = overlayActive
+    ? overlayRecs?.[0].config_hash ?? null
+    : timesTrusted
+      ? theaterRun?.configHash ?? null
+      : null;
+  const rootSeed = overlayActive
+    ? null // overlay legend names both seeds per run instead
+    : timesTrusted
+      ? theaterRun?.rootSeed ?? run?.root_seed ?? null
+      : run?.root_seed ?? null;
 
-  const panelH = series.length > 1 ? 250 : 460;
-  const headH = 34;
-  const svgH = headH + Math.max(1, series.length) * panelH;
-  const circuitLabel = sampleKey ?? circuit?.name ?? "circuit";
+  const panelH = overlayActive ? 460 : series.length > 1 ? 250 : 460;
+  // Overlay header carries a second line (the per-run A/B legend).
+  const headH = overlayActive ? 52 : 34;
+  const svgH = headH + (overlayActive ? 1 : Math.max(1, series.length)) * panelH;
+  const circuitLabel = overlayActive
+    ? overlayRecs?.[0].sample_key ?? overlayRecs?.[0].circuit_name ?? "circuit"
+    : sampleKey ?? circuit?.name ?? "circuit";
+  const hasContent = overlayActive ? shownOverlay != null : series.length > 0;
 
   return (
     <div
@@ -803,6 +1166,14 @@ export function EvidenceTheater() {
             streaming
           </span>
         )}
+        {overlayActive && (
+          <span
+            className="chip !border-warn/50 !text-warn"
+            title="Comparing two archived replays of one configuration, overlaid on one axis pair. Close the theater (or start a new run) to exit."
+          >
+            overlay comparison
+          </span>
+        )}
         <div className="flex-1" />
         <label
           className="flex items-center gap-1.5 text-[11px] text-mute cursor-pointer select-none"
@@ -820,7 +1191,7 @@ export function EvidenceTheater() {
         </label>
         <FigureExportButton
           getTarget={() => svgRef.current}
-          name="evidence-theater"
+          name={overlayActive ? "evidence-theater-overlay" : "evidence-theater"}
           view="evidence-theater"
           getTracePosition={() =>
             canScrub && scrub != null && cur < maxB ? cur : null
@@ -904,20 +1275,36 @@ export function EvidenceTheater() {
         </div>
       )}
 
-      {series.length === 0 ? (
+      {!hasContent ? (
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="max-w-md text-center space-y-2">
             <div className="text-sm text-ink font-medium">
-              {running
-                ? "Waiting for the first shot batch…"
-                : "No sampled evidence to stage yet"}
+              {overlayActive
+                ? overlayRecs == null
+                  ? "Loading the two runs…"
+                  : "These runs carry no sampled per-batch trace to overlay"
+                : running
+                  ? "Waiting for the first shot batch…"
+                  : "No sampled evidence to stage yet"}
             </div>
-            <div className="text-xs text-mute">
-              Run a pipeline with a <em>sampled</em> fidelity step and every
-              shot batch will land here as it happens — the 95% interval
-              narrows live, and a precision target (toolbar: “target ±pp”)
-              lets the run stop itself once the evidence is tight enough.
-            </div>
+            {overlayActive ? (
+              overlayRecs != null && (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setTheaterOverlay(null)}
+                >
+                  exit overlay
+                </button>
+              )
+            ) : (
+              <div className="text-xs text-mute">
+                Run a pipeline with a <em>sampled</em> fidelity step and every
+                shot batch will land here as it happens — the 95% interval
+                narrows live, and a precision target (toolbar: “target ±pp”)
+                lets the run stop itself once the evidence is tight enough.
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -937,9 +1324,26 @@ export function EvidenceTheater() {
               <text x={M.l} y={20} fontSize={12} fill="rgb(var(--color-ink))">
                 <tspan fontWeight={600}>{circuitLabel}</tspan>
                 <tspan fill="rgb(var(--color-mute))">
-                  {" · anytime evidence — every shot batch redraws the 95% interval"}
+                  {overlayActive
+                    ? " · two replays of one configuration — same rule, different draws"
+                    : " · anytime evidence — every shot batch redraws the 95% interval"}
                 </tspan>
               </text>
+              {overlayActive && overlayRecs && (
+                /* per-run legend: hue keyed to the funnels below; run ids
+                   + seeds make the figure self-identifying (which two
+                   draws, replayable from which seeds) */
+                <text x={M.l} y={40} fontSize={11} fontFamily="ui-monospace, monospace">
+                  <tspan fill="rgb(var(--color-accent))" fontWeight={600}>
+                    ● A {overlayRecs[0].run_id}
+                    {overlayRecs[0].root_seed != null ? ` · seed ${overlayRecs[0].root_seed}` : ""}
+                  </tspan>
+                  <tspan dx={20} fill="rgb(var(--color-warn))" fontWeight={600}>
+                    ● B {overlayRecs[1].run_id}
+                    {overlayRecs[1].root_seed != null ? ` · seed ${overlayRecs[1].root_seed}` : ""}
+                  </tspan>
+                </text>
+              )}
               {configHash && (
                 <g>
                   <circle cx={W - M.r + 16} cy={16} r={4} fill={hueCss(hashHue(configHash), 0.9)}>
@@ -958,16 +1362,25 @@ export function EvidenceTheater() {
                 </text>
               )}
             </g>
-            {shown.map((s, i) => (
-              <Panel
-                key={s.nodeId}
-                s={s}
-                pool={shown.length === 1 && pool ? pool.p : null}
-                poolRuns={pool?.n ?? 0}
-                top={headH + i * panelH}
-                height={panelH}
-              />
-            ))}
+            {overlayActive
+              ? shownOverlay && (
+                  <OverlayPanel
+                    a={shownOverlay.a}
+                    b={shownOverlay.b}
+                    top={headH}
+                    height={panelH}
+                  />
+                )
+              : shown.map((s, i) => (
+                  <Panel
+                    key={s.nodeId}
+                    s={s}
+                    pool={shown.length === 1 && pool ? pool.p : null}
+                    poolRuns={pool?.n ?? 0}
+                    top={headH + i * panelH}
+                    height={panelH}
+                  />
+                ))}
           </svg>
         </div>
       )}

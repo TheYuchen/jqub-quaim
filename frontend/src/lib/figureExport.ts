@@ -94,6 +94,19 @@ async function runsForView(
       config_hash: r.config_hash,
     }));
   }
+  if (view === "evidence-theater" && st.theaterOverlayIds) {
+    // Theater in overlay-comparison mode: the two staged archived
+    // runs, not the store's current run.
+    const ids = st.theaterOverlayIds;
+    const all = await listRuns(500);
+    return all
+      .filter((r) => ids.includes(r.run_id))
+      .map((r) => ({
+        run_id: r.run_id,
+        root_seed: r.root_seed,
+        config_hash: r.config_hash,
+      }));
+  }
   if (view === "evidence-compare") {
     const all = await listRuns(500);
     return all
@@ -134,7 +147,7 @@ export async function collectProvenance(
     regenerate:
       "Rebuild the pipeline via '#s=' + base64url(graph) on any deployment; " +
       "pin a run's root_seed to replay its draws bit-exactly; " +
-      "?scenario=F0..F6 boots the paper's scripted figure states.",
+      "?scenario=F0..F7 boots the paper's scripted figure states.",
   };
 }
 

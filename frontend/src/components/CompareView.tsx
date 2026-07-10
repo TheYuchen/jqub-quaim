@@ -12,7 +12,7 @@
 //     is not evidence when both intervals span the difference.
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { Presentation, X } from "lucide-react";
 import type { StepResult } from "../lib/api";
 import { useApp } from "../lib/store";
 import { getRun, type RunRecord } from "../lib/runStore";
@@ -91,6 +91,18 @@ function CompareRow({
   );
 }
 
+/** Does the record carry at least one sampled per-batch trace? The
+ *  theater overlay needs the funnel data, not just a final interval. */
+function hasSampledTrace(r: RunRecord): boolean {
+  return r.response.steps.some((st) => {
+    const d = st.distribution as
+      | { kind?: string; trace?: unknown[] }
+      | null
+      | undefined;
+    return d?.kind === "binomial" && Array.isArray(d.trace) && d.trace.length > 0;
+  });
+}
+
 function fidelityStep(r: RunRecord): StepResult | undefined {
   for (let i = r.response.steps.length - 1; i >= 0; i--) {
     const s = r.response.steps[i];
@@ -167,6 +179,7 @@ function ciOf(s: StepResult | undefined): [number, number] | null {
 export function CompareView() {
   const compareIds = useApp((s) => s.compareIds);
   const clearCompare = useApp((s) => s.clearCompare);
+  const setTheaterOverlay = useApp((s) => s.setTheaterOverlay);
   // historyVersion: a selected run can be DELETED from the archive
   // while it is being compared. The bump re-runs the lookup below, and
   // the missing-record branch clears the stale pair — without this the
@@ -273,6 +286,24 @@ export function CompareView() {
             {diffs.length} setting{diffs.length === 1 ? "" : "s"} differ
           </span>
         )}
+        {/* Theater overlay (marker: theater-overlay): only offered when
+            the pair is genuinely overlayable — same configuration (so
+            "one rule, two draws" is a true statement) AND both runs
+            persisted a per-batch trace (the funnel data). */}
+        {A.config_hash === B.config_hash &&
+          hasSampledTrace(A) &&
+          hasSampledTrace(B) && (
+            <button
+              type="button"
+              data-marker="theater-overlay"
+              className="chip !border-accent/50 !text-accent hover:bg-accent/10 flex items-center gap-1"
+              title="Open the evidence theater with both runs' shot-batch funnels overlaid on one axis pair — two replays of one configuration, same rule, different draws."
+              onClick={() => setTheaterOverlay([A.run_id, B.run_id])}
+            >
+              <Presentation className="w-3 h-3" />
+              overlay in theater ↗
+            </button>
+          )}
         <button
           type="button"
           className="ml-auto p-0.5 text-mute hover:text-ink rounded hover:bg-surfaceAlt"
