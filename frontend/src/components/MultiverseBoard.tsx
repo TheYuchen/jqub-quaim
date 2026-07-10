@@ -848,7 +848,7 @@ export function MultiverseBoard() {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         {runs == null ? (
           <div className="p-6 text-sm text-mute">Loading archive…</div>
         ) : groups.length === 0 ? (
@@ -881,7 +881,13 @@ export function MultiverseBoard() {
             ref={gridRef}
             className="grid gap-3 p-3"
             style={{
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+              // min(240px, 100%): in a container narrower than one
+              // 240px track the column shrinks to the container
+              // instead of forcing horizontal overflow (the scroll
+              // body's overflow-y:auto would otherwise mint an x
+              // scrollbar — see the RESPONSIVE CONTRACT in App.tsx).
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(min(240px, 100%), 1fr))",
             }}
           >
             {groups.map((g) => {

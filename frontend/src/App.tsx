@@ -6,7 +6,7 @@ import { api } from "./lib/api";
 import { getUserId } from "./lib/userId";
 import { useApp } from "./lib/store";
 import { ensureDemoArchive } from "./lib/demoArchive";
-import { useIsDesktop } from "./lib/useMediaQuery";
+import { useIsDesktop, useMediaQuery } from "./lib/useMediaQuery";
 import { TopBar } from "./components/TopBar";
 import { NodePalette } from "./components/NodePalette";
 import { FlowCanvas } from "./components/FlowCanvas";
@@ -18,6 +18,33 @@ import { MobileDrawer } from "./components/MobileDrawer";
 import { WelcomeTour, useFirstVisitTour } from "./components/WelcomeTour";
 import { activateScenario } from "./lib/scenarios";
 
+// ---------------------------------------------------------------------------
+// RESPONSIVE CONTRACT (no horizontal page scroll at ANY width ≥ 768px)
+//
+//   <768px       mobile: both side panes become MobileDrawers; the Run
+//                FAB replaces the toolbar Run button.
+//   768–1199px   compact desktop ("the band"): the left pane stays in
+//                flow (its clamps account for the strip), but the
+//                Evidence pane NEVER takes layout width — it boots
+//                collapsed to its 32px strip and, when expanded, opens
+//                as a right-anchored OVERLAY over the center column
+//                (bandEvidenceOpen: session state, never persisted).
+//                Rationale: LEFT_MIN + RIGHT_MIN + MIN_CANVAS_W + two
+//                resizers = 808px, so hosting both panes in flow is
+//                impossible at 768px and cramped through ~1200px.
+//   ≥1200px      full desktop: three columns, both panes resizable,
+//                widths + collapsed preferences persisted.
+//
+// Two width guards keep the columns inside the viewport: the drag-time
+// clamp in each PaneResizer, and the mount+resize clamp effect below —
+// it MUST run on mount, not just on resize events, because persisted
+// widths from a wider monitor would otherwise overflow the first paint
+// into horizontal scroll. The center column owns all remaining width
+// (flex-1 + min-w-0 down to the board grid, whose auto-fill tracks are
+// minmax(min(240px,100%),1fr)); the board/theater overlays are
+// absolutely positioned inside it, so nothing can widen the page.
+// ---------------------------------------------------------------------------
+
 // Default + clamp bounds for the two side panels. The middle canvas flexes.
 const LEFT_DEFAULT = 320;
 const LEFT_MIN = 220;
@@ -26,6 +53,8 @@ const RIGHT_DEFAULT = 400;
 const RIGHT_MIN = 300;
 const RIGHT_MAX = 720;
 const COLLAPSED_W = 32;
+// Full-desktop threshold — below this (and ≥768px) is "the band".
+const WIDE_QUERY = "(min-width: 1200px)";
 
 // Minimum width we ever want to leave for the canvas (NodePalette + React
 // Flow). Below this, NodePalette tiles (each fixed at 108px and shrink-0)
@@ -73,6 +102,9 @@ export default function App() {
   const theaterOpen = useApp((s) => s.theaterOpen);
   const [ready, setReady] = useState(false);
   const isDesktop = useIsDesktop();
+  const isWide = useMediaQuery(WIDE_QUERY);
+  // 768–1199px compact-desktop band (see RESPONSIVE CONTRACT above).
+  const band = isDesktop && !isWide;
 
   // Welcome tour: auto-opens on the first visit (skipped under
   // ?scenario= boots), re-openable from the TopBar Tour button.
@@ -102,6 +134,14 @@ export default function App() {
   const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
 
+  // Band (768–1199px) Evidence overlay — session-only, never
+  // persisted: the band boots collapsed-by-default regardless of the
+  // ≥1200px preference, and expanding here must not rewrite it.
+  const [bandEvidenceOpen, setBandEvidenceOpen] = useState(false);
+  useEffect(() => {
+    if (!band) setBandEvidenceOpen(false);
+  }, [band]);
+
   // FlowCanvas can ask us to surface the CircuitPicker when the user
   // tries to run without a circuit selected.
   const hintExpandLeftPane = useApp((s) => s.hintExpandLeftPane);
@@ -117,9 +157,10 @@ export default function App() {
   const hintExpandRightPane = useApp((s) => s.hintExpandRightPane);
   useEffect(() => {
     if (hintExpandRightPane === 0) return;
-    if (isDesktop) setRightCollapsed(false);
-    else setRightDrawerOpen(true);
-  }, [hintExpandRightPane, isDesktop]);
+    if (!isDesktop) setRightDrawerOpen(true);
+    else if (band) setBandEvidenceOpen(true);
+    else setRightCollapsed(false);
+  }, [hintExpandRightPane, isDesktop, band]);
 
   // True while a PaneResizer drag is in flight. We use it to suppress the
   // CSS `transition-[width]` during dragging: setRightW / setLeftW fire on
@@ -170,14 +211,18 @@ export default function App() {
   const prevRunningRef = useRef(running);
   useEffect(() => {
     if (running && !prevRunningRef.current) {
-      if (isDesktop) {
-        if (rightCollapsed) setRightCollapsed(false);
-      } else {
+      if (!isDesktop) {
         setRightDrawerOpen(true);
+      } else if (band) {
+        // Band: surface progress as the overlay — the in-flow pane
+        // must not take layout width here (RESPONSIVE CONTRACT).
+        setBandEvidenceOpen(true);
+      } else if (rightCollapsed) {
+        setRightCollapsed(false);
       }
     }
     prevRunningRef.current = running;
-  }, [running, rightCollapsed, isDesktop]);
+  }, [running, rightCollapsed, isDesktop, band]);
 
   // Close any open drawer as soon as we leave mobile layout, so switching
   // from portrait to landscape doesn't leave a floating panel hanging.
@@ -188,33 +233,38 @@ export default function App() {
     }
   }, [isDesktop]);
 
-  // Window resize → shrink oversized panes back into the safe zone.
-  // The drag-time clamp keeps users from making things too wide; this
-  // covers the case where the user shrinks the window after panes were
-  // already wide. Without it, current widths could exceed the dynamic
-  // max for the new viewport, and NodePalette tiles would overflow into
-  // the side panes again.
+  // Mount + window-resize clamp → shrink oversized panes back into
+  // the safe zone (RESPONSIVE CONTRACT). The drag-time clamp keeps
+  // users from making things too wide while dragging; this covers (a)
+  // the user shrinking the window afterwards and (b) BOOTING at a
+  // narrower viewport than the persisted widths came from — (b) is why
+  // it runs once immediately, not only on resize events.
   useEffect(() => {
     if (!isDesktop) return;
-    const onResize = () => {
+    const clamp = () => {
       const ww = window.innerWidth;
-      const leftFoot = leftCollapsed ? COLLAPSED_W : 0; // pane footprint computed below
-      const rightFoot = rightCollapsed ? COLLAPSED_W : 0;
-      // Headroom each pane has, given the *other* pane and resizers.
+      // In the band the right pane is always its strip in flow (the
+      // expanded pane is an overlay, costing no layout width).
+      const rightInFlow =
+        band || rightCollapsed ? COLLAPSED_W : rightW + RESIZER_W;
+      const leftInFlow = leftCollapsed ? COLLAPSED_W : leftW + RESIZER_W;
+      // Headroom each pane has, given the *other* pane's in-flow
+      // footprint, its own resizer and the canvas floor.
       const maxLeft = Math.min(
         LEFT_MAX,
-        ww - (rightCollapsed ? rightFoot : rightW + RESIZER_W) - RESIZER_W - MIN_CANVAS_W,
+        ww - rightInFlow - RESIZER_W - MIN_CANVAS_W,
       );
       const maxRight = Math.min(
         RIGHT_MAX,
-        ww - (leftCollapsed ? leftFoot : leftW + RESIZER_W) - RESIZER_W - MIN_CANVAS_W,
+        ww - leftInFlow - RESIZER_W - MIN_CANVAS_W,
       );
       setLeftW((w) => Math.max(LEFT_MIN, Math.min(w, Math.max(LEFT_MIN, maxLeft))));
       setRightW((w) => Math.max(RIGHT_MIN, Math.min(w, Math.max(RIGHT_MIN, maxRight))));
     };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [isDesktop, leftCollapsed, rightCollapsed, leftW, rightW]);
+    clamp();
+    window.addEventListener("resize", clamp);
+    return () => window.removeEventListener("resize", clamp);
+  }, [isDesktop, band, leftCollapsed, rightCollapsed, leftW, rightW]);
 
   const setPlugins = useApp((s) => s.setPlugins);
   useEffect(() => {
@@ -269,7 +319,10 @@ export default function App() {
   }, []);
 
   const leftWidth = leftCollapsed ? COLLAPSED_W : leftW;
-  const rightWidth = rightCollapsed ? COLLAPSED_W : rightW;
+  // In the band the Evidence pane's in-flow footprint is ALWAYS the
+  // strip; the expanded pane is an overlay (RESPONSIVE CONTRACT).
+  const rightStrip = band || rightCollapsed;
+  const rightWidth = rightStrip ? COLLAPSED_W : rightW;
 
   return (
     // h-[100dvh] uses the dynamic viewport height — iOS Safari shrinks
@@ -288,7 +341,7 @@ export default function App() {
       />
       {isDesktop ? (
         /* =====================  Desktop  ===================== */
-        <div className="flex-1 flex min-h-0">
+        <div className="relative flex-1 flex min-h-0">
           <aside
             style={{ width: leftWidth }}
             className={`shrink-0 border-r border-edge flex flex-col min-h-0 ${
@@ -313,7 +366,7 @@ export default function App() {
                   // the canvas falls below MIN_CANVAS_W. Account for the
                   // right pane's current footprint (collapsed strip when
                   // collapsed, full width otherwise) and both resizers.
-                  const rightFoot = rightCollapsed ? COLLAPSED_W : rightW + RESIZER_W;
+                  const rightFoot = rightStrip ? COLLAPSED_W : rightW + RESIZER_W;
                   const dynamicMax = Math.min(
                     LEFT_MAX,
                     window.innerWidth - rightFoot - RESIZER_W - MIN_CANVAS_W,
@@ -354,7 +407,7 @@ export default function App() {
               </div>
             )}
           </main>
-          {!rightCollapsed && (
+          {!rightStrip && (
             <PaneResizer
               onResize={(dx) =>
                 setRightW((w) => {
@@ -381,18 +434,38 @@ export default function App() {
             style={{ width: rightWidth }}
             className={`shrink-0 border-l border-edge flex flex-col min-h-0 overflow-x-hidden ${
               isResizing ? "" : "transition-[width] duration-150"
-            } ${rightCollapsed ? "overflow-hidden" : ""}`}
+            } ${rightStrip ? "overflow-hidden" : ""}`}
           >
-            {rightCollapsed ? (
+            {rightStrip ? (
               <CollapsedStrip
                 label="Evidence"
                 side="right"
-                onExpand={() => setRightCollapsed(false)}
+                onExpand={() =>
+                  band ? setBandEvidenceOpen(true) : setRightCollapsed(false)
+                }
               />
             ) : (
               <ResultsPane onCollapse={() => setRightCollapsed(true)} />
             )}
           </aside>
+          {/* Band Evidence overlay (RESPONSIVE CONTRACT): expanded
+              Evidence floats over the center column instead of taking
+              layout width, so the canvas/board keep computing layout
+              from real viewport space and the page can never scroll
+              horizontally. Width: the persisted pane width, capped so
+              a sliver of the center column stays visible. */}
+          {band && bandEvidenceOpen && (
+            <div
+              role="complementary"
+              aria-label="Evidence pane (overlay)"
+              className="absolute inset-y-0 right-0 z-30 flex flex-col min-h-0 bg-canvas border-l border-edge shadow-xl overflow-x-hidden"
+              style={{
+                width: `min(${rightW}px, calc(100vw - ${COLLAPSED_W + 48}px))`,
+              }}
+            >
+              <ResultsPane onCollapse={() => setBandEvidenceOpen(false)} />
+            </div>
+          )}
         </div>
       ) : (
         /* =====================  Mobile  ====================== */
