@@ -185,6 +185,18 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
           badge={compareIds.length > 0 ? compareIds.length : null}
         />
       </div>
+      {/* Active-scale subtitle (visible, not hover): one plain-words
+          line naming what the active tab pools. The tab tooltips keep
+          the full framing, but the minimum needed to USE the view must
+          not live in hover alone. */}
+      <div className="shrink-0 border-b border-edge/60 bg-surfaceAlt/30 px-3 py-1 text-[10px] text-mute">
+        {tab === "current" &&
+          "Scale 1 — this run, step by step; each shot batch tightens the 95% interval"}
+        {tab === "history" &&
+          "Scale 2 — all archived runs; same color = same configuration"}
+        {tab === "compare" &&
+          "Scale 3 — two configurations side by side; the difference interval carries the verdict"}
+      </div>
       <div ref={contentRef} className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
         {tab === "current" && (
           <>
