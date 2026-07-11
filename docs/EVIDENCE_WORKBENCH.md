@@ -1753,3 +1753,38 @@ embedded provenance JSON (lane-asserted); plus ~40 smaller honesty,
 a11y and stale-comment repairs. All gates green: tsc, vite build
 (default and VITE_ANON=1), backend pytest, svg_paper / export_python /
 difference_funnel node lanes.
+
+## Deep audit 2026-07-10 — final wave: the five deferrals (SHIPPED 2026-07-11)
+
+The five items Wave 3 deferred pending design calls are decided and
+shipped, emptying docs/AUDIT_BACKLOG.md. (1) Global toast channel:
+store.globalNotice + an App-level host (fixed bottom-center, z-50,
+canvas-toast styling, auto-fade ok=4s / warn=8s, danger sticky with ×)
+replaces NodePalette's alert(); window.confirm stays as the blocking
+guard on destructive plugin deletes, and the FlowCanvas-local Notice
+stays local (positionally contextual). (2) Share-hash boots rehydrate
+plugin defaults: a ref-guarded one-time FlowCanvas effect fires when
+`plugins` first turns non-empty and merges each plugin spec's
+defaultData UNDER the mounted nodes' params (missing keys only) —
+manifests load async after buildInitialGraph, so boot-time resolution
+was impossible by construction. (3) The History tab's lineage legend
+became fixed chrome: the tabpanel stopped scrolling, RunHistory pins
+the legend (with the "key" and archive-reopen chips riding in the same
+row) above an internal scroll body — no position:sticky against
+overflow-hidden ancestors — and the guidance budget is settled at max
+TWO rows on a fresh device (banner + legend chrome; the scale hint and
+archive strip yield to the banner, and reopening the strip is
+session-sticky user intent); the legend stays inside the exported
+tabpanel subtree, so History figures still carry the key. (4)
+CircuitDiff lanes share ONE horizontal scroll container (CSS grid,
+sticky-left qN labels on an opaque panel-alt cell), so lane columns
+can never desync; chip encodings and tooltips untouched. (5) Figure
+export downloads ONE `<base>.bundle.zip` (new frontend/src/lib/zip.ts,
+STORE-method ZIP writer, pure JS, no deps) holding the .svg, the .png
+(raster path only) and the .provenance.json; in-SVG provenance
+`<metadata>` unchanged; the new check_zip node lane asserts the CRC-32
+check vector ("123456789" → 0xCBF43926) and reads the writer's bytes
+back with `python3 -m zipfile` (-l listing and -t CRC test). Gates
+green: tsc, vite build (default and VITE_ANON=1), backend pytest, and
+the svg_paper / export_python (esbuild recipe) / difference_funnel /
+zip node lanes.
