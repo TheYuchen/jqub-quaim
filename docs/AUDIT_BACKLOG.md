@@ -13,13 +13,6 @@ deferred.
 
 ## Evidence
 
-- lineage legend not sticky + four guidance strips can stack on a
-  fresh device [deferred — the legend sits inside a panel-alt with
-  overflow-hidden, which breaks position:sticky against the Evidence
-  pane's scroll container; unsticking requires restructuring the
-  panel layout. The strip-budget question (which of banner / hint /
-  legend / archive-io yields on a fresh device) is a guidance-design
-  pass, not a one-liner.]
 - CircuitDiff per-lane scrollbars desync [deferred — the honest fix is
   one shared horizontal scroll container for all qubit lanes, which
   restructures the per-lane DOM; explicitly out of scope for this

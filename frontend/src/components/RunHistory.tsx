@@ -373,36 +373,28 @@ function KeyItem({
  *  fields in the file are never trusted) and skips run_ids already
  *  present, so importing twice — or importing on top of the bundled
  *  demo records — is safe. */
-function ArchiveIO({
-  count,
-  collapsed = false,
-}: {
-  count: number;
-  collapsed?: boolean;
-}) {
+function ArchiveReopenChip({ onOpen }: { onOpen: () => void }) {
+  // Reopen affordance for the collapsed archive strip (guidance
+  // budget: the demo banner outranks the strip). Embedded hosting
+  // parks this chip inside the legend chrome row so it does not cost
+  // a guidance row of its own; standalone hosting gives it a slim row.
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-mute hover:text-ink hover:bg-surfaceAlt"
+      title="Show the archive hand-off controls: export this browser's runs to a JSON file, or import one from another device"
+      aria-label="Show archive export/import controls"
+      onClick={onOpen}
+    >
+      <Download className="w-3 h-3" />
+      archive…
+    </button>
+  );
+}
+
+function ArchiveIO({ count }: { count: number }) {
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Guidance-strip budget (visual-calm pass): at most ONE strip at a
-  // time in this tab, and the demo banner outranks this one. While the
-  // banner is up the parent passes collapsed=true and the strip
-  // shrinks to a single reopen affordance; expanding it back is
-  // explicit user intent, so it wins for the session.
-  const [userOpened, setUserOpened] = useState(false);
-  if (collapsed && !userOpened)
-    return (
-      <div className="archive-io flex justify-end border-b border-edge/40 px-1.5 py-0.5">
-        <button
-          type="button"
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-mute hover:text-ink hover:bg-surfaceAlt"
-          title="Show the archive hand-off controls: export this browser's runs to a JSON file, or import one from another device"
-          aria-label="Show archive export/import controls"
-          onClick={() => setUserOpened(true)}
-        >
-          <Download className="w-3 h-3" />
-          archive…
-        </button>
-      </div>
-    );
   const onExport = () => {
     exportArchive()
       .then((n) => setMsg(`exported ${n} run${n === 1 ? "" : "s"}`))
@@ -469,7 +461,7 @@ function ArchiveIO({
  *  marks, localStorage dismissal) plus the affordance that one lacks:
  *  a compact "key" chip in the same top strip that brings the legend
  *  back -- a key you can lose forever is barely better than none. */
-function LineageLegend() {
+function LineageLegend({ trailing }: { trailing?: ReactNode } = {}) {
   const [dismissed, setDismissed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(LINEAGE_LEGEND_LS_KEY) === "1";
@@ -480,7 +472,8 @@ function LineageLegend() {
   const ACC = "rgb(var(--color-accent))";
   if (dismissed)
     return (
-      <div className="lineage-legend flex justify-end border-b border-edge/40 px-1.5 py-0.5">
+      <div className="lineage-legend flex items-center justify-end gap-1 border-b border-edge/40 px-1.5 py-0.5">
+        {trailing}
         <button
           type="button"
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-mute hover:text-ink hover:bg-surfaceAlt"
@@ -555,22 +548,25 @@ function LineageLegend() {
         <circle cx={10.5} cy={7} r={1.8} fill={ACC} fillOpacity={0.4} />
         <circle cx={17} cy={7} r={1.8} fill={ACC} fillOpacity={0.95} />
       </KeyItem>
-      <button
-        type="button"
-        className="ml-auto shrink-0 self-start text-mute hover:text-ink transition-colors"
-        title="Dismiss (remembered on this device -- the small 'key' button brings it back)"
-        aria-label="Dismiss lineage encoding key"
-        onClick={() => {
-          setDismissed(true);
-          try {
-            localStorage.setItem(LINEAGE_LEGEND_LS_KEY, "1");
-          } catch {
-            /* private mode etc. -- the key just reappears next visit */
-          }
-        }}
-      >
-        <X className="w-3 h-3" />
-      </button>
+      <span className="ml-auto shrink-0 self-start flex items-center gap-1.5">
+        {trailing}
+        <button
+          type="button"
+          className="shrink-0 text-mute hover:text-ink transition-colors"
+          title="Dismiss (remembered on this device -- the small 'key' button brings it back)"
+          aria-label="Dismiss lineage encoding key"
+          onClick={() => {
+            setDismissed(true);
+            try {
+              localStorage.setItem(LINEAGE_LEGEND_LS_KEY, "1");
+            } catch {
+              /* private mode etc. -- the key just reappears next visit */
+            }
+          }}
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </span>
     </div>
   );
 }
@@ -598,6 +594,12 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const [archiveError, setArchiveError] = useState(false);
   const [open, setOpen] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
+  // Guidance-strip budget (audit backlog): the demo banner outranks
+  // BOTH the scale hint and the archive strip, so a fresh device sees
+  // at most TWO guidance rows in this tab — the banner plus the
+  // legend chrome (pinned header chrome, not a strip). Reopening the
+  // archive strip is explicit user intent and wins for the session.
+  const [archiveOpened, setArchiveOpened] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -635,6 +637,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
 
   if (records.length === 0)
     return embedded ? (
+      <div className="flex-1 min-h-0 overflow-y-auto p-3">
       <div className="panel-alt overflow-hidden">
         {/* Import must be reachable at zero runs — a fresh device is
             exactly where a handed-off archive file arrives. */}
@@ -658,6 +661,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
           )}
         </div>
       </div>
+      </div>
     ) : null;
 
   const restore = (r: RunRecord, pin: boolean) =>
@@ -675,7 +679,8 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const enter = (id: string) => setHoverId(id);
   const leave = (id: string) => setHoverId((h) => (h === id ? null : h));
 
-  return (
+  const hasDemo = records.some((r) => r.demo);
+  const panel = (
     <div className="panel-alt overflow-hidden">
       {!embedded && (
         <button
@@ -694,19 +699,33 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
         <>
           {/* Scale statement (three-scales IA): this tab is scale 2 —
               the archive as replicates of configurations. One quiet
-              line; the legend key below carries the decoding. */}
-          <div className="border-b border-edge/40 bg-surfaceAlt/20 px-2.5 py-1 text-[10px] text-mute">
-            Every archived run; same-color runs are replicates of one
-            configuration.
-          </div>
-          <LineageLegend />
-          {/* One guidance strip at a time: when the demo banner below
-              renders, the archive-io strip starts collapsed. */}
-          <ArchiveIO
-            count={records.length}
-            collapsed={records.some((r) => r.demo)}
-          />
-          {records.some((r) => r.demo) && <DemoArchiveBanner />}
+              line. Guidance budget: the demo banner outranks it (the
+              banner and the tab's subtitle already frame the archive),
+              so on a fresh device this row yields entirely. */}
+          {!hasDemo && (
+            <div className="border-b border-edge/40 bg-surfaceAlt/20 px-2.5 py-1 text-[10px] text-mute">
+              Every archived run; same-color runs are replicates of one
+              configuration.
+            </div>
+          )}
+          {/* Standalone hosting keeps the legend inside the panel (no
+              fixed chrome exists to pin it to); embedded hosting
+              renders it once, above the scroll body — see the
+              embedded return below. */}
+          {!embedded && <LineageLegend />}
+          {/* Guidance budget: the demo banner outranks the archive
+              strip. While the banner is up the strip collapses to the
+              reopen chip — hosted in the legend chrome row when
+              embedded, or on its own slim row standalone. */}
+          {(!hasDemo || archiveOpened) && (
+            <ArchiveIO count={records.length} />
+          )}
+          {!embedded && hasDemo && !archiveOpened && (
+            <div className="archive-io flex justify-end border-b border-edge/40 px-1.5 py-0.5">
+              <ArchiveReopenChip onOpen={() => setArchiveOpened(true)} />
+            </div>
+          )}
+          {hasDemo && <DemoArchiveBanner />}
           {/* Compare needs TWO runs, but nothing used to acknowledge the
               first checkbox beyond a "1" on a tab the user may never
               look at — the interaction just seemed to do nothing. One
@@ -1123,4 +1142,27 @@ cumulative Wilson CI half-width of this configuration's pooled counts, widest ro
       )}
     </div>
   );
+  // Embedded (History tab) hosting: ResultsPane's tabpanel hands this
+  // component the full tab height as a flex column with NO scrolling
+  // of its own, so the lineage legend sits ABOVE the scroll container
+  // as plain non-scrolling chrome — no position:sticky fighting the
+  // pane's overflow-hidden ancestors (which is what sank the sticky
+  // approach this replaces). The legend chrome row doubles as the
+  // host for the archive-strip reopen chip, so neither costs a
+  // guidance row; the chrome (and everything below) stays inside the
+  // tabpanel subtree the figure camera exports.
+  if (embedded)
+    return (
+      <div className="flex-1 min-h-0 flex flex-col">
+        <LineageLegend
+          trailing={
+            hasDemo && !archiveOpened ? (
+              <ArchiveReopenChip onOpen={() => setArchiveOpened(true)} />
+            ) : null
+          }
+        />
+        <div className="flex-1 min-h-0 overflow-y-auto p-3">{panel}</div>
+      </div>
+    );
+  return panel;
 }

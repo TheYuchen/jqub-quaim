@@ -233,7 +233,17 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
         role="tabpanel"
         id={`evpanel-${tab}`}
         aria-labelledby={`evtab-${tab}`}
-        className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0"
+        className={
+          tab === "history"
+            ? // History owns its own scrolling: RunHistory pins the
+              // lineage legend above its internal scroll body as
+              // non-scrolling chrome, so the tabpanel must NOT scroll
+              // (or pad) here — the legend would ride away with the
+              // list otherwise. Both stay inside contentRef, so the
+              // figure export still captures legend + list together.
+              "flex-1 flex flex-col min-h-0"
+            : "flex-1 overflow-y-auto p-3 space-y-3 min-h-0"
+        }
       >
         {tab === "current" && (
           <>
