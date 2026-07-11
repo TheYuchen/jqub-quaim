@@ -102,8 +102,15 @@ export const PIPELINE_PRESETS: PipelinePreset[] = [
     nodes: [
       { id: "n1", kind: "input_circuit" },
       { id: "n2", kind: "qshot" },
+      // First-party presets must pass their own preflight: without an
+      // output sink this one shipped with a standing lint warning
+      // (audit S2).
+      { id: "n3", kind: "output" },
     ],
-    edges: [{ source: "n1", target: "n2" }],
+    edges: [
+      { source: "n1", target: "n2" },
+      { source: "n2", target: "n3" },
+    ],
     defaultCircuit: "ry_chain_6q",
   },
   {

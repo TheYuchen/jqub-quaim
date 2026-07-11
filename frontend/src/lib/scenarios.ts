@@ -379,7 +379,17 @@ export function activeScenarioKey(): string | null {
 /** Pick the latest successful run of each of the two most-replicated
  *  configurations — deterministic over the bundled archive. */
 async function pickTopTwoRunIds(): Promise<string[]> {
-  const runs = await listRuns(500);
+  const all = await listRuns(500);
+  // Scenario-boot records are scripted figure states, not evidence —
+  // the same exclusion pickOverlayPairRunIds (F7) applies. And when
+  // demo-flagged records exist, prefer them EXCLUSIVELY: on a well-used
+  // browser the user's own configurations can out-replicate the bundled
+  // groups and silently swap which pair F6/F8 select — the documented
+  // figure numbers must reproduce wherever the demo archive is present
+  // (audit S2).
+  const pool = all.filter((r) => r.scenario == null);
+  const demo = pool.filter((r) => r.demo === true);
+  const runs = demo.length > 0 ? demo : pool;
   const byHash = new Map<string, typeof runs>();
   for (const r of runs) {
     const arr = byHash.get(r.config_hash) ?? [];

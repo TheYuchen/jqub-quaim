@@ -26,6 +26,22 @@
  *  hybrid path applies via cloned cssText — keep the two in sync). */
 export const PAPER_FONT_BUMP = 1.25;
 
+/** Shared text-width estimate for SVG layout math (label flip /
+ *  intrusion rules). Average glyph width ≈ 0.6em for the
+ *  Helvetica/Arial stack the exporter writes. `bumped` (default true)
+ *  folds in PAPER_FONT_BUMP: the export pipeline scales every
+ *  font-size ×1.25 while POSITIONS stay fixed, so layout decisions
+ *  must reserve the EXPORTED width or bumped labels collide/clip in
+ *  figures (audit S2). Pass bumped=false only for text that never
+ *  reaches the export path. */
+export function estimateTextW(
+  chars: number,
+  fontSize: number,
+  bumped = true,
+): number {
+  return chars * fontSize * 0.6 * (bumped ? PAPER_FONT_BUMP : 1);
+}
+
 /** Whitelisted presentation attributes the inliner may write. */
 export const SVG_PRESENTATION_WHITELIST = [
   "fill",

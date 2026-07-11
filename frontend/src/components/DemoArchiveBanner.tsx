@@ -8,16 +8,22 @@
 
 import { useState } from "react";
 import { FlaskConical } from "lucide-react";
-import { clearDemoRuns } from "../lib/demoArchive";
+import { clearDemoRuns, demoReimportedForScenario } from "../lib/demoArchive";
 
 export function DemoArchiveBanner() {
   const [busy, setBusy] = useState(false);
   return (
-    <div className="shrink-0 border-b border-accent/25 bg-accent/5 px-3 py-1.5 flex items-center gap-2 text-[11px] text-mute">
+    // data-export-strip: guidance chrome, not evidence — figure
+    // exports (F2 board/history figures) drop this strip (audit S2).
+    <div
+      data-export-strip
+      className="shrink-0 border-b border-accent/25 bg-accent/5 px-3 py-1.5 flex items-center gap-2 text-[11px] text-mute"
+    >
       <FlaskConical className="w-3 h-3 text-accent shrink-0" />
       <span className="min-w-0">
-        Showing a bundled demo archive of real seeded runs — run any
-        pipeline to start your own evidence.
+        {demoReimportedForScenario()
+          ? "Demo archive re-imported for this figure scenario — Clear demo data again to remove it."
+          : "Showing a bundled demo archive of real seeded runs — run any pipeline to start your own evidence."}
       </span>
       <button
         type="button"
@@ -27,7 +33,7 @@ export function DemoArchiveBanner() {
           setBusy(true);
           void clearDemoRuns();
         }}
-        title="Delete every demo record from this browser's archive. Your own runs are untouched, and the demo never auto-reloads."
+        title="Delete every demo record from this browser's archive. Your own runs are untouched, and the demo won't auto-reload — though opening a documented ?scenario= figure link re-imports it for that figure."
       >
         {busy ? "Clearing…" : "Clear demo data"}
       </button>

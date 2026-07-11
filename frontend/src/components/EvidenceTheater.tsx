@@ -99,6 +99,7 @@ import {
 } from "../lib/stats";
 import { hashHue, hueCss } from "../lib/hues";
 import { costAnchor } from "../lib/costModel";
+import { estimateTextW } from "../lib/svgPaper";
 import { GLOSSARY } from "../lib/glossary";
 import { FigureExportButton } from "./FigureExportButton";
 import { TipIcon } from "./TipIcon";
@@ -408,19 +409,23 @@ function Panel({
       : 0;
 
   // Which side of the stop line the "⏹ stopped here" label sits on.
-  // The label is ~330px at fontSize 11; a stop late in the budget
-  // (e.g. batch 7 of 8 → stopX ≈ 700) would run the text past the
-  // 1000px viewBox and clip it — flip to the left of the line when the
-  // right side would clip (the flipped text ends at stopX - 8 - 330,
-  // still inside the plot for any stopX past the flip threshold, and
-  // a stop at the FINAL batch puts the line at the plot's right edge
+  // stopTextW is the label's EXPORT width — estimateTextW folds in the
+  // ×1.25 PAPER_FONT_BUMP the export pipeline applies to font sizes
+  // while positions stay fixed, so the flip/intrude decisions below
+  // must budget the bumped text or exported SVGs clip/collide (audit
+  // S2; the old hardcoded 330 was the unbumped width). A stop late in
+  // the budget would run the text past the 1000px viewBox and clip it
+  // — flip to the left of the line when the right side would clip
+  // (a stop at the FINAL batch puts the line at the plot's right edge
   // → always flipped). A non-flipped label can still legitimately
-  // extend past the plot edge into the right-margin readout column
-  // (F0: stopX ≈ 520, text ends ≈ 858 > column x 802); that overlap
-  // is resolved VERTICALLY by stopIntrudes below, not by flipping
-  // earlier — the label reads best pointing into the unspent region
-  // it annotates.
-  const stopTextW = 330;
+  // extend past the plot edge into the right-margin readout column;
+  // that overlap is resolved VERTICALLY by stopIntrudes below, not by
+  // flipping earlier — the label reads best pointing into the unspent
+  // region it annotates.
+  const stopLabel = `⏹ stopped here — target reached at ${fmtShots(
+    s.shotsExecuted ?? 0,
+  )} of ${fmtShots(s.shotsRequested)} shots`;
+  const stopTextW = estimateTextW(stopLabel.length, 11);
   const stopLabelFlip = stopX != null && stopX + 8 + stopTextW > W - 4;
 
   // Right-margin readout placement — the panel's LAYOUT CONTRACT:
@@ -501,7 +506,10 @@ function Panel({
         {s.label}
         <title>{GLOSSARY.fidelity}</title>
       </text>
-      <text x={M.l} y={22} dx={8 * s.label.length + 14} fontSize={11} fill="rgb(var(--color-mute))">
+      {/* dx budgets the EXPORT width of the 14px title to its left —
+          estimateTextW folds in PAPER_FONT_BUMP so the bumped title
+          can't overprint this subtitle in figures (audit S2). */}
+      <text x={M.l} y={22} dx={estimateTextW(s.label.length, 14) + 14} fontSize={11} fill="rgb(var(--color-mute))">
         {titleBits}
       </text>
 
@@ -554,7 +562,7 @@ function Panel({
           <rect x={stopX} y={M.t} width={M.l + plotW - stopX} height={plotH} fill="rgb(var(--color-mute))" opacity={0.05} />
           <line x1={stopX} x2={stopX} y1={M.t - 4} y2={axisY} stroke="rgb(var(--color-warn))" strokeWidth={1.5} strokeDasharray="5 3" />
           <text x={stopLabelFlip ? stopX - 8 : stopX + 8} textAnchor={stopLabelFlip ? "end" : "start"} y={M.t + 12} fontSize={11} fontWeight={600} fill="rgb(var(--color-warn))">
-            ⏹ stopped here — target reached at {fmtShots(s.shotsExecuted ?? 0)} of {fmtShots(s.shotsRequested)} shots
+            {stopLabel}
             <title>{GLOSSARY.precisionTarget}</title>
           </text>
           <text x={stopLabelFlip ? stopX - 8 : stopX + 8} textAnchor={stopLabelFlip ? "end" : "start"} y={M.t + 26} fontSize={10} fill="rgb(var(--color-mute))">
@@ -692,21 +700,37 @@ function Panel({
           — hardware timing differs. Rendered only when a duration is
           actually known, so archived traces without timing show no
           made-up price. */}
-      {anchor != null && (
-        <text
-          data-marker="cost-anchor"
-          x={M.l}
-          y={axisY + (gaps.length > 0 ? 73 : 58)}
-          fontSize={9}
-          fill="rgb(var(--color-mute))"
-          opacity={0.9}
-        >
-          on IBM pay-as-you-go this evidence ≈ {anchor.usd} (est. at
-          $1.60/s hardware time) · ≈{anchor.freeTierPct} of a free-tier
-          month (10 min/28d) — simulator wall-time as proxy; hardware
-          timing differs
-        </text>
-      )}
+      {anchor != null &&
+        (() => {
+          const l1 = `on IBM pay-as-you-go this evidence ≈ ${anchor.usd} (est. at $1.60/s hardware time)`;
+          const l2 = `· ≈${anchor.freeTierPct} of a free-tier month (10 min/28d) — simulator wall-time as proxy; hardware timing differs`;
+          const oneLine = `${l1} ${l2}`;
+          // Split into two tspans when the EXPORT-bumped width would
+          // run past the panel edge (audit S2: the single line clipped
+          // in exported SVGs once PAPER_FONT_BUMP grew it ×1.25).
+          const split = estimateTextW(oneLine.length, 9) > W - M.l - 8;
+          return (
+            <text
+              data-marker="cost-anchor"
+              x={M.l}
+              y={axisY + (gaps.length > 0 ? 73 : 58)}
+              fontSize={9}
+              fill="rgb(var(--color-mute))"
+              opacity={0.9}
+            >
+              {split ? (
+                <>
+                  <tspan x={M.l}>{l1}</tspan>
+                  <tspan x={M.l} dy={11}>
+                    {l2}
+                  </tspan>
+                </>
+              ) : (
+                oneLine
+              )}
+            </text>
+          );
+        })()}
     </g>
   );
 }
@@ -920,7 +944,7 @@ function OverlayPanel({
         {a.label}
         <title>{GLOSSARY.fidelity}</title>
       </text>
-      <text x={M.l} y={22} dx={8 * a.label.length + 14} fontSize={11} fill="rgb(var(--color-mute))">
+      <text x={M.l} y={22} dx={estimateTextW(a.label.length, 14) + 14} fontSize={11} fill="rgb(var(--color-mute))">
         overlay — A {fmtPct(lastA.point, 2)} ±{fmtPp((lastA.hi - lastA.lo) / 2, 2)} · B {fmtPct(lastB.point, 2)} ±{fmtPp((lastB.hi - lastB.lo) / 2, 2)}
       </text>
 
@@ -1183,7 +1207,11 @@ export function EvidenceTheater() {
   const panelH = overlayActive ? 460 : series.length > 1 ? 250 : 460;
   // Overlay header carries a second line (the per-run A/B legend).
   const headH = overlayActive ? 52 : 34;
-  const svgH = headH + (overlayActive ? 1 : Math.max(1, series.length)) * panelH;
+  // +14 bottom pad: a split cost-anchor line (see FunnelPanel) adds an
+  // 11px second line below the last panel's baseline — without the pad
+  // it would clip at the svg edge in the last panel.
+  const svgH =
+    headH + (overlayActive ? 1 : Math.max(1, series.length)) * panelH + 14;
   const circuitLabel = overlayActive
     ? overlayRecs?.[0].sample_key ?? overlayRecs?.[0].circuit_name ?? "circuit"
     : sampleKey ?? circuit?.name ?? "circuit";

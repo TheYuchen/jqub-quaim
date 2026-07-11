@@ -781,6 +781,7 @@ export function MultiverseBoard() {
         {!hintVisible && (
           <button
             type="button"
+            data-export-strip
             className="shrink-0 p-0.5 rounded text-mute hover:text-ink hover:bg-surfaceAlt"
             title="Show the board orientation hint (what a card is and what Open / A/B do)"
             aria-label="Show board orientation hint"
@@ -826,6 +827,7 @@ export function MultiverseBoard() {
         <div
           className="multiverse-hint flex items-center gap-2 border-b border-edge/60 bg-surfaceAlt/40 px-3 py-1.5 text-[11px] text-mute"
           role="note"
+          data-export-strip
           data-marker="multiverse-hint"
           aria-label="Board orientation hint"
         >

@@ -40,6 +40,17 @@ import { useApp } from "./store";
  *  because they clicked "Clear demo data". Never auto-import again. */
 const DECIDED_FLAG = "quda-demo-decided";
 
+/** Honesty flag (audit S2): true when the demo archive was re-imported
+ *  by a scenario boot's `force` on a browser that had already decided
+ *  (typically: the user CLEARED demo data, then opened a documented
+ *  ?scenario= figure link). The demo banner turns this into an explicit
+ *  "re-imported for this figure" notice instead of pretending the
+ *  archive was there all along. Session-scoped by design. */
+let scenarioReimported = false;
+export function demoReimportedForScenario(): boolean {
+  return scenarioReimported;
+}
+
 /** Shape of one entry in src/data/demoArchive.json (produced by the
  *  archive-generation script; see docs/EVIDENCE_WORKBENCH.md). */
 interface DemoEntry {
@@ -92,7 +103,8 @@ export async function ensureDemoArchive(
   } = {},
 ): Promise<boolean> {
   const { force = false } = opts;
-  if (!force && isDecided()) return false;
+  const decidedBefore = isDecided();
+  if (!force && decidedBefore) return false;
   try {
     if (force) {
       const existing = await listRuns(1000);
@@ -135,6 +147,7 @@ export async function ensureDemoArchive(
       rec.demo = true;
       await saveRun(rec);
     }
+    if (force && decidedBefore) scenarioReimported = true;
     markDecided();
     useApp.getState().bumpHistoryVersion();
     return true;
@@ -149,6 +162,7 @@ export async function ensureDemoArchive(
  *  clearing is permanent for this browser (no auto re-import). */
 export async function clearDemoRuns(): Promise<void> {
   markDecided();
+  scenarioReimported = false;
   try {
     const all = await listRuns(1000);
     for (const r of all) {

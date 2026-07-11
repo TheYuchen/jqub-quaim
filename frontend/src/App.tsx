@@ -4,7 +4,7 @@ import "@xyflow/react/dist/style.css";
 import { PanelLeft, PanelRight } from "lucide-react";
 import { api } from "./lib/api";
 import { getUserId } from "./lib/userId";
-import { useApp } from "./lib/store";
+import { theaterAutoOpenEnabled, useApp } from "./lib/store";
 import { ensureDemoArchive } from "./lib/demoArchive";
 import { useIsDesktop, useMediaQuery } from "./lib/useMediaQuery";
 import { TopBar } from "./components/TopBar";
@@ -216,7 +216,12 @@ export default function App() {
       } else if (band) {
         // Band: surface progress as the overlay — the in-flow pane
         // must not take layout width here (RESPONSIVE CONTRACT).
-        setBandEvidenceOpen(true);
+        // UNLESS the Evidence theater will auto-open on this run's
+        // first streaming frame: stacking both overlays buried the
+        // board under two layers (audit S2). With theater auto-open
+        // disabled, this overlay stays the band's only progress
+        // surface and still opens.
+        if (!theaterAutoOpenEnabled()) setBandEvidenceOpen(true);
       } else if (rightCollapsed) {
         setRightCollapsed(false);
       }
@@ -515,7 +520,11 @@ export default function App() {
       )}
       <WelcomeTour open={tourOpen} onClose={() => setTourOpen(false)} />
       {!ready && (
-        <div className="absolute inset-0 bg-canvas/80 flex items-center justify-center backdrop-blur">
+        // z-50: the boot overlay must paint over EVERYTHING (board
+        // z-20, theater z-30, header z-40) — without it the connecting
+        // state showed through whichever surface stacked higher
+        // (audit S2).
+        <div className="absolute inset-0 z-50 bg-canvas/80 flex items-center justify-center backdrop-blur">
           <div className="text-mute text-sm">Connecting to compute backend…</div>
         </div>
       )}

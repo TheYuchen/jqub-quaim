@@ -76,6 +76,7 @@ import {
 } from "../lib/stats";
 import { hashHue, hueCss } from "../lib/hues";
 import { GLOSSARY } from "../lib/glossary";
+import { estimateTextW } from "../lib/svgPaper";
 import { FigureExportButton } from "./FigureExportButton";
 import { TipIcon } from "./TipIcon";
 
@@ -264,17 +265,24 @@ function ppTickStep(span: number): number {
 // the chart
 // ---------------------------------------------------------------------------
 
-const W = 760;
+/** Export-path viewBox width — the documented F8 figure geometry.
+ *  The pane render passes a container-derived width instead (two-tier,
+ *  audit S2) so labels keep ≥9px effective size in narrow panes. */
+const EXPORT_W = 760;
 const H = 312;
 const M = { l: 58, r: 168, t: 62, b: 56 };
 
 function Chart({
   data,
+  w = EXPORT_W,
 }: {
   data: Extract<NonNullable<DifferenceData>, { status: "ready" }>;
+  /** viewBox width. Pane renders derive it from the container; the
+   *  hidden export twin keeps the documented EXPORT_W geometry. */
+  w?: number;
 }) {
   const { steps, verdict, a, b } = data;
-  const plotW = W - M.l - M.r;
+  const plotW = w - M.l - M.r;
   const plotH = H - M.t - M.b;
   const axisY = M.t + plotH;
   const final = verdict.final;
@@ -321,7 +329,7 @@ function Chart({
   // would run into the right readout column (same flip rule as the
   // theater's stop annotation).
   const EST_TEXT_W = 340;
-  const estFlip = est != null && x(est.shots) + 8 + EST_TEXT_W > W - M.r;
+  const estFlip = est != null && x(est.shots) + 8 + EST_TEXT_W > w - M.r;
   const LOST_TEXT_W = 350;
   const lostFlip = lost != null && x(lost.shots) - 8 - LOST_TEXT_W < M.l;
 
@@ -361,7 +369,7 @@ function Chart({
 
   return (
     <svg
-      viewBox={`0 0 ${W} ${H}`}
+      viewBox={`0 0 ${w} ${H}`}
       width="100%"
       style={{ maxWidth: 900, display: "block" }}
       xmlns="http://www.w3.org/2000/svg"
@@ -374,13 +382,38 @@ function Chart({
         Δ(B−A) fidelity, all archived replicates
         <title>{GLOSSARY.differenceInterval}</title>
       </text>
-      <text x={M.l} y={36} fontSize={10.5} fontFamily="ui-monospace, monospace">
-        <tspan fill={hueCss(hashHue(a.configHash), 0.95)}>●</tspan>
-        <tspan dx={4} fill="rgb(var(--color-mute))">{legendSide("A", a)}</tspan>
-        <tspan dx={16} fill={hueCss(hashHue(b.configHash), 0.95)}>●</tspan>
-        <tspan dx={4} fill="rgb(var(--color-mute))">{legendSide("B", b)}</tspan>
-        <title>{GLOSSARY.configuration}</title>
-      </text>
+      {(() => {
+        const la = legendSide("A", a);
+        const lb = legendSide("B", b);
+        // One line only when both sides fit the current width (the
+        // estimate budgets the export font bump); otherwise stack —
+        // at pane-tier widths a single line clipped B entirely.
+        const oneLine =
+          estimateTextW(la.length + lb.length + 6, 10.5) + 24 <=
+          w - M.l - 8;
+        return oneLine ? (
+          <text x={M.l} y={36} fontSize={10.5} fontFamily="ui-monospace, monospace">
+            <tspan fill={hueCss(hashHue(a.configHash), 0.95)}>●</tspan>
+            <tspan dx={4} fill="rgb(var(--color-mute))">{la}</tspan>
+            <tspan dx={16} fill={hueCss(hashHue(b.configHash), 0.95)}>●</tspan>
+            <tspan dx={4} fill="rgb(var(--color-mute))">{lb}</tspan>
+            <title>{GLOSSARY.configuration}</title>
+          </text>
+        ) : (
+          <>
+            <text x={M.l} y={34} fontSize={10.5} fontFamily="ui-monospace, monospace">
+              <tspan fill={hueCss(hashHue(a.configHash), 0.95)}>●</tspan>
+              <tspan dx={4} fill="rgb(var(--color-mute))">{la}</tspan>
+              <title>{GLOSSARY.configuration}</title>
+            </text>
+            <text x={M.l} y={47} fontSize={10.5} fontFamily="ui-monospace, monospace">
+              <tspan fill={hueCss(hashHue(b.configHash), 0.95)}>●</tspan>
+              <tspan dx={4} fill="rgb(var(--color-mute))">{lb}</tspan>
+              <title>{GLOSSARY.configuration}</title>
+            </text>
+          </>
+        );
+      })()}
 
       {/* Δ gridlines */}
       {gridVals.map((v) => (
@@ -525,10 +558,10 @@ function Chart({
       )}
 
       {/* final readout, right margin */}
-      <text x={W - M.r + 10} y={readoutY} fontSize={11} fontWeight={600} fill={readout.headFill}>
-        <tspan x={W - M.r + 10}>{readout.head}</tspan>
+      <text x={w - M.r + 10} y={readoutY} fontSize={11} fontWeight={600} fill={readout.headFill}>
+        <tspan x={w - M.r + 10}>{readout.head}</tspan>
         {readout.lines.map((l, i) => (
-          <tspan key={i} x={W - M.r + 10} dy={13} fontWeight={400} fill="rgb(var(--color-mute))">
+          <tspan key={i} x={w - M.r + 10} dy={13} fontWeight={400} fill="rgb(var(--color-mute))">
             {l}
           </tspan>
         ))}
@@ -563,6 +596,12 @@ function Chart({
 export function DifferenceFunnel({ data }: { data: DifferenceData }) {
   const setDifferenceRunIds = useApp((s) => s.setDifferenceRunIds);
   const svgHost = useRef<HTMLDivElement | null>(null);
+  const exportHost = useRef<HTMLDivElement | null>(null);
+  // Pane tier of the two-tier viewBox width (audit S2): track the host
+  // width so the visible chart's viewBox ≈ container width and its
+  // 9.5-12.5px labels render at (near-)native size instead of being
+  // scaled to ~5px in a narrow Evidence pane.
+  const [hostW, setHostW] = useState<number | null>(null);
   const ready = data != null && data.status === "ready" ? data : null;
   const runIdsKey = ready ? ready.runIds.join(",") : null;
 
@@ -578,6 +617,19 @@ export function DifferenceFunnel({ data }: { data: DifferenceData }) {
     () => (data != null && data.status === "insufficient" ? data : null),
     [data],
   );
+
+  const hasChart = ready != null;
+  useEffect(() => {
+    const el = svgHost.current;
+    if (!hasChart || el == null || typeof ResizeObserver === "undefined")
+      return;
+    const ro = new ResizeObserver((entries) => {
+      const cw = entries[0]?.contentRect.width;
+      if (cw) setHostW(Math.round(cw));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasChart]);
 
   if (data == null || data.status === "same-config") return null;
 
@@ -622,6 +674,10 @@ export function DifferenceFunnel({ data }: { data: DifferenceData }) {
   }
 
   if (!ready) return null;
+  // Pane tier: viewBox ≈ container (floored at 420 so the readout
+  // column can't crush the plot); export tier stays EXPORT_W.
+  const chartW =
+    hostW == null ? EXPORT_W : Math.min(EXPORT_W, Math.max(420, hostW));
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-1.5">
@@ -632,7 +688,7 @@ export function DifferenceFunnel({ data }: { data: DifferenceData }) {
         <span className="ml-auto">
           <FigureExportButton
             getTarget={() =>
-              svgHost.current?.querySelector("svg") as SVGSVGElement | null
+              exportHost.current?.querySelector("svg") as SVGSVGElement | null
             }
             name="difference-funnel"
             view="evidence-compare"
@@ -640,6 +696,26 @@ export function DifferenceFunnel({ data }: { data: DifferenceData }) {
         </span>
       </div>
       <div ref={svgHost}>
+        <Chart data={ready} w={chartW} />
+      </div>
+      {/* Hidden export twin at the documented EXPORT_W geometry (audit
+          S2: pane scaling must not change exported figures). Offscreen
+          but rendered, so computed styles resolve for the true-SVG
+          serializer; data-export-strip keeps it out of whole-pane
+          exports (the funnel's own export button above targets it
+          directly). */}
+      <div
+        ref={exportHost}
+        data-export-strip
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: -99999,
+          top: 0,
+          width: EXPORT_W,
+          pointerEvents: "none",
+        }}
+      >
         <Chart data={ready} />
       </div>
       {/* legend line (HTML so it stays legible at pane scale) */}
