@@ -135,15 +135,17 @@ export function runPreflight(input: PreflightInput): PreflightFinding[] {
       });
     }
 
-    // 3. QuCAD needs a backend upstream (it uses a noise model).
-    //    Without one, the runner falls back to a default Fake — fine,
-    //    but worth flagging.
+    // 3. QuCAD REQUIRES a backend upstream: the runtime handler
+    //    (_handle_qucad) hard-errors without ctx["backend"] — the
+    //    FakeFez soft-fallback exists only for QuBound/CompressVQC.
+    //    Same truth autoConnect's warning tells ("requires a backend
+    //    node upstream and will error at run time").
     if (kind === "qucad") {
       const backend = findUpstream(n.id, incoming, (pid) => familyOf(pid) === "backend");
       if (!backend) {
         findings.push({
-          severity: "warn",
-          message: "QuCAD has no backend upstream; it will use the default FakeFez.",
+          severity: "error",
+          message: "QuCAD needs a backend node upstream — it will error at run time.",
           node_id: n.id,
         });
       }

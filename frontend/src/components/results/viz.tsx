@@ -50,11 +50,15 @@ export function Gauge({
   // Color bands.
   const good = inverted ? v >= 0.95 : v < 0.05;
   const mid = inverted ? v >= 0.8 && v < 0.95 : v >= 0.05 && v < 0.15;
+  // Theme tokens are raw RGB triplets ("45 212 191"), not colors —
+  // they must be wrapped in rgb(...) or the declaration is invalid CSS
+  // and the fill renders as NOTHING (cf. RibbonEdge's
+  // rgb(var(--color-ok)) pattern).
   const color = good
-    ? "var(--color-ok, #2dd4bf)"
+    ? "rgb(var(--color-ok))"
     : mid
-      ? "var(--color-warn, #f4a261)"
-      : "var(--color-danger, #f72585)";
+      ? "rgb(var(--color-warn))"
+      : "rgb(var(--color-danger))";
   return (
     <div className="w-32 shrink-0">
       <div className="relative h-2.5 w-full rounded-full bg-canvas border border-edge overflow-hidden">
