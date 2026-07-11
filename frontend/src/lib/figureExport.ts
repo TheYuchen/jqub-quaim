@@ -30,8 +30,12 @@
 //     as the always-works fallback — explicit pixel dimensions
 //     (css px × scale, never devicePixelRatio), 2.5× by default, 4×
 //     via alt/⌥-click or long-press on the camera button.
-//   Both paths also download a `<name>.provenance.json` sidecar with
+//   Both paths also write a `<base>.provenance.json` sidecar carrying
 //   the same JSON that is embedded in the SVG <metadata> element.
+//   Everything ships as ONE `<base>.bundle.zip` download (lib/zip.ts,
+//   STORE method, no deps): three separate programmatic downloads
+//   from a single click could trip browser multi-download blocking,
+//   which silently dropped the sidecar and/or the PNG.
 //
 // Paper styling transform applied to the clone:
 //   * forced light/white background (the theme attribute is lifted for
@@ -52,6 +56,7 @@ import {
   finalizeSvgMarkup,
   inlinePresentation,
 } from "./svgPaper";
+import { buildZip, type ZipEntry } from "./zip";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
@@ -461,12 +466,16 @@ function rasterize(
 // ---------------------------------------------------------------------------
 
 /**
- * Export `target` as a paper figure. Downloads (base name is
- * `<view>_<scenario|runid>[_batchK]` so the filename itself names the
- * recipe that regenerates the figure):
+ * Export `target` as a paper figure. Downloads ONE `<base>.bundle.zip`
+ * (base name is `<view>_<scenario|runid>[_batchK]` so the filename
+ * itself names the recipe that regenerates the figure) containing:
  *   <base>.svg              — vector (true-SVG or foreignObject hybrid)
  *   <base>_<scale>x.png     — explicit-pixel raster (hybrid targets only)
  *   <base>.provenance.json  — the same provenance embedded in the SVG
+ * One download per click by design (audit backlog): the old triple
+ * download tripped multi-download blocking on strict browsers. The
+ * zip is STORE-method (lib/zip.ts); the SVG keeps its embedded
+ * provenance <metadata> unchanged, zipped or not.
  */
 export async function exportFigure(
   target: HTMLElement | SVGSVGElement,
@@ -491,32 +500,34 @@ export async function exportFigure(
   const base =
     (slug ? `${opts.name}_${slug}` : opts.name) +
     (opts.tracePosition != null ? `_batch${opts.tracePosition}` : "");
+  const enc = new TextEncoder();
+  const files: ZipEntry[] = [];
   await withLightTheme(async () => {
     if (target instanceof SVGSVGElement) {
       const svgString = serializeSvgNative(target, provenance);
-      download(
-        new Blob([svgString], { type: "image/svg+xml;charset=utf-8" }),
-        `${base}.svg`,
-      );
+      files.push({ name: `${base}.svg`, data: enc.encode(svgString) });
     } else {
       const { svg, width, height } = serializeHtmlHybrid(target, provenance);
-      download(
-        new Blob([svg], { type: "image/svg+xml;charset=utf-8" }),
-        `${base}.svg`,
-      );
+      files.push({ name: `${base}.svg`, data: enc.encode(svg) });
       try {
         const png = await rasterize(svg, width, height, scale);
-        download(png, `${base}_${scale}x.png`);
+        files.push({
+          name: `${base}_${scale}x.png`,
+          data: new Uint8Array(await png.arrayBuffer()),
+        });
       } catch {
         // foreignObject rasterization can fail on exotic browsers —
-        // the SVG + sidecar still landed, so don't fail the export.
+        // the SVG + sidecar still land in the bundle, so don't fail
+        // the export.
       }
     }
   });
+  files.push({
+    name: `${base}.provenance.json`,
+    data: enc.encode(JSON.stringify(provenance, null, 2)),
+  });
   download(
-    new Blob([JSON.stringify(provenance, null, 2)], {
-      type: "application/json",
-    }),
-    `${base}.provenance.json`,
+    new Blob([buildZip(files)], { type: "application/zip" }),
+    `${base}.bundle.zip`,
   );
 }

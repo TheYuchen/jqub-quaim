@@ -16,8 +16,3 @@ deferred.
 
 ## Infra
 
-- figure export triple-download can be popup-blocked (SVG + PNG +
-  provenance sidecar are three programmatic downloads from one click)
-  [deferred — needs a packaging decision: zip the three artifacts
-  (new dependency), drop to two downloads, or stage sequential
-  prompts. Each changes the documented export contract.]

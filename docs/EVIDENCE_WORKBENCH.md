@@ -901,9 +901,10 @@ the run to finish, then export three states —
 | 2 | batch 4 of 5 | funnel narrowing, still outside ±2pp | 2,048 shots, point 0.4878, ±2.16pp |
 | 3 | final | ⏹ stop + unspent budget | 2,560 of 4,096 shots, point 0.484375, ±1.93pp ≤ target |
 
-Files land as `evidence-theater_F0_batch2.svg`, `_batch4.svg`,
-`evidence-theater_F0.svg` — each regenerable from its own embedded
-provenance (scenario key + seed + trace_position).
+Files land as `evidence-theater_F0_batch2.bundle.zip`,
+`_batch4.bundle.zip`, `evidence-theater_F0.bundle.zip` (each bundle
+holds the .svg + .provenance.json) — each regenerable from its own
+embedded provenance (scenario key + seed + trace_position).
 
 ### Illustrator-grade true-SVG export
 
@@ -960,9 +961,18 @@ is 2.5× on every machine. Default 2.5×; **4× print-resolution via
 alt/⌥-click or press-and-hold (≥550 ms) on any camera button**.
 
 File naming ties every artifact to its regeneration recipe:
-`<view>_<scenario|runid>[_batchK]` as the base —
-`<base>.svg`, `<base>_<scale>x.png`, `<base>.provenance.json`
-(e.g. `multiverse_F2_4x.png`, `evidence-theater_F0_batch2.svg`).
+`<view>_<scenario|runid>[_batchK]` as the base. A camera click
+downloads ONE `<base>.bundle.zip` (STORE-method writer in
+frontend/src/lib/zip.ts — pure JS, no dependency; CRC-32 and
+python-zipfile interop asserted by the check_zip node lane)
+containing `<base>.svg`, `<base>_<scale>x.png` (hybrid/raster path
+only) and `<base>.provenance.json` — e.g. `multiverse_F2.bundle.zip`
+holding `multiverse_F2_4x.png`, or
+`evidence-theater_F0_batch2.bundle.zip` holding
+`evidence-theater_F0_batch2.svg`. One download per click by design
+(audit backlog): three programmatic downloads from one click could
+trip browser multi-download blocking, silently dropping the sidecar
+and/or PNG. The in-SVG provenance `<metadata>` is unchanged.
 The slug prefers the active scenario key (now recorded by the
 scenario loader and embedded as `provenance.scenario`), falling back
 to the first visible run_id.
@@ -995,9 +1005,10 @@ Flow HTML/SVG composite (raster-only as a whole).
 4. Provenance `<metadata id="provenance">` embedded (app version,
    export time, scenario key, run_ids/root_seeds/config_hashes,
    SharePayload graph, trace_position when scrubbed) + the
-   `.provenance.json` sidecar for raster-only use. Note: Illustrator
-   may drop `<metadata>` on re-save — the sidecar is the durable
-   copy; keep it next to the .ai file.
+   `.provenance.json` sidecar (inside the export's .bundle.zip) for
+   raster-only use. Note: Illustrator may drop `<metadata>` on
+   re-save — the sidecar is the durable copy; keep it next to the
+   .ai file.
 
 ## UX comprehension + polish wave (SHIPPED 2026-07-06)
 

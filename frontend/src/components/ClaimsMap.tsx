@@ -98,7 +98,7 @@ const SECTIONS: ClaimSection[] = [
       },
       {
         claim: "Provenance-backed figures — every export regenerates bit-exactly from its own metadata",
-        where: "Camera buttons on the canvas, Evidence board, evidence pane and theater (SVG + PNG + sidecar)",
+        where: "Camera buttons on the canvas, Evidence board, evidence pane and theater (one .bundle.zip: SVG + PNG + sidecar)",
         scenarios: ["F0"],
       },
     ],

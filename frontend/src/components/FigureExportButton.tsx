@@ -5,7 +5,8 @@ import { exportFigure } from "../lib/figureExport";
 
 /**
  * Small camera button that exports its host view as a paper figure
- * (SVG + PNG + .provenance.json sidecar — see lib/figureExport.ts).
+ * (one .bundle.zip: SVG + PNG + .provenance.json sidecar — see
+ * lib/figureExport.ts).
  * Placed on the canvas toolbar, the Multiverse board header, the
  * Evidence pane header and the Evidence theater. The button itself
  * never appears in exports (figureExport strips all <button>
@@ -27,7 +28,7 @@ export function FigureExportButton({
 }: {
   /** Resolve the DOM subtree to export at click time. */
   getTarget: () => HTMLElement | SVGSVGElement | null;
-  /** Download basename (also names the provenance sidecar). */
+  /** Download basename (names the bundle zip and its contents). */
   name: string;
   /** Provenance view key: canvas | multiverse | evidence-<tab>. */
   view: string;
@@ -115,7 +116,7 @@ export function FigureExportButton({
       onPointerCancel={pressCancel}
       data-marker="figure-export"
       className={`btn ${className}`}
-      title="Export this view as a paper figure: SVG + PNG with embedded provenance (run ids, seeds, config hashes, graph) + a .provenance.json sidecar. Alt/⌥-click or press-and-hold for the 4× print-resolution PNG (default 2.5×)."
+      title="Export this view as a paper figure: one .bundle.zip holding the SVG + PNG with embedded provenance (run ids, seeds, config hashes, graph) + a .provenance.json sidecar. Alt/⌥-click or press-and-hold for the 4× print-resolution PNG (default 2.5×)."
       aria-label="Export figure"
     >
       <Icon
