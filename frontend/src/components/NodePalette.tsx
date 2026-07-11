@@ -83,9 +83,16 @@ export function NodePalette() {
       bumpPluginsRev();
     } catch (err) {
       // Destructive actions failing silently look like the click
-      // didn't register. Surface the error so the user knows to retry.
+      // didn't register. Surface the error so the user knows to retry
+      // — via the global toast channel (danger = sticky), not the
+      // blocking alert() the toast idiom replaced. window.confirm
+      // stays as the guard BEFORE the delete: destructive actions
+      // still deserve a blocking yes/no.
       const msg = err instanceof Error ? err.message : String(err);
-      alert(`Could not delete plugin "${kind}": ${msg}`);
+      useApp.getState().setGlobalNotice({
+        text: `Could not delete plugin "${kind}": ${msg}`,
+        tone: "danger",
+      });
     }
   };
 

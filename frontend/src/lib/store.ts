@@ -378,6 +378,15 @@ interface AppState {
    *  scripted state ends its framing (audit S3). */
   gateDiffDefaultOpen: boolean;
   setGateDiffDefaultOpen: (v: boolean) => void;
+
+  /** Global toast channel (audit backlog: alert() vs toast idiom).
+   *  One-shot feedback from components that don't own a positional
+   *  toast of their own — the canvas Notice stays FlowCanvas-local
+   *  because it is positionally contextual to the canvas. App.tsx
+   *  renders the host (fixed bottom-center, z-50): ok fades after
+   *  4s, warn after 8s, danger sticks until dismissed. */
+  globalNotice: { text: string; tone: "ok" | "warn" | "danger" } | null;
+  setGlobalNotice: (n: AppState["globalNotice"]) => void;
 }
 
 export const useApp = create<AppState>((set) => ({
@@ -551,4 +560,6 @@ export const useApp = create<AppState>((set) => ({
     set((s) => ({ hintExpandRightPane: s.hintExpandRightPane + 1 })),
   gateDiffDefaultOpen: false,
   setGateDiffDefaultOpen: (v) => set({ gateDiffDefaultOpen: v }),
+  globalNotice: null,
+  setGlobalNotice: (n) => set({ globalNotice: n }),
 }));

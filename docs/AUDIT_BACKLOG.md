@@ -10,12 +10,6 @@ deferred.
 
 ## FlowCanvas
 
-- NodePalette alert()/confirm() inconsistent with the toast idiom
-  [deferred — needs a global toast channel; the canvas Notice is
-  FlowCanvas-local state, and inventing a cross-component notification
-  bridge is a design decision. The search aria-label half of the
-  original finding was fixed in Wave 3; window.confirm stays as the
-  blocking guard for destructive plugin deletes.]
 - share-hash boot ignores plugin defaults [deferred — plugin manifests
   load async AFTER buildInitialGraph runs, so the boot path cannot
   resolve plugin defaultData; merging them retroactively needs a

@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { PanelLeft, PanelRight } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  Check,
+  PanelLeft,
+  PanelRight,
+  X,
+} from "lucide-react";
 import { api } from "./lib/api";
 import { getUserId } from "./lib/userId";
 import { theaterAutoOpenEnabled, useApp } from "./lib/store";
@@ -548,6 +555,7 @@ export default function App() {
         </div>
       )}
       <WelcomeTour open={tourOpen} onClose={() => setTourOpen(false)} />
+      <GlobalToastHost />
       {!ready && (
         // z-50: the boot overlay must paint over EVERYTHING (board
         // z-20, theater z-30, header z-40) — without it the connecting
@@ -691,5 +699,71 @@ function PaneResizer({
       }}
       className="group shrink-0 w-1 cursor-col-resize touch-none bg-edge/40 hover:bg-accent/60 active:bg-accent focus-visible:bg-accent focus-visible:outline-none transition-colors"
     />
+  );
+}
+
+
+/**
+ * Global toast host (audit backlog: NodePalette's alert() was the one
+ * hold-out against the toast idiom). Renders the store's
+ * `globalNotice` fixed to the bottom-center of the VIEWPORT at z-50
+ * (above drawers and both overlays) — the channel for feedback from
+ * components that don't own a positional toast. The canvas keeps its
+ * own FlowCanvas-local Notice: that one is positionally contextual
+ * (anchored inside the canvas, clearing the Run FAB) and works.
+ * Styling mirrors that canvas toast: same tone palette, auto-fade
+ * ok=4s / warn=8s, danger sticky until explicitly dismissed (every
+ * tone gets the x).
+ */
+function GlobalToastHost() {
+  const notice = useApp((s) => s.globalNotice);
+  const setGlobalNotice = useApp((s) => s.setGlobalNotice);
+  useEffect(() => {
+    if (!notice || notice.tone === "danger") return;
+    const ms = notice.tone === "ok" ? 4000 : 8000;
+    const t = window.setTimeout(() => setGlobalNotice(null), ms);
+    return () => window.clearTimeout(t);
+  }, [notice, setGlobalNotice]);
+  if (!notice) return null;
+  const palette = {
+    ok: {
+      border: "border-ok/40",
+      bg: "bg-ok/10",
+      icon: <Check className="w-4 h-4 text-ok" />,
+    },
+    warn: {
+      border: "border-warn/40",
+      bg: "bg-warn/10",
+      icon: <AlertTriangle className="w-4 h-4 text-warn" />,
+    },
+    danger: {
+      border: "border-danger/40",
+      bg: "bg-danger/10",
+      icon: <AlertCircle className="w-4 h-4 text-danger" />,
+    },
+  }[notice.tone];
+  return (
+    <div
+      role={notice.tone === "danger" ? "alert" : "status"}
+      aria-live={notice.tone === "danger" ? "assertive" : "polite"}
+      // Clear the iOS home indicator. The canvas toast's extra Run-FAB
+      // clearance doesn't apply here: this host overlays the app frame,
+      // not the canvas column.
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)" }}
+      className={`fixed left-1/2 -translate-x-1/2 z-50 w-[min(36rem,calc(100%-2rem))] rounded-lg border ${palette.border} ${palette.bg} bg-surface/95 backdrop-blur-sm shadow-xl px-4 py-3 flex items-start gap-3`}
+    >
+      <div className="shrink-0 mt-0.5">{palette.icon}</div>
+      <div className="flex-1 min-w-0 text-sm text-ink leading-snug">
+        {notice.text}
+      </div>
+      <button
+        type="button"
+        onClick={() => setGlobalNotice(null)}
+        aria-label="Dismiss notification"
+        className="shrink-0 text-mute hover:text-ink transition-colors"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
