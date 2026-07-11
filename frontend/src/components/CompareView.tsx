@@ -52,6 +52,15 @@ interface StepPair {
   b: StepResult | undefined;
 }
 
+/** Chip timestamp: time-only for today's runs, date + time otherwise
+ *  (audit S3 — cross-day pairs looked minutes apart). */
+function fmtWhen(t: number): string {
+  const d = new Date(t);
+  if (d.toDateString() === new Date().toDateString())
+    return d.toLocaleTimeString();
+  return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 /** One aligned step row. `divergence` marks the first row where the
  *  two compositions part ways — accent left border + tiny label, so
  *  the eye lands exactly where the evidence starts. */
@@ -311,9 +320,12 @@ export function CompareView() {
     if (!sameSignature(a, b)) break;
     prefixLen++;
   }
-  if (prefixLen < 2) prefixLen = 0; // folding a single row saves nothing
+  // Marker before fold decision (audit S3): zeroing prefixLen for
+  // fold economy also erased the divergence marker whenever the
+  // shared prefix was a single row.
   const divergenceIdx =
     prefixLen > 0 && prefixLen < rows.length ? prefixLen : -1;
+  if (prefixLen < 2) prefixLen = 0; // folding a single row saves nothing
 
   return (
     <div className="panel-alt p-3 space-y-2 border !border-accent/40">
@@ -323,8 +335,15 @@ export function CompareView() {
           overflow-x-hidden aside. */}
       <div className="flex flex-wrap items-center gap-2 gap-y-1">
         <span className="text-xs font-semibold text-ink">Comparing two runs</span>
-        <span className="chip">A · {new Date(A.created_at).toLocaleTimeString()}</span>
-        <span className="chip">B · {new Date(B.created_at).toLocaleTimeString()}</span>
+        {/* Date shown whenever a run is not from today (audit S3):
+            bare times made "14:02 vs 14:07" from different days read
+            as five minutes apart. Full timestamp in the tooltip. */}
+        <span className="chip" title={new Date(A.created_at).toLocaleString()}>
+          A · {fmtWhen(A.created_at)}
+        </span>
+        <span className="chip" title={new Date(B.created_at).toLocaleString()}>
+          B · {fmtWhen(B.created_at)}
+        </span>
         {A.config_hash === B.config_hash ? (
           <span className="chip !border-ok/40 !text-ok" title="Identical circuit + graph + params — any metric difference is run-to-run variation (shot noise, training stochasticity).">
             same configuration — differences are noise
@@ -387,12 +406,19 @@ export function CompareView() {
               <div className="absolute top-1 h-1.5 bg-accent/30 rounded"
                 style={{ left: `${ciA[0] * 100}%`, width: `${Math.max(0.5, (ciA[1] - ciA[0]) * 100)}%` }} />
             )}
-            <div className="absolute top-0.5 h-2.5 w-0.5 bg-accent" style={{ left: `clamp(0px, calc(${va * 100}% - 1px), calc(100% - 2px))` }} title={`A: ${(va * 100).toFixed(2)}%`} />
+            {/* 2px marks are unhoverable — a transparent 10px-wide
+                wrapper carries the tooltip (audit S3); the values are
+                also spelled out in the readout line below. */}
+            <div className="absolute top-0 h-3.5 w-2.5 flex justify-center" style={{ left: `clamp(0px, calc(${va * 100}% - 5px), calc(100% - 10px))` }} title={`A: ${(va * 100).toFixed(2)}%`}>
+              <div className="h-full w-0.5 bg-accent mt-0.5" style={{ height: "10px" }} />
+            </div>
             {ciB && (
               <div className="absolute bottom-1 h-1.5 bg-warn/30 rounded"
                 style={{ left: `${ciB[0] * 100}%`, width: `${Math.max(0.5, (ciB[1] - ciB[0]) * 100)}%` }} />
             )}
-            <div className="absolute bottom-0.5 h-2.5 w-0.5 bg-warn" style={{ left: `clamp(0px, calc(${vb * 100}% - 1px), calc(100% - 2px))` }} title={`B: ${(vb * 100).toFixed(2)}%`} />
+            <div className="absolute bottom-0 h-3.5 w-2.5 flex items-end justify-center" style={{ left: `clamp(0px, calc(${vb * 100}% - 5px), calc(100% - 10px))` }} title={`B: ${(vb * 100).toFixed(2)}%`}>
+              <div className="w-0.5 bg-warn mb-0.5" style={{ height: "10px" }} />
+            </div>
           </div>
           <div className="text-[10px] text-mute font-mono">
             A {(va * 100).toFixed(2)}% · B {(vb * 100).toFixed(2)}% · Δ(B−A){" "}
@@ -469,7 +495,9 @@ export function CompareView() {
             <CompareRow
               key={prefixLen + i}
               pair={pair}
-              divergence={divergenceIdx !== -1 && i === 0}
+              // Absolute row position, not "first rendered row": with
+              // a 1-row unfolded prefix the divergence is row 1.
+              divergence={prefixLen + i === divergenceIdx}
             />
           ))}
         </tbody>

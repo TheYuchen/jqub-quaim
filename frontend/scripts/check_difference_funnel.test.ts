@@ -13,7 +13,9 @@
 //      zero (lo > 0 and hi < 0), chronological ordering, unequal run
 //      counts (the shorter side stops growing) and unequal
 //      shots-per-run (512-shot side vs 2048-shot side pool on counts);
-//   3. replay dedup: same root seed = the same draw, pooled once;
+//   3. replay dedup: bit-exact replays (same root_seed AND same
+//      shots/successes) pooled once; the same seed with a different
+//      stopping point survives (it executed different measurements);
 //   4. the scenario-F8 numbers, derived from src/data/demoArchive.json
 //      ITSELF (not hardcoded groupings), so the scenarios.ts comment,
 //      docs/EVIDENCE_WORKBENCH.md and the bundled data cannot drift.
@@ -143,6 +145,29 @@ const ev = (
   assert.equal(t[t.length - 1].shotsA, 1024);
   // Unknown seeds are never deduped — no proof they repeat a draw.
   assert.equal(dedupeDraws([ev(1, 1, 10, null), ev(2, 1, 10, null)]).length, 2);
+  // (root_seed, shots, successes) key — audit S3 (approved): the same
+  // seed with a DIFFERENT stopping point (early-stopped replay: fewer
+  // shots) is new evidence and must survive the dedupe; only a
+  // bit-exact repetition of the whole draw collapses.
+  assert.equal(
+    dedupeDraws([ev(1, 240, 512, 7), ev(2, 120, 256, 7)]).length,
+    2,
+    "same seed, different shots (early stop) kept",
+  );
+  assert.equal(
+    dedupeDraws([ev(1, 240, 512, 7), ev(2, 241, 512, 7)]).length,
+    2,
+    "same seed+shots, different successes kept (defensive)",
+  );
+  assert.equal(
+    dedupeDraws([
+      ev(1, 240, 512, 7),
+      ev(2, 240, 512, 7),
+      ev(3, 240, 512, 7),
+    ]).length,
+    1,
+    "bit-exact replays collapse to one",
+  );
 }
 
 // -- 4. scenario F8: the bundled demo archive -----------------------------------

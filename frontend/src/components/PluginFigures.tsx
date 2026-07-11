@@ -318,6 +318,10 @@ function formatCell(c: string | number | boolean | null): string {
   if (c === null || c === undefined) return "—";
   if (typeof c === "number") {
     if (Number.isInteger(c)) return String(c);
+    // Tiny non-zeros go scientific (same convention as the results
+    // pane's fmt) — audit S3: toFixed(4) turned 3e-5 into "0.0000",
+    // which the zero-strip then printed as a flat "0".
+    if (c !== 0 && Math.abs(c) < 1e-3) return c.toExponential(2);
     return c.toFixed(4).replace(/\.?0+$/, "");
   }
   if (typeof c === "boolean") return c ? "true" : "false";
@@ -459,7 +463,12 @@ function BarBlock({
               fillOpacity="0.65"
               textAnchor="middle"
             >
-              {truncate(d.label, 10)}
+              {/* Pitch-aware truncation (audit S3): a fixed 10-char
+                  cut overlapped neighbours at every bar width (9px
+                  chars ≈ 5.5px vs a 20-42px pitch). Full label in the
+                  tooltip. */}
+              {truncate(d.label, Math.max(3, Math.floor((barW + barGap) / 5.5)))}
+              <title>{d.label}</title>
             </text>
           </g>
         );
@@ -504,12 +513,36 @@ function SvgBlock({ content }: { content: string }) {
   // Wrap in minimal HTML so the iframe knows it's rendering SVG.
   // body padding 0 + neutral background matches the rest of the card.
   const srcdoc = useMemo(() => {
+    // Theme-token bridge (audit S3): a sandboxed iframe inherits
+    // NOTHING from the host document, so `color:inherit` resolved to
+    // browser-default black and plugin SVGs using currentColor /
+    // var(--color-*) vanished on dark themes. Snapshot the host's
+    // tokens into the iframe's :root. (Snapshot is taken per srcdoc
+    // build; a live theme switch updates it on the next re-render.)
+    let tokenCss = "";
+    try {
+      const cs = getComputedStyle(document.documentElement);
+      const names = [
+        "ink", "mute", "edge", "surface", "surfaceAlt", "canvas",
+        "accent", "accent2", "accent3", "accent4", "ok", "warn", "danger",
+      ];
+      const vars = names
+        .map((t) => {
+          const v = cs.getPropertyValue(`--color-${t}`).trim();
+          return v ? `--color-${t}:${v};` : "";
+        })
+        .join("");
+      const ink = cs.getPropertyValue("--color-ink").trim();
+      tokenCss = `:root{${vars}}body{color:${ink ? `rgb(${ink})` : "inherit"}}`;
+    } catch {
+      /* non-browser env (tests) — tokens just absent */
+    }
     const css = `
-      html,body{margin:0;padding:0;background:transparent;color:inherit}
+      html,body{margin:0;padding:0;background:transparent}
       body{overflow:auto;max-width:100%}
       svg{max-width:100%;height:auto;display:block}
     `;
-    return `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${content}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><style>${css}${tokenCss}</style></head><body>${content}</body></html>`;
   }, [content]);
   // Try to extract an aspect ratio from the SVG's viewBox attribute so
   // the iframe gets a sensible height proportional to its content.

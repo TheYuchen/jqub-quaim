@@ -6,7 +6,13 @@
 // (RunHistory) and the MultiverseBoard import from here so the mapping
 // can never drift between the two.
 
-/** Stable pastel per config hash so replicate groups pop visually. */
+/** Stable pastel per config hash so replicate groups pop visually.
+ *
+ *  Collision disclosure (audit S3): 360 hue buckets ⇒ by the birthday
+ *  bound, ~50% chance of two configurations sharing a hue once ~23
+ *  are archived (and nearby hues blur earlier than that). Acceptable
+ *  because hue is a RECOGNITION aid, never an identity: every surface
+ *  that colors by hue also prints the #hash chip or tooltip. */
 export function hashHue(hash: string): number {
   let h = 0;
   for (let i = 0; i < hash.length; i++) h = (h * 31 + hash.charCodeAt(i)) >>> 0;

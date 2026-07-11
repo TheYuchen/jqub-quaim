@@ -390,6 +390,10 @@ export function SignatureCard({ step }: { step: StepResult }) {
             // largest |op delta| in THIS step (op counts are only
             // comparable within a step, unlike the channel strip)
             const pct = (Math.abs(d) / opMax) * 50;
+            // Width floor BEFORE the side offset (audit S3): floors
+            // applied at render time pushed a tiny negative bar across
+            // the centerline onto the positive side.
+            const wPct = Math.max(pct, 2);
             return (
               <div
                 key={op}
@@ -406,8 +410,8 @@ export function SignatureCard({ step }: { step: StepResult }) {
                       d < 0 ? "bg-ok/80" : "bg-warn/80"
                     }`}
                     style={{
-                      left: d < 0 ? `${50 - pct}%` : "50%",
-                      width: `${Math.max(pct, 2)}%`,
+                      left: d < 0 ? `${50 - wPct}%` : "50%",
+                      width: `${wPct}%`,
                     }}
                   />
                 </div>

@@ -157,7 +157,9 @@ interface Layout {
   /** Wave J: per-run node radius (evidence mass). */
   radius: Map<string, number>;
   /** Wave J: one cumulative-certainty funnel per replicate band with
-   *  ≥2 binomial runs. `pts` run oldest (widest) → newest. */
+   *  ≥2 binomial runs. `pts` run oldest → newest. (The WIDEST row is
+   *  usually, not always, the oldest: pooling can nudge p̂ toward ½
+   *  and briefly widen the interval — scaling keys on the widest.) */
   funnels: {
     x: number;
     hue: number;
@@ -592,6 +594,8 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
   // window, and a window must SAY it is a window (audit S2: older runs
   // silently vanished from the view with no hint they still exist).
   const [total, setTotal] = useState<number | null>(null);
+  // Archive read failed (≠ empty archive) — drives an honest message.
+  const [archiveError, setArchiveError] = useState(false);
   const [open, setOpen] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
@@ -605,7 +609,10 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
         if (!cancelled) setRecords(rs);
       })
       .catch(() => {
-        /* IndexedDB unavailable (private mode etc.) — panel stays empty */
+        // IndexedDB unavailable (private mode, blocked storage): say
+        // so — an unreadable archive must not masquerade as an empty
+        // one (audit S3).
+        if (!cancelled) setArchiveError(true);
       });
     countRuns()
       .then((n) => {
@@ -633,10 +640,22 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
             exactly where a handed-off archive file arrives. */}
         <ArchiveIO count={0} />
         <div className="p-4 text-[12px] text-mute leading-relaxed">
-          No archived runs yet. Every run is archived here automatically,
-          seed included — run the pipeline once and it will appear, ready
-          to restore, replay (exact numbers), or compare. Or import an
-          archive file exported from another device.
+          {archiveError ? (
+            <>
+              The run archive can't be read in this browser (private
+              browsing or blocked storage). Runs still execute, but
+              nothing can be archived, restored or compared until
+              storage is available.
+            </>
+          ) : (
+            <>
+              No archived runs yet. Every run is archived here
+              automatically, seed included — run the pipeline once and
+              it will appear, ready to restore, replay (exact numbers),
+              or compare. Or import an archive file exported from
+              another device.
+            </>
+          )}
         </div>
       </div>
     ) : null;
@@ -885,6 +904,16 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                           title="Delete this record"
                           aria-label="Delete run record"
                           onClick={() => {
+                            // Only copy of the evidence (audit S3): a
+                            // single click destroyed it with no undo.
+                            // Blocking confirm = the palette's plugin-
+                            // delete idiom.
+                            if (
+                              !window.confirm(
+                                "Delete this run record? This browser holds the only copy — export the archive first if you might need it.",
+                              )
+                            )
+                              return;
                             void deleteRun(r.run_id).then(() => {
                               const st = useApp.getState();
                               // A deleted run must not stay selected for
@@ -972,7 +1001,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                       >
                         <title>
                           {`pooled ±${(newest.hw * 100).toFixed(1)}pp after ${newest.nRuns} runs / ${newest.shots} shots (exact replays counted once)
-cumulative Wilson CI half-width of this configuration's pooled counts, widest (oldest) row scaled to ${FUNNEL_MAX_PX}px — the funnel narrowing upward is certainty accumulating across replicate runs (same motif as the fidelity card's funnel, where shot batches accumulate inside one run)`}
+cumulative Wilson CI half-width of this configuration's pooled counts, widest row scaled to ${FUNNEL_MAX_PX}px (usually the oldest — pooling isn't strictly monotone) — the funnel narrowing upward is certainty accumulating across replicate runs (same motif as the fidelity card's funnel, where shot batches accumulate inside one run)`}
                         </title>
                       </polygon>
                     </g>
@@ -1056,15 +1085,24 @@ cumulative Wilson CI half-width of this configuration's pooled counts, widest (o
                           />
                         </>
                       )}
-                      {/* oversized invisible hit-target: tooltip + lineage hover */}
+                      {/* oversized invisible hit-target: tooltip +
+                          lineage hover. Keyboard parity (audit S3):
+                          focusable, focus mirrors hover so the lineage
+                          highlight is reachable without a pointer; the
+                          title doubles as the accessible name. */}
                       <circle
                         cx={pos.x}
                         cy={pos.y}
                         r={Math.max(9, rad + RING_PAD + 2.5)}
                         fill="transparent"
-                        style={{ pointerEvents: "auto" }}
+                        tabIndex={0}
+                        role="img"
+                        aria-label={nodeTitle(rec)}
+                        style={{ pointerEvents: "auto", outline: "none" }}
                         onMouseEnter={() => enter(rec.run_id)}
                         onMouseLeave={() => leave(rec.run_id)}
+                        onFocus={() => enter(rec.run_id)}
+                        onBlur={() => leave(rec.run_id)}
                       >
                         <title>{nodeTitle(rec)}</title>
                       </circle>

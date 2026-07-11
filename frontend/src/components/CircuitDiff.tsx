@@ -30,7 +30,9 @@ export interface GateDiffPayload {
   n_added?: number;
 }
 
-export function gateDiffOf(
+// Module-local since audit S3 (the export was dead — the card is the
+// only consumer).
+function gateDiffOf(
   t: TransformationPayload | null | undefined,
 ): GateDiffPayload | null {
   const g = (t as unknown as Record<string, unknown> | null | undefined)

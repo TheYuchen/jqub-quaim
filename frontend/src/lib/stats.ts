@@ -191,8 +191,13 @@ export interface DatedEvidence extends Evidence {
  *  inference over accumulated counts must not pool it twice (the
  *  bundled demo archive contains exactly this case: bell-512 run
  *  7e401b5270b9 replays f0cb7403bbae, seed 815033775, 247/512 twice).
- *  Runs with unknown seeds are never deduped — there is no proof they
- *  repeat a draw. Since the 2026-07-10 audit wave, EVERY pooling
+ *  The dedupe key is (root_seed, shots, successes) — audit S3,
+ *  approved: the replay guarantee only holds when the WHOLE draw
+ *  repeats, and the same seed with a different stopping point (an
+ *  early-stopped replay, a changed shot budget) executed different
+ *  measurements — that is new evidence, not a recording of the old
+ *  draw. Runs with unknown seeds are never deduped — there is no
+ *  proof they repeat a draw. Since the 2026-07-10 audit wave, EVERY pooling
  *  surface applies this rule — difference funnel, theater archive
  *  band, multiverse pooled band/line, fidelity-card replicate strip,
  *  lineage certainty funnel — and their labels say "exact replays
@@ -200,13 +205,14 @@ export interface DatedEvidence extends Evidence {
  *  docs/EVIDENCE_WORKBENCH.md). */
 export function dedupeDraws<T extends DatedEvidence>(runs: T[]): T[] {
   const sorted = [...runs].sort((a, b) => a.created_at - b.created_at);
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   const out: T[] = [];
   for (const r of sorted) {
     if (r.shots <= 0) continue;
     if (r.root_seed != null) {
-      if (seen.has(r.root_seed)) continue;
-      seen.add(r.root_seed);
+      const key = `${r.root_seed}|${r.shots}|${r.successes}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
     }
     out.push(r);
   }

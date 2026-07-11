@@ -11,7 +11,11 @@ import type { StepResult } from "../lib/api";
  *
  * Two visual variants:
  *   * `tile` — compact 9px text + tight padding for the canvas tile
- *     (QNode's result strip).
+ *     (QNode's result strip). 9px is a DELIBERATE exception to the
+ *     app's 10px type floor (audit S3: documented, not drift): the
+ *     chips are single-word statuses whose meaning the border color
+ *     already carries, and at 10px they collide with the tile's
+ *     metric text at the default canvas zoom.
  *   * `card` — the global `.chip` pill used in the right pane card
  *     (ResultsPane's step header).
  *

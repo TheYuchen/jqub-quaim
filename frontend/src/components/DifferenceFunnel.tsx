@@ -129,6 +129,8 @@ export function useDifferenceEvidence(
   // CompareView re-looks-up its pair on historyVersion bumps).
   const historyVersion = useApp((s) => s.historyVersion);
   const [data, setData] = useState<DifferenceData>(null);
+  // Pair identity last staged — see the stale-trace guard below.
+  const pairKeyRef = useRef<string | null>(null);
   const aId = a?.run_id ?? null;
   const bId = b?.run_id ?? null;
   const aHash = a?.config_hash ?? null;
@@ -144,6 +146,15 @@ export function useDifferenceEvidence(
     if (aHash == null || bHash == null) {
       setData(null);
       return;
+    }
+    // Pair switch: drop the PREVIOUS pair's trace immediately instead
+    // of letting it render under the new pair's chips while the
+    // archive fetch resolves (audit S3). historyVersion bumps keep the
+    // old trace up (same pair, refreshed data — no flash).
+    const pairKey = `${aHash}|${bHash}`;
+    if (pairKeyRef.current !== pairKey) {
+      pairKeyRef.current = pairKey;
+      setData(null);
     }
     if (aHash === bHash) {
       setData({ status: "same-config" });
@@ -247,9 +258,11 @@ const fmtK = (n: number) =>
 const fmtDpp = (v: number, dp = 1) =>
   `${v > 0 ? "+" : ""}${(v * 100).toFixed(dp)}pp`;
 
-/** Round-valued shot ticks, ≤ ~7 over the span. */
+/** Round-valued shot ticks, ≤ ~7 over the span. Sub-100 candidates
+ *  (audit S3): a pair of small pilot runs spans <100 shots, and the
+ *  old 100-minimum step rendered a tickless axis for them. */
 function shotTickStep(span: number): number {
-  for (const s of [100, 200, 500, 1000, 2000, 2500, 5000, 10000, 25000, 50000])
+  for (const s of [5, 10, 20, 25, 50, 100, 200, 500, 1000, 2000, 2500, 5000, 10000, 25000, 50000])
     if (span / s <= 6.5) return s;
   return 100000;
 }
@@ -327,11 +340,23 @@ function Chart({
     : "rgb(var(--color-warn))";
   // Flip the established label to the left of its line when the text
   // would run into the right readout column (same flip rule as the
-  // theater's stop annotation).
-  const EST_TEXT_W = 340;
-  const estFlip = est != null && x(est.shots) + 8 + EST_TEXT_W > w - M.r;
-  const LOST_TEXT_W = 350;
-  const lostFlip = lost != null && x(lost.shots) - 8 - LOST_TEXT_W < M.l;
+  // theater's stop annotation). Widths come from the shared estimator
+  // measuring the ACTUAL label at its font size — audit S3: the old
+  // hardcoded 340/350px guesses drifted from the strings they guarded.
+  const estLabel =
+    est != null
+      ? `difference established at ${fmtShots(est.shots)} shots — Δ${fmtDpp(est.d, 1)} [${fmtDpp(est.lo, 1)}, ${fmtDpp(est.hi, 1)}]`
+      : "";
+  const estFlip =
+    est != null &&
+    x(est.shots) + 8 + estimateTextW(estLabel.length, 10.5) > w - M.r;
+  const lostLabel =
+    lost != null
+      ? `re-includes 0 at ${fmtShots(lost.shots)} shots — not sustained, treat as inconclusive`
+      : "";
+  const lostFlip =
+    lost != null &&
+    x(lost.shots) - 8 - estimateTextW(lostLabel.length, 10.5) < M.l;
 
   // Right-margin readout: one block, clamped into the plot band.
   const finalHalf = (final.hi - final.lo) / 2;
@@ -526,7 +551,7 @@ function Chart({
             fontWeight={600}
             fill={estColor}
           >
-            difference established at {fmtShots(est.shots)} shots — Δ{fmtDpp(est.d, 1)} [{fmtDpp(est.lo, 1)}, {fmtDpp(est.hi, 1)}]
+            {estLabel}
             <title>{GLOSSARY.established}</title>
           </text>
         </g>
@@ -551,7 +576,7 @@ function Chart({
             fontWeight={600}
             fill="rgb(var(--color-warn))"
           >
-            re-includes 0 at {fmtShots(lost.shots)} shots — not sustained, treat as inconclusive
+            {lostLabel}
             <title>{GLOSSARY.established}</title>
           </text>
         </g>

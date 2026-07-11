@@ -58,7 +58,10 @@ export function StepBody({ step }: { step: StepResult }) {
 /** QuBound — predicted error bound in [0, 1] + lay explanation. */
 function QuBoundCard({ s }: { s: Record<string, unknown> }) {
   const raw = s["predicted_error_bound"];
-  const value = typeof raw === "number" ? raw : undefined;
+  // Number.isFinite: a NaN payload must render as the absent state,
+  // not a "NaN" tile with a confident explanation under it (audit S3).
+  const value =
+    typeof raw === "number" && Number.isFinite(raw) ? raw : undefined;
   const source = String(s["source"] ?? "");
 
   return (
@@ -125,7 +128,13 @@ function QuCADCard({ s }: { s: Record<string, unknown> }) {
           <Stat label="removed" value={`${removed}`} sub={`${pct.toFixed(0)}%`} />
           <Stat
             label="final loss"
-            value={numOr(s["final_loss"], NaN).toFixed(4)}
+            // "—", not "NaN": a missing/broken payload is an absent
+            // value, not a number (audit S3).
+            value={
+              Number.isFinite(numOr(s["final_loss"], NaN))
+                ? numOr(s["final_loss"], NaN).toFixed(4)
+                : "—"
+            }
           />
         </div>
       )}
@@ -228,8 +237,15 @@ function QshotCard({ s }: { s: Record<string, unknown> }) {
         />
         <Stat
           label="predicted fidelity"
-          value={Number.isFinite(fid) ? fid.toFixed(4) : "—"}
-          sub={Number.isFinite(std) ? `± ${std.toFixed(4)}` : undefined}
+          // House convention: fidelities read as percentages
+          // everywhere else (cards, board, funnels) — a bare 0-1
+          // 4-decimal here made the same quantity look like a
+          // different one (audit S3). The α-formula line and pilot
+          // table below keep the author's raw-unit notation.
+          value={Number.isFinite(fid) ? `${(fid * 100).toFixed(2)}%` : "—"}
+          sub={
+            Number.isFinite(std) ? `± ${(std * 100).toFixed(2)}pp` : undefined
+          }
         />
         <Stat label="method" value={methodLabel} />
       </div>
@@ -437,14 +453,22 @@ function UncertaintyBlock({
   shotsRequested?: number;
 }) {
   const [lo, hi] = ci;
-  const entries = Object.entries(countsTop).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const allEntries = Object.entries(countsTop).sort((a, b) => b[1] - a[1]);
+  const entries = allEntries.slice(0, 6);
   const maxCount = entries.length > 0 ? entries[0][1] : 1;
+  // Honest truncation (audit S3): the histogram shows the top 6
+  // outcomes; say what it hides. counts_top may itself be a server-
+  // side top-N, so the shot arithmetic (not the entry count) is the
+  // reliable signal.
+  const hiddenOutcomes = allEntries.length - entries.length;
+  const shownShots = entries.reduce((a, [, c]) => a + c, 0);
+  const hiddenShots = Math.max(0, shots - shownShots);
   const ppTarget =
     precisionTarget != null ? (precisionTarget * 100).toFixed(0) : null;
   return (
     <div className="panel-alt p-2 space-y-2">
       <div className="flex items-center justify-between text-[10px] text-mute">
-        <span title={GLOSSARY.ci}>
+        <span title={GLOSSARY.ci} className="tabular-nums">
           95% interval: {(lo * 100).toFixed(1)}–{(hi * 100).toFixed(1)}% ·{" "}
           {successes}/{shots} measurements hit the ideal outcome
         </span>
@@ -562,6 +586,15 @@ function UncertaintyBlock({
               <span className="font-mono text-mute w-8 text-right">{count}</span>
             </div>
           ))}
+          {hiddenShots > 0 && (
+            <div className="text-[10px] text-mute/70">
+              {hiddenOutcomes > 0
+                ? `+${hiddenOutcomes} more outcome${hiddenOutcomes === 1 ? "" : "s"} · `
+                : ""}
+              {hiddenShots} shot{hiddenShots === 1 ? "" : "s"} in outcomes
+              not listed
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -597,7 +630,16 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
         );
         setPoints(
           rs
-            .filter((r) => r.headline_label === "fidelity" && r.headline_value != null)
+            // r.ok too (audit S3): a run whose LATER step failed still
+            // carries a fidelity headline, but the pooled interval
+            // below already excludes it — a dot indistinguishable from
+            // trusted evidence would contradict the pool it sits on.
+            .filter(
+              (r) =>
+                r.ok &&
+                r.headline_label === "fidelity" &&
+                r.headline_value != null,
+            )
             .map((r) => r.headline_value as number),
         );
         // Wave J: pool the archived replicates' binomial counts —
@@ -638,14 +680,26 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
         {(max * 100).toFixed(1)}%
       </div>
       <div className="relative h-4 rounded bg-surfaceAlt" aria-hidden>
-        {points.map((p, i) => (
-          <div
-            key={i}
-            className={`absolute top-1 w-1 h-2 rounded-sm ${p === currentPoint ? "bg-accent" : "bg-accent/40"}`}
-            style={{ left: `calc(${p * 100}% - 2px)` }}
-            title={`${(p * 100).toFixed(2)}%`}
-          />
-        ))}
+        {points.map((p, i) => {
+          // Highlight THE newest dot when it matches the displayed run
+          // (epsilon, not ===: float identity is luck, and two
+          // coincidentally-equal older runs must not both light up —
+          // audit S3).
+          const isCurrent =
+            i === points.length - 1 && Math.abs(p - currentPoint) < 1e-6;
+          return (
+            <div
+              key={i}
+              className={`absolute top-1 w-1 h-2 rounded-sm ${isCurrent ? "bg-accent" : "bg-accent/40"}`}
+              // clamp: 0%/100% dots sit AT the scale edge instead of
+              // overhanging it (audit S3, same rule as the interval bar).
+              style={{
+                left: `clamp(0px, calc(${p * 100}% - 2px), calc(100% - 4px))`,
+              }}
+              title={`${(p * 100).toFixed(2)}%`}
+            />
+          );
+        })}
       </div>
       {pooled && (
         <div

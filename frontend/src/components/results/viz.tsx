@@ -136,9 +136,12 @@ export function OpBar({
  *
  * Defensive about input shape: accepts any numeric array (negatives are
  * fine — the y-axis floor is `Math.min(...data, 0)`), returns null for
- * fewer than 2 points, and clamps the y-range to ≥1 so a flat trace
- * doesn't divide-by-zero. In practice the call sites pass strictly
- * non-negative values (QuCAD loss trace, Qshot pilot fidelities). */
+ * fewer than 2 points, and falls back to a range of 1 ONLY for a flat
+ * trace (divide-by-zero guard). Audit S3: the old max(range, 1) /
+ * max(...data, 1) clamps flattened every sub-unit series — a QuCAD
+ * loss trace living in [0.28, 0.34] rendered as a flat line. In
+ * practice the call sites pass strictly non-negative values (QuCAD
+ * loss trace, Qshot pilot fidelities). */
 export function Sparkline({
   data,
   height = 32,
@@ -149,9 +152,9 @@ export function Sparkline({
   if (data.length < 2) return null;
   const w = 200;
   const h = height;
-  const max = Math.max(...data, 1);
+  const max = Math.max(...data);
   const min = Math.min(...data, 0);
-  const range = Math.max(max - min, 1);
+  const range = max - min || 1;
   const pts = data
     .map((v, i) => {
       const x = (i / (data.length - 1)) * (w - 4) + 2;
@@ -200,7 +203,7 @@ export function KvRow({ k, v }: { k: string; v: unknown }) {
       <div className="flex justify-between items-center gap-2 text-[11px]">
         <span className="text-mute">{k}</span>
         <span className="font-mono text-ink truncate max-w-[60%] text-right">
-          [{v.slice(0, 6).map(String).join(", ")}
+          [{v.slice(0, 6).map((x) => fmtCell(x)).join(", ")}
           {v.length > 6 ? ", …" : ""}]
         </span>
       </div>
@@ -214,7 +217,7 @@ export function KvRow({ k, v }: { k: string; v: unknown }) {
           {Object.entries(v as Record<string, unknown>).map(([kk, vv]) => (
             <div key={kk} className="flex gap-2">
               <span className="text-mute">{kk}</span>
-              <span>{String(vv)}</span>
+              <span>{fmtCell(vv)}</span>
             </div>
           ))}
         </div>
@@ -231,9 +234,25 @@ export function KvRow({ k, v }: { k: string; v: unknown }) {
   );
 }
 
+/** One nested value, stringified without ever printing
+ *  "[object Object]" (audit S3): objects/arrays inside KvRow payloads
+ *  JSON-stringify (truncated), everything else goes through fmt. */
+function fmtCell(v: unknown): string {
+  if (typeof v === "object" && v !== null) {
+    try {
+      const j = JSON.stringify(v);
+      return j.length > 48 ? j.slice(0, 45) + "…" : j;
+    } catch {
+      return "…";
+    }
+  }
+  return fmt(v);
+}
+
 /** Human-friendly number formatting. Ints stay integer; tiny floats go
- *  scientific; everything else gets 4 decimals. */
-export function fmt(v: unknown): string {
+ *  scientific; everything else gets 4 decimals. (Module-local since
+ *  audit S3 — the export was dead; headlineMetric has its own fmt.) */
+function fmt(v: unknown): string {
   if (typeof v === "number") {
     if (!Number.isFinite(v)) return String(v);
     if (Math.abs(v) < 1e-3 && v !== 0) return v.toExponential(3);

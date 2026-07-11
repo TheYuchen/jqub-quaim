@@ -104,8 +104,15 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
         <h3 className="text-sm font-semibold text-ink truncate">Evidence</h3>
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Paper-figure export of the active evidence tab (hybrid
-              path: cards/funnel/lineage/compare as shown). */}
-          {(run != null || tab !== "current") && (
+              path: cards/funnel/lineage/compare as shown). Gated per
+              tab on that tab actually having content (audit S3: the
+              old gate offered the camera over an empty lineage or a
+              "pick two runs" placeholder). */}
+          {(tab === "current"
+            ? run != null
+            : tab === "history"
+              ? archived > 0
+              : compareIds.length === 2) && (
             <FigureExportButton
               getTarget={() => contentRef.current}
               name={`evidence-${tab}`}
@@ -167,14 +174,33 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
         className="shrink-0 border-b border-edge px-2 py-1.5 flex flex-wrap items-center gap-1"
         role="tablist"
         aria-label="Evidence views"
+        // Arrow-key tab navigation (audit S3): roving focus follows
+        // selection, Home/End jump. tabIndex roves via TabButton.
+        onKeyDown={(e) => {
+          const order: EvidenceTab[] = ["current", "history", "compare"];
+          const i = order.indexOf(tab);
+          let next: EvidenceTab | null = null;
+          if (e.key === "ArrowRight") next = order[(i + 1) % order.length];
+          else if (e.key === "ArrowLeft")
+            next = order[(i + order.length - 1) % order.length];
+          else if (e.key === "Home") next = order[0];
+          else if (e.key === "End") next = order[order.length - 1];
+          if (next) {
+            e.preventDefault();
+            setTab(next);
+            document.getElementById(`evtab-${next}`)?.focus();
+          }
+        }}
       >
         <TabButton
+          tabKey="current"
           label="This run"
           title="Scale 1 — steer a single estimate: one card per pipeline step; the funnel card expands into the Evidence Theater"
           active={tab === "current"}
           onClick={() => setTab("current")}
         />
         <TabButton
+          tabKey="history"
           label="This configuration"
           title="Scale 2 — pool replicates of one configuration: every archived run as a lineage; restore, replay (exact numbers), tick two to compare"
           active={tab === "history"}
@@ -182,6 +208,7 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
           badge={archived > 0 ? archived : null}
         />
         <TabButton
+          tabKey="compare"
           label="Between configurations"
           title="Scale 3 — compare configurations: two runs side by side as 95% intervals, plus the difference funnel (sequential A/B)"
           active={tab === "compare"}
@@ -201,7 +228,13 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
         {tab === "compare" &&
           "Scale 3 — two configurations side by side; the difference interval carries the verdict"}
       </div>
-      <div ref={contentRef} className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+      <div
+        ref={contentRef}
+        role="tabpanel"
+        id={`evpanel-${tab}`}
+        aria-labelledby={`evtab-${tab}`}
+        className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0"
+      >
         {tab === "current" && (
           <>
             {!run && !running && <EmptyHint />}
@@ -227,12 +260,15 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
 }
 
 function TabButton({
+  tabKey,
   label,
   title,
   active,
   onClick,
   badge = null,
 }: {
+  /** Stable tab id — pairs the tab with its panel (aria-controls). */
+  tabKey: string;
   label: string;
   title?: string;
   active: boolean;
@@ -243,7 +279,12 @@ function TabButton({
     <button
       type="button"
       role="tab"
+      id={`evtab-${tabKey}`}
+      aria-controls={`evpanel-${tabKey}`}
       aria-selected={active}
+      // Roving tabindex: the tablist exposes ONE tab stop; arrows move
+      // within it (handler on the tablist).
+      tabIndex={active ? 0 : -1}
       title={title}
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors border ${
