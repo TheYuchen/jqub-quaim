@@ -10,10 +10,6 @@ deferred.
 
 ## FlowCanvas
 
-- share-hash boot ignores plugin defaults [deferred — plugin manifests
-  load async AFTER buildInitialGraph runs, so the boot path cannot
-  resolve plugin defaultData; merging them retroactively needs a
-  rehydration pass over already-mounted nodes.]
 
 ## Evidence
 

@@ -614,6 +614,39 @@ export function FlowCanvas() {
     [nodes, edges, circuit, preflightPlugins],
   );
 
+  // ---- Share-hash plugin-default rehydration (audit backlog) --------
+  // buildInitialGraph runs synchronously at mount, but plugin
+  // manifests arrive async (App.tsx fetches /api/plugins after boot).
+  // A share-hash boot therefore mounts plugin nodes with ONLY the
+  // params the link carried — resolveNodeSpec can't see the plugin's
+  // spec yet, so its defaultData never gets merged the way built-in
+  // kinds' (and every later add/restore path's) defaults do. Repair
+  // retroactively, exactly once, the first time `plugins` becomes
+  // non-empty: merge each plugin spec's defaultData UNDER the node's
+  // existing params (missing keys only — the author's explicit values
+  // always win). Non-share boots skip it: presets go through
+  // buildPresetGraph, which never places plugin kinds.
+  const pluginDefaultsRehydratedRef = useRef(false);
+  useEffect(() => {
+    if (pluginDefaultsRehydratedRef.current) return;
+    if (!initial.hashPayload) return; // only share-hash boots miss defaults
+    if (preflightPlugins.length === 0) return; // manifests not in yet
+    pluginDefaultsRehydratedRef.current = true;
+    setNodes((ns) =>
+      ns.map((n) => {
+        const spec = resolveNodeSpec(n.data.kind, preflightPlugins);
+        if (!spec || !("isPlugin" in spec)) return n;
+        const defaults = (spec.defaultData ?? {}) as Record<string, unknown>;
+        const params = n.data.params ?? {};
+        if (Object.keys(defaults).every((k) => k in params)) return n;
+        return {
+          ...n,
+          data: { ...n.data, params: { ...defaults, ...params } },
+        };
+      }),
+    );
+  }, [initial.hashPayload, preflightPlugins, setNodes]);
+
   // ---- Stale post-run encodings (audit S3) --------------------------
   // Ribbons/edge labels describe the graph AS IT RAN. Editing the
   // graph afterwards (params, wiring, blocks) leaves those marks
