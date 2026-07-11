@@ -225,7 +225,16 @@ export function FlowCanvas() {
     // Nothing observed for ANY canvas kind → an "estimate" would be
     // pure fiction; show nothing until at least one run is archived.
     if (costEst.knownS <= 0 && unknownN > 0) return null;
+    // Copy contract (toolbar row 2): replicates=1 -> "est ~35s";
+    // N>1 -> "est ~35s each · ≈2m total". The ×N multiplier is NOT
+    // repeated here — the replicate select one slot to the left
+    // already states it (the old "… · ×5 ≈ 1m 59s" said ×5 twice in
+    // adjacent controls). "each" ≈ the first full run; the tooltip
+    // keeps the honest replicate approximation (cached prefix, only
+    // stochastic blocks re-run) and the cost-anchor provenance.
+    const showTotal = replicateCount > 1 && pinnedSeed == null;
     let text = `est ~${formatSeconds(costEst.knownS)}`;
+    if (showTotal) text += " each";
     if (unknownN > 0) text += ` + ${unknownN} unknown`;
     let title =
       `Estimated from ${costEst.sampleRuns} archived run(s) in this ` +
@@ -243,13 +252,13 @@ export function FlowCanvas() {
     if (unknownN > 0) {
       title += ` No history yet for: ${costEst.unknownKinds.join(", ")}.`;
     }
-    if (replicateCount > 1 && pinnedSeed == null) {
+    if (showTotal) {
       const extra = replicateExtraS(
         costEst,
         nodes.map((n) => ({ id: n.id, kind: (n.data as QNodeData).kind })),
         replicateCount,
       );
-      text += ` · ×${replicateCount} ≈ ${formatSeconds(costEst.knownS + extra)}`;
+      text += ` · ≈${formatSeconds(costEst.knownS + extra)} total`;
       title +=
         ` Replicate approximation: the deterministic prefix is served ` +
         `from cache after run 1; only stochastic blocks (sampled ` +
@@ -1249,43 +1258,79 @@ export function FlowCanvas() {
           circuitTag={sampleKey ?? circuit?.name ?? "no circuit"}
         />
       )}
-      {/* No overflow-x clip here: CSS spec forces overflow-y to auto
-          when overflow-x is auto, which would clip the dropdowns
-          (PresetPicker, MoreMenu) that anchor below this row. On
-          mobile the Run button drops out (md:flex) and the FAB
-          replaces it, so the remaining icon-only items fit easily.
+      {/* ================== CANVAS TOOLBAR =========================
+          An INTENTIONAL two-row toolbar at every width ≥ 768px —
+          predictable beats adaptive raggedness. The old single
+          flex-wrap row broke at an arbitrary, pane-width-dependent
+          point: the evidence cluster dangled left on a ragged second
+          line and its border-l + 9px "evidence" micro-label read as
+          floating debris. Two fixed rows are identical at every
+          width; on very wide screens they read as one clean header
+          block, so nothing is lost at the top end either.
 
-          flex-wrap + min-h-12 (not a fixed h-12): the action cluster's
-          visibility is keyed to VIEWPORT breakpoints (md:/lg:) but this
-          row lives in a RESIZABLE center column — at a 1280-1440px
-          window with default side panes the column is only ~550-700px
-          wide while lg: still shows every label, and with the optional
-          chips present (pinned seed / cost estimate) the row used to
-          overflow and clip the Run button off the right edge. Wrapping
-          keeps every control reachable at any pane width; when one
-          line fits (the common wide case) min-h-12 renders pixel-
-          identical to the old fixed row. */}
-      <div className="min-h-12 shrink-0 border-b border-edge px-3 sm:px-4 py-1 flex flex-wrap items-center justify-between gap-x-2 sm:gap-x-4 gap-y-1">
-        {/* ---- LEFT: workspace + AUTHORING cluster --------------------
-            Two-cluster toolbar (authoring vs evidence). Everything on
-            this side describes or edits the COMPOSITION — mode toggle,
-            block/link counters, preset, wiring, figure snapshot,
-            clear, overflow menu — and none of it changes what the next
-            run MEASURES. Rarely-used authoring actions (Share,
-            Export .py) live in the ⋯ menu at EVERY width: reachable,
-            but two fewer buttons of permanent chrome. min-w-0 +
-            flex-wrap so the cluster wraps instead of clipping in a
-            narrow center column. Counters: full text on ≥sm; on <sm an
-            icon pair (Box = "blocks", Link2 = "links") — a bare "5·4"
-            was unreadable in user testing. */}
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 gap-y-1 min-w-0 text-xs text-mute">
-          <WorkspaceToggle />
-          <span className="hidden sm:inline text-edge">·</span>
-          <span className="hidden sm:inline">{nodes.length} blocks</span>
-          <span className="hidden sm:inline text-edge">·</span>
-          <span className="hidden sm:inline">{edges.length} links</span>
+            Row 1 — workspace & authoring:  "what am I composing?"
+            Row 2 — evidence & execution:   "what will the next run
+                     measure, and what will it cost?"
+
+          The ROW BOUNDARY itself now carries the grouping semantics
+          the old divider + micro-label tried to carry — both are
+          deleted; the word "evidence" survives in row 2's aria-label
+          where it does its job without adding visual noise.
+
+          Hierarchy: Run is the ONLY accent-colored control in the
+          toolbar. Load preset — a secondary action — used to be an
+          accent2 btn-secondary pill competing with Run for the eye;
+          it is now a standard outline `btn` (see PresetPicker.tsx).
+
+          Consistency sweep (toolbar only): every control is exactly
+          h-8, one border tone (border-edge via .btn), one gap rhythm
+          (gap-2), selects share .btn padding, and the mode toggle
+          keeps its segmented style at the same h-8.
+
+          Overflow: both rows stay overflow:visible — an overflow-x
+          clip would force overflow-y:auto (CSS spec) and clip the
+          dropdowns (PresetPicker, MoreMenu) that anchor below row 1.
+          No wrap is needed by construction: row 2's worst case below
+          a 900px viewport is ×20 select (~78px) + target select
+          (~120px) + Run (~130px) + two gap-2 (16px) ≈ 345px, ≈380px
+          with row padding, and a 768px viewport with the default
+          left pane leaves the center column ~412px (768 − 320 left −
+          4 resizer − 32 evidence strip). The est chip is the one
+          purely advisory element, so it yields first: hidden below a
+          900px VIEWPORT (min-[900px]:), where band centers get tight
+          with the full ~480px row. Only a deliberate extreme
+          left-pane drag (center at its 280px clamp floor, App.tsx)
+          can still undercut row 2 — justify-end then spills leftward
+          into the row's own empty half while Run stays pinned in the
+          corner. Below md, row 1 sheds its md-gated buttons and row
+          2 hides as a unit: the mobile Run-FAB flow is unchanged. */}
+      <div className="shrink-0 border-b border-edge">
+        {/* ---- Row 1: WORKSPACE & AUTHORING -------------------------
+            Everything here describes or edits the COMPOSITION — mode
+            toggle, block/link counters, preset, wiring, figure
+            snapshot, clear, overflow menu — none of it changes what
+            the next run MEASURES. Rarely-used authoring actions
+            (Share, Export .py) live in the ⋯ menu at EVERY width:
+            reachable, but two fewer buttons of permanent chrome.
+            Counters are passive status (mute 11px) parked next to the
+            toggle behind a subtle dot; the ml-auto gulf separates
+            them from the action group — status left, verbs right, no
+            interleaving. Full text on ≥sm; on <sm an icon pair (Box =
+            "blocks", Link2 = "links") — a bare "5·4" was unreadable
+            in user testing. */}
+        <div className="h-10 px-3 sm:px-4 flex items-center gap-2 min-w-0">
+          <WorkspaceToggle className="h-8" />
           <span
-            className="sm:hidden flex items-center gap-1"
+            className="hidden sm:inline text-[11px] text-edge select-none"
+            aria-hidden="true"
+          >
+            ·
+          </span>
+          <span className="hidden sm:inline text-[11px] text-mute whitespace-nowrap">
+            {nodes.length} blocks · {edges.length} links
+          </span>
+          <span
+            className="sm:hidden flex items-center gap-1 text-[11px] text-mute"
             aria-label={`${nodes.length} blocks, ${edges.length} links`}
           >
             <Box className="w-3 h-3" aria-hidden="true" />
@@ -1294,88 +1339,82 @@ export function FlowCanvas() {
             <Link2 className="w-3 h-3" aria-hidden="true" />
             <span className="tabular-nums">{edges.length}</span>
           </span>
-          <PresetPicker onPick={loadPreset} />
-          {/* Frequent authoring actions as buttons at ≥md (labels at
-              ≥lg); below md they live in the ⋯ menu instead (its
-              Auto-connect/Clear rows are md:hidden — mirrored
-              visibility, exactly one reachable copy at any width). */}
-          <button
-            onClick={runAutoConnect}
-            disabled={nodes.length < 2}
-            className="btn hidden md:inline-flex disabled:opacity-40 disabled:cursor-not-allowed"
-            title={
-              edges.length > 0
-                ? "Re-wire all blocks into a source→backend→algorithm→metric→sink chain (replaces existing links)"
-                : "Wire all blocks into a source→backend→algorithm→metric→sink chain"
-            }
-            aria-label="Auto-connect all blocks"
-          >
-            <Wand2 className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Auto-connect</span>
-          </button>
-          {/* Paper-figure export of the whole canvas (hybrid path:
-              foreignObject SVG + hi-res PNG; provenance embedded). */}
-          <FigureExportButton
-            className="hidden md:inline-flex"
-            getTarget={() => wrapperRef.current}
-            name="canvas"
-            view="canvas"
-            getGraph={() => buildSharePayload(nodes, edges, sampleKey)}
-          />
-          <button
-            onClick={clearGraph}
-            className="btn hidden md:inline-flex"
-            title="Clear the canvas"
-            aria-label="Clear canvas"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">Clear</span>
-          </button>
-          {/* ⋯ overflow menu (ALL widths): Share + Export .py always
-              live here; Auto-connect + Clear join below md. */}
-          <MoreMenu
-            canAutoConnect={nodes.length >= 2}
-            hasEdgesToReplace={edges.length > 0}
-            canClear={nodes.length > 0 || edges.length > 0}
-            canExport={nodes.length > 0}
-            onAutoConnect={runAutoConnect}
-            onShare={handleShareFromMenu}
-            onExport={exportPython}
-            onClear={clearGraph}
-          />
+          {/* Right-aligned authoring actions — all h-8 outline btns,
+              labels lg-gated (icon-only through the band). Below md
+              Auto-connect/Clear fold into the ⋯ menu (its rows are
+              md:hidden-mirrored — exactly one reachable copy of each
+              action at any width). */}
+          <div className="ml-auto flex items-center gap-2">
+            <PresetPicker onPick={loadPreset} />
+            <button
+              onClick={runAutoConnect}
+              disabled={nodes.length < 2}
+              className="btn h-8 hidden md:inline-flex disabled:opacity-40 disabled:cursor-not-allowed"
+              title={
+                edges.length > 0
+                  ? "Re-wire all blocks into a source→backend→algorithm→metric→sink chain (replaces existing links)"
+                  : "Wire all blocks into a source→backend→algorithm→metric→sink chain"
+              }
+              aria-label="Auto-connect all blocks"
+            >
+              <Wand2 className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Auto-connect</span>
+            </button>
+            {/* Paper-figure export of the whole canvas (hybrid path:
+                foreignObject SVG + hi-res PNG; provenance embedded). */}
+            <FigureExportButton
+              className="hidden md:inline-flex h-8"
+              getTarget={() => wrapperRef.current}
+              name="canvas"
+              view="canvas"
+              getGraph={() => buildSharePayload(nodes, edges, sampleKey)}
+            />
+            <button
+              onClick={clearGraph}
+              className="btn h-8 hidden md:inline-flex"
+              title="Clear the canvas"
+              aria-label="Clear canvas"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">Clear</span>
+            </button>
+            {/* ⋯ overflow menu (ALL widths): Share + Export .py always
+                live here; Auto-connect + Clear join below md. */}
+            <MoreMenu
+              canAutoConnect={nodes.length >= 2}
+              hasEdgesToReplace={edges.length > 0}
+              canClear={nodes.length > 0 || edges.length > 0}
+              canExport={nodes.length > 0}
+              onAutoConnect={runAutoConnect}
+              onShare={handleShareFromMenu}
+              onExport={exportPython}
+              onClear={clearGraph}
+            />
+          </div>
         </div>
-        {/* ---- RIGHT: EVIDENCE cluster --------------------------------
+        {/* ---- Row 2: EVIDENCE & EXECUTION --------------------------
             Everything here shapes or prices the evidence the next Run
             buys: pinned seed, replicate count, optional-stopping
-            target, cost estimate, and Run itself. Visually separated
-            from authoring (divider + faint group label at ≥lg) so the
-            toolbar reads as two questions — "what am I composing?" vs
-            "what will the next run measure?". min-w-0 (NOT shrink-0)
-            is what lets flex-wrap actually engage; justify-end keeps
-            continuation lines right-aligned, so Run stays in the
-            bottom-right corner where the eye expects it. The divider
-            is lg-gated: in the 768-1024 band the wrapped cluster made
-            the border-l + pl-3 read as a clipped stray rule next to
-            the label, so below lg the grouping is implied by spacing
-            alone; below md every control here is hidden anyway (the
-            Run FAB takes over). */}
+            target, cost estimate, then Run — one right-aligned group
+            ending in the toolbar's single CTA, so the row reads
+            left-to-right as "under these conditions, at this price →
+            RUN", with Run in the bottom-right corner where the eye
+            expects the trigger. Nothing floats on the left. Hidden
+            below md as a unit (every control in it was individually
+            md-gated before): the mobile Run FAB replaces it.
+            border-edge/40 = an internal seam, quieter than the
+            toolbar's outer border. */}
         <div
           role="group"
-          aria-label="Evidence controls for the next run"
-          className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 gap-y-1 min-w-0 lg:border-l lg:border-edge/60 lg:pl-3"
+          aria-label="Evidence and execution — controls for the next run"
+          className="hidden md:flex h-10 px-3 sm:px-4 border-t border-edge/40 items-center justify-end gap-2"
         >
-          <span
-            className="hidden lg:inline text-[9px] uppercase tracking-wider text-mute/70 select-none"
-            title="Controls for the next run's evidence: replicates, stopping target, seed, estimated cost."
-          >
-            evidence
-          </span>
           {/* Pinned-seed chip: visible whenever the next run will replay
               a specific draw instead of sampling fresh. The × clears the
               pin and returns to fresh sampling. */}
           {pinnedSeed != null && (
             <span
-              className="chip !border-accent/50 !text-accent hidden md:inline-flex items-center gap-1"
+              className="chip !border-accent/50 !text-accent"
               title={`Next run replays root seed ${pinnedSeed} exactly. Click × to return to fresh draws.`}
             >
               seed {pinnedSeed}
@@ -1398,7 +1437,7 @@ export function FlowCanvas() {
               value={replicateCount}
               onChange={(e) => setReplicateCount(Number(e.target.value))}
               disabled={running}
-              className="btn hidden md:inline-flex !px-1.5 cursor-pointer disabled:opacity-40"
+              className="btn h-8 cursor-pointer disabled:opacity-40"
               title={`${GLOSSARY.replicate} Distributions build up in the fidelity card and the run history. Fast after run 1: the unchanged deterministic prefix is served from cache, so replicates 2..N only re-run the stochastic steps.`}
               aria-label="Replicate count"
             >
@@ -1422,7 +1461,7 @@ export function FlowCanvas() {
               )
             }
             disabled={running}
-            className="btn hidden md:inline-flex !px-1.5 cursor-pointer disabled:opacity-40"
+            className="btn h-8 cursor-pointer disabled:opacity-40"
             title={`${GLOSSARY.precisionTarget} Off = run every requested measurement. The target is archived with the run and restored on replay, so an early stop reproduces exactly.`}
             aria-label="Precision target"
           >
@@ -1439,25 +1478,26 @@ export function FlowCanvas() {
           {/* cost-estimate chip: what will pressing Run cost, judged
               from this browser's own archived step timings. Sits next
               to Run so the price tag is read together with the
-              trigger. Mute styling on purpose — it's advisory, not a
-              gate. */}
+              trigger. Mute styling on purpose — advisory, not a gate —
+              which is also why IT is the element that yields below a
+              900px viewport (see the width contract above): glanceable
+              info, never load-bearing. */}
           {costChip && (
             <span
               data-marker="cost-estimate"
-              className="chip hidden md:inline-flex whitespace-nowrap"
+              className="chip hidden min-[900px]:inline-flex whitespace-nowrap"
               title={costChip.title}
             >
               {costChip.text}
             </span>
           )}
+          {/* The toolbar's one accent-colored control. The whole row
+              md-gates, so no hidden/md:flex here — on mobile the
+              bottom-right Run FAB takes over. */}
           <button
             onClick={runPipeline}
             disabled={running || !circuit}
-            // Hidden on mobile — the bottom-right Run FAB takes over
-            // there, and dropping this button frees the toolbar to
-            // fit the remaining icons without horizontal overflow
-            // (which used to clip the PresetPicker dropdown).
-            className="hidden md:flex btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary h-8 disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={running ? "Running" : "Run pipeline"}
           >
             {running ? (

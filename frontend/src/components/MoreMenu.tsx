@@ -103,7 +103,8 @@ export function MoreMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="btn"
+        // h-8: the canvas toolbar's uniform control height.
+        className="btn h-8"
         title="More actions"
         aria-label="More actions"
         aria-haspopup="menu"

@@ -16,15 +16,21 @@ export function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
 
   return (
     <div ref={rootRef} className="relative">
+      {/* Standard outline `btn`, deliberately NOT btn-secondary: the
+          canvas toolbar reserves accent color for exactly one control
+          (Run). The old accent2 pill made this secondary action read
+          as a competing CTA. h-8 = the toolbar's uniform control
+          height; the label lg-gates like its Auto-connect/Clear row
+          siblings (icon + chevron still signal the dropdown). */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="btn-secondary"
+        className="btn h-8"
         title="Load a preset pipeline onto the canvas"
         aria-label="Load a preset pipeline"
       >
         <Layers className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">Load preset</span>
+        <span className="hidden lg:inline">Load preset</span>
         <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
