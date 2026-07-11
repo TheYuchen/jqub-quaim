@@ -1630,3 +1630,90 @@ provenance or reproducibility. One line per fix:
 9. **SSE parser** — decoder flushed after the read loop and the
    remaining buffer parsed (no lost final event); unknown JSON events
    are treated as StepResults only when `node_id` is a string.
+
+## Deep audit 2026-07-10 — Wave 2 fixes (SHIPPED 2026-07-11)
+
+S2 findings: run-lifecycle races, dead affordances, dishonest empties,
+and export text-metric drift. Deferred S3 polish lives in
+docs/AUDIT_BACKLOG.md. One line per fix:
+
+Run-lifecycle guards (FlowCanvas):
+
+1. **Restore queues behind a running pipeline** — the pendingRestore
+   consumer refuses to swap the canvas while `running` (warn notice);
+   the request stays in the store and applies when the run ends.
+2. **pendingAutoRun expires** — cleared by the restore consumer,
+   loadPreset and clearGraph, so a superseded request can never fire a
+   surprise run minutes later.
+3. **Restore-path loadSample staleness guard** — shares the preset
+   path's generation counter (one `sampleGenRef` for both paths), so
+   the two paths supersede each other.
+4. **Replicate-loop partial honesty** — completed count tracked; a
+   failed step (or mid-loop transport error) reports "stopped after i
+   of N", never the unconditional success toast.
+5. **Loop cancel affordance** — while a ×N loop runs, Run (toolbar +
+   mobile FAB) becomes "Stop after this run"; a ref checked between
+   iterations stops the loop after the current run archives.
+6. **Boot sample-load failure speaks** — warn notice + "No circuit
+   loaded — pick one on the left" title on the disabled Run buttons.
+7. **Authoring locked during runs** — param editors, node delete ×,
+   preset picker and circuit picks disable while `running` (toolbar
+   selects already did), each with a "locked while a run is in
+   progress" title.
+
+Pickers / palette:
+
+8. **BlockPicker badges are live** — FlowCanvas publishes canvasKinds
+   to the store; on-canvas defaults are no longer pre-checked (no more
+   duplicate input/output per Add-blocks round-trip) and the "on
+   canvas" badges render.
+9. **Palette zero-state accounts for the family filter** — plus a
+   "Show all families" escape hatch.
+10. **Upload input resets + shows busy** — same file re-uploads after
+    a failure; the `__upload__` spinner renders.
+
+Evidence pane:
+
+11. **Compare auto-switch keys on identity** — pair replacement
+    re-fires the tab switch (was `.length`, which never changes 2→2).
+12. **compareIds lifecycle** — pruned after Clear demo data / archive
+    import (`pruneCompareSelection`); setCompareIds dedupes;
+    CompareView explains "runs no longer archived" instead of a silent
+    blank.
+13. **Interval-bar point markers clamp at 0/1** — cards (clipped by
+    overflow-hidden) and CompareView twins (overhung).
+14. **Uploaded-circuit records tell the truth in history** —
+    restore/replay titles say "re-upload to reproduce" when
+    sample_key is null (board wording).
+15. **PluginFigures empty bar stub** — `data: []` renders a message
+    instead of crashing the whole pane on the reduce.
+16. **Lineage window is named** — footer "showing the 50 most recent
+    of N archived runs" when the archive exceeds the window.
+
+Board / theater / infra:
+
+17. **Connecting overlay z-50** — paints over board/theater/header.
+18. **No band double-overlay** — the run-start effect skips the band
+    Evidence overlay when the theater will auto-open.
+19. **F2 exports drop guidance chrome** — data-export-strip on
+    DemoArchiveBanner and the board hint strip/"?" button.
+20. **Scenario force-reimport honesty** — after a forced demo import
+    on a browser that had cleared demo data, the banner says
+    "re-imported for this figure scenario"; the Clear tooltip no
+    longer claims "never".
+21. **Export text metrics share one estimator** —
+    svgPaper.estimateTextW budgets the ×1.25 PAPER_FONT_BUMP in the
+    theater's stop-label flip/intrusion, panel title-dx and the
+    cost-anchor line (which splits into two tspans when the bumped
+    width would clip; the svg gains bottom pad for the second line).
+22. **DifferenceFunnel pane scale** — two-tier viewBox width:
+    container-derived in the pane (text ≥9px effective, legend wraps),
+    documented 760px kept for exports via a hidden twin the funnel's
+    export button targets.
+23. **F6/F8 pair picker reproduces documented figures** — excludes
+    scenario-tagged records (F7's Wave-1 guard verified) and prefers
+    demo-flagged records when present.
+24. **config-context bar never flashes a stale hash** — liveHash
+    resets on editorContext change and renders "computing identity…"
+    while null (empty canvas keeps its own wording).
+25. **qshot preset lints clean** — ships with its output sink.
