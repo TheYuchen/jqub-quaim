@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, FileText, Search, X } from "lucide-react";
 import { api } from "../lib/api";
 import {
@@ -44,14 +44,17 @@ const FAMILY_META: {
   { key: "sink", label: "Sink", description: "Aggregates final output" },
 ];
 
-export function NodePalette({
-  canvasKinds = new Set(),
-}: {
-  /** Kinds currently on the canvas — passed through to BlockPicker for
-   *  "on canvas" badges. */
-  canvasKinds?: Set<NodeKind>;
-} = {}) {
+export function NodePalette() {
   const [search, setSearch] = useState("");
+  // Kinds currently on the canvas — published by FlowCanvas (store
+  // bridge, audit S2) and passed to BlockPicker for live "on canvas"
+  // badges. The old prop defaulted to an empty set and no caller ever
+  // threaded the real kinds, so the badges were dead code.
+  const canvasKindsArr = useApp((s) => s.canvasKinds);
+  const canvasKinds = useMemo(
+    () => new Set<NodeKind>(canvasKindsArr),
+    [canvasKindsArr],
+  );
   const [expanded, setExpanded] = useState(true);
   // null = show all families; a family key = show only that family.
   const [activeFamily, setActiveFamily] = useState<NodeSpec["family"] | null>(null);
@@ -230,9 +233,27 @@ export function NodePalette({
             </div>
           );
         })}
-        {filtered.length === 0 && (
+        {filtered.filter(
+          (n) => activeFamily === null || n.family === activeFamily,
+        ).length === 0 && (
           <div className="py-4 w-full text-center text-[11px] text-mute">
-            No blocks match "{search}"
+            No blocks match{search.trim() ? ` "${search}"` : ""}
+            {activeFamily !== null
+              ? ` in the ${
+                  FAMILY_META.find((f) => f.key === activeFamily)?.label ??
+                  activeFamily
+                } family`
+              : ""}
+            .
+            {activeFamily !== null && (
+              <button
+                type="button"
+                className="ml-1.5 underline decoration-dotted hover:text-ink"
+                onClick={() => setActiveFamily(null)}
+              >
+                Show all families
+              </button>
+            )}
           </div>
         )}
       </div>

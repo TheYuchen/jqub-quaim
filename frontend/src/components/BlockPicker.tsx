@@ -46,21 +46,28 @@ export function BlockPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [checked, setChecked] = useState<Set<NodeKind>>(new Set(DEFAULT_CHECKED));
+  // Starts empty; the on-open effect below seeds the default checks
+  // (minus kinds already on the canvas).
+  const [checked, setChecked] = useState<Set<NodeKind>>(new Set());
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const addBlocksToCanvas = useApp((s) => s.addBlocksToCanvas);
 
   useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
 
-  // Reset to defaults + focus search on open.
+  // Reset to defaults + focus search on open. Defaults that are
+  // already on the canvas are NOT re-checked — pre-checking them
+  // produced duplicate input/output blocks on every "Add blocks"
+  // round-trip (audit S2); the "on canvas" badge marks them instead.
   useEffect(() => {
     if (open) {
-      setChecked(new Set(DEFAULT_CHECKED));
+      setChecked(
+        new Set(DEFAULT_CHECKED.filter((k) => !canvasKinds.has(k))),
+      );
       setSearch("");
       searchRef.current?.focus();
     }
-  }, [open]);
+  }, [open, canvasKinds]);
 
   // Merge built-in catalog with the user's plugin manifests so the
   // picker shows everything in one list, grouped by family.

@@ -9,6 +9,9 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
   const [err, setErr] = useState<string | null>(null);
   const [openPreview, setOpenPreview] = useState<string | null>(null);
   const circuit = useApp((s) => s.circuit);
+  // Authoring lock (audit S2): swapping the input circuit mid-run
+  // would desync the canvas from the run in flight.
+  const running = useApp((s) => s.running);
   const setCircuit = useApp((s) => s.setCircuit);
   const setSampleKey = useApp((s) => s.setSampleKey);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -73,18 +76,34 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
           </h3>
         </div>
         <button
-          className="btn-ghost shrink-0"
+          className="btn-ghost shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
           onClick={() => fileRef.current?.click()}
-          title="Upload your own .qpy (Qiskit) or .qasm (OpenQASM 2/3) file"
+          disabled={running || busy === "__upload__"}
+          title={
+            running
+              ? "Locked while a run is in progress"
+              : "Upload your own .qpy (Qiskit) or .qasm (OpenQASM 2/3) file"
+          }
         >
-          <FileUp className="w-3 h-3" /> upload .qpy / .qasm
+          {busy === "__upload__" ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <FileUp className="w-3 h-3" />
+          )}{" "}
+          {busy === "__upload__" ? "uploading…" : "upload .qpy / .qasm"}
         </button>
         <input
           ref={fileRef}
           type="file"
           accept=".qpy,.qasm,.qasm2,.qasm3"
           hidden
-          onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onUpload(f);
+            // Reset so picking the SAME file again re-fires change —
+            // without this a failed upload can't be retried (audit S2).
+            e.target.value = "";
+          }}
         />
       </div>
 
@@ -96,8 +115,10 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
           <span className="text-ink">Input circuit</span> block in your pipeline.
           Or <button
             type="button"
-            className="underline decoration-dotted hover:text-ink"
+            className="underline decoration-dotted hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
             onClick={() => fileRef.current?.click()}
+            disabled={running || busy === "__upload__"}
+            title={running ? "Locked while a run is in progress" : undefined}
           >
             upload your own
           </button>{" "}
@@ -132,8 +153,9 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
               <div className="flex items-stretch">
                 <button
                   onClick={() => pick(s.key)}
-                  className="flex-1 text-left px-2 py-1.5 min-w-0"
-                  disabled={busy === s.key}
+                  className="flex-1 text-left px-2 py-1.5 min-w-0 disabled:cursor-not-allowed"
+                  disabled={busy === s.key || running}
+                  title={running ? "Locked while a run is in progress" : undefined}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span
