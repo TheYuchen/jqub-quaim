@@ -983,6 +983,7 @@ export function FlowCanvas() {
       precisionTarget: restoredTarget,
       autoRunAfter,
       replicateOnce,
+      scenario,
     } = pendingRestore;
     useApp.getState().clearRestore();
 
@@ -1058,10 +1059,10 @@ export function FlowCanvas() {
             // Scenario boot: the graph is on the canvas and the right
             // circuit is loaded — NOW it is safe to request the auto
             // run (see the pendingAutoRun consumer below).
-            useApp.getState().requestAutoRun(
-              sk,
-              replicateOnce != null ? { replicateOnce } : undefined,
-            );
+            useApp.getState().requestAutoRun(sk, {
+              ...(replicateOnce != null ? { replicateOnce } : {}),
+              ...(scenario != null ? { scenario } : {}),
+            });
             return;
           }
           setNotice({
@@ -1087,7 +1088,10 @@ export function FlowCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRestore]);
 
-  const runPipeline = async (opts?: { replicateOnce?: number }) => {
+  const runPipeline = async (opts?: {
+    replicateOnce?: number;
+    scenario?: string;
+  }) => {
     if (!circuit) {
       // Open the left pane so the user can see where to pick a circuit.
       useApp.getState().bumpHintExpandLeftPane();
@@ -1193,6 +1197,9 @@ export function FlowCanvas() {
           useLiveIbm,
           forkedFrom: useApp.getState().restoredFrom,
           precisionTarget: useApp.getState().precisionTarget,
+          // Scenario boots archive tagged: a scripted figure state
+          // must never pool with (or be picked as) user evidence.
+          scenario: opts?.scenario ?? null,
         });
         await saveRun(record);
         // forked_from is a one-shot claim: only the FIRST run archived
@@ -1276,9 +1283,12 @@ export function FlowCanvas() {
     )
       return;
     autoRunFiredRef.current = true;
-    const { replicateOnce } = pendingAutoRun;
+    const { replicateOnce, scenario } = pendingAutoRun;
     useApp.getState().clearAutoRun();
-    void runPipeline(replicateOnce != null ? { replicateOnce } : undefined);
+    void runPipeline({
+      ...(replicateOnce != null ? { replicateOnce } : {}),
+      ...(scenario != null ? { scenario } : {}),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runPipeline is stable-enough (reads live state via closures/store)
   }, [pendingAutoRun, circuit, sampleKey, nodes, running]);
 

@@ -14,7 +14,8 @@ import { GLOSSARY } from "../../lib/glossary";
 import {
   poolEvidence,
   runEvidence,
-  type Evidence,
+  dedupeDraws,
+  type DatedEvidence,
   type PooledEvidence,
 } from "../../lib/stats";
 import {
@@ -599,10 +600,20 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
         // valid within one configuration (same underlying p; see
         // lib/stats.ts) — so the across-runs answer carries a real
         // interval, not just a scatter of points.
-        const evs = rs
-          .filter((r) => r.ok)
-          .map((r) => runEvidence(r.response))
-          .filter((e): e is Evidence => e != null);
+        // Exact replays counted once (dedupeDraws): a pinned replay
+        // repeats its ancestor's draw bit-exactly, so pooling it again
+        // would narrow the interval with no new evidence.
+        const evs = dedupeDraws(
+          rs
+            .filter((r) => r.ok)
+            .map((r): DatedEvidence | null => {
+              const ev = runEvidence(r.response);
+              return ev
+                ? { ...ev, created_at: r.created_at, root_seed: r.root_seed }
+                : null;
+            })
+            .filter((e): e is DatedEvidence => e != null),
+        );
         setPooled(evs.length >= 2 ? poolEvidence(evs) : null);
       })
       .catch(() => {});
@@ -635,7 +646,7 @@ function ReplicateStrip({ currentPoint }: { currentPoint: number }) {
       {pooled && (
         <div
           className="text-[10px] text-mute tabular-nums"
-          title={`All ${pooled.nRuns} archived replicates' measurement counts pooled (${pooled.successes}/${pooled.shots}), one Wilson interval over the pooled counts — same math as the Evidence-board card's pooled band.`}
+          title={`All ${pooled.nRuns} archived replicates' measurement counts pooled (${pooled.successes}/${pooled.shots}), one Wilson interval over the pooled counts — same math as the Evidence-board card's pooled band. Exact replays (same pinned seed) are counted once.`}
         >
           pooled μ {(pooled.point * 100).toFixed(1)}% ±
           {(pooled.halfWidth * 100).toFixed(1)}pp over {pooled.shots} shots (

@@ -248,9 +248,18 @@ function computeLayout(records: RunRecord[]): Layout {
       let cSucc = 0;
       let cShots = 0;
       let cRuns = 0;
+      // Exact replays counted once (same rule as stats.dedupeDraws):
+      // a pinned replay repeats its ancestor's draw bit-exactly, so
+      // pooling it again would narrow the funnel with no new evidence.
+      const seenSeeds = new Set<number>();
       for (let i = sec.length - 1; i >= 0; i--) {
-        const ev = evidence.get(sec[i].run_id);
+        const rec = sec[i];
+        const ev = evidence.get(rec.run_id);
         if (!ev) continue; // non-binomial runs neither widen nor narrow the pool
+        if (rec.root_seed != null) {
+          if (seenSeeds.has(rec.root_seed)) continue;
+          seenSeeds.add(rec.root_seed);
+        }
         cSucc += ev.successes;
         cShots += ev.shots;
         cRuns += 1;
@@ -517,7 +526,7 @@ function LineageLegend() {
       </KeyItem>
       <KeyItem
         label="band = replicates"
-        hint="A translucent band + spine groups a contiguous block of replicate runs of one configuration (what the xN runner produces). The two thin lines flaring around a band are its certainty funnel: the pooled 95% CI half-width narrowing as replicates accumulate -- scaled per group, so compare funnel widths within a band, not across bands."
+        hint="A translucent band + spine groups a contiguous block of replicate runs of one configuration (what the xN runner produces). The two thin lines flaring around a band are its certainty funnel: the pooled 95% CI half-width narrowing as replicates accumulate (exact replays counted once) -- scaled per group, so compare funnel widths within a band, not across bands."
       >
         <rect x={1} y={2.5} width={22} height={9} rx={4.5} fill={ACC} fillOpacity={0.15} />
         <line x1={5} y1={7} x2={19} y2={7} stroke={ACC} strokeOpacity={0.4} strokeWidth={1.5} />
@@ -942,7 +951,7 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                         style={{ pointerEvents: "auto" }}
                       >
                         <title>
-                          {`pooled ±${(newest.hw * 100).toFixed(1)}pp after ${newest.nRuns} runs / ${newest.shots} shots
+                          {`pooled ±${(newest.hw * 100).toFixed(1)}pp after ${newest.nRuns} runs / ${newest.shots} shots (exact replays counted once)
 cumulative Wilson CI half-width of this configuration's pooled counts, widest (oldest) row scaled to ${FUNNEL_MAX_PX}px — the funnel narrowing upward is certainty accumulating across replicate runs (same motif as the fidelity card's funnel, where shot batches accumulate inside one run)`}
                         </title>
                       </polygon>

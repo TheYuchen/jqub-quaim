@@ -46,6 +46,12 @@ export interface RunRecord {
    *  archive (real seeded runs recorded against the live backend).
    *  Lets the UI label them honestly and clear them in one click. */
   demo?: boolean;
+  /** Scenario key ("F0".."F8") when this run was executed by a
+   *  scenario boot's auto-run — a scripted figure state, not user
+   *  evidence. Scenario-tagged records are excluded from the theater's
+   *  prior-evidence pool and the F7 overlay picker (lib/scenarios.ts
+   *  documents the pollution this prevents). */
+  scenario?: string | null;
   /** Optional-stopping target the run was executed with (absolute
    *  fidelity units), or null/absent. Part of provenance: replay
    *  must re-send it or an early-stopped run is not reproducible. */
@@ -265,6 +271,8 @@ export function buildRunRecord(args: {
   forkedFrom: string | null;
   /** Optional-stopping target the request was sent with. */
   precisionTarget?: number | null;
+  /** Scenario key when this run is a scenario boot's auto-run. */
+  scenario?: string | null;
 }): RunRecord {
   const { response } = args;
   const headline = extractHeadline(response.steps);
@@ -297,6 +305,7 @@ export function buildRunRecord(args: {
       args.useLiveIbm,
     ),
     forked_from: args.forkedFrom,
+    scenario: args.scenario ?? null,
     precision_target: args.precisionTarget ?? null,
     stopped_early: stoppedEarly,
     ok: response.ok,
@@ -437,6 +446,7 @@ export async function importArchive(file: File): Promise<ImportReport> {
         typeof entry.precision_target === "number"
           ? entry.precision_target
           : null,
+      scenario: typeof entry.scenario === "string" ? entry.scenario : null,
     });
     // Preserved verbatim: the original archive timestamp (the lineage
     // layout orders by it) and the demo honesty flag.

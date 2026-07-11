@@ -192,11 +192,12 @@ export interface DatedEvidence extends Evidence {
  *  bundled demo archive contains exactly this case: bell-512 run
  *  7e401b5270b9 replays f0cb7403bbae, seed 815033775, 247/512 twice).
  *  Runs with unknown seeds are never deduped — there is no proof they
- *  repeat a draw. NOTE: the multiverse pooled band and the theater's
- *  archive band do not dedupe replays; that pre-existing looseness is
- *  documented in docs/EVIDENCE_WORKBENCH.md rather than silently
- *  repeated here, because this view's whole claim is inferential
- *  honesty. */
+ *  repeat a draw. Since the 2026-07-10 audit wave, EVERY pooling
+ *  surface applies this rule — difference funnel, theater archive
+ *  band, multiverse pooled band/line, fidelity-card replicate strip,
+ *  lineage certainty funnel — and their labels say "exact replays
+ *  counted once" (uniform truth documented in
+ *  docs/EVIDENCE_WORKBENCH.md). */
 export function dedupeDraws<T extends DatedEvidence>(runs: T[]): T[] {
   const sorted = [...runs].sort((a, b) => a.created_at - b.created_at);
   const seen = new Set<number>();

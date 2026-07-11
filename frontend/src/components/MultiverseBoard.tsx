@@ -68,7 +68,8 @@ import {
   POOLED_SMALL_N_SHOTS,
   poolEvidence,
   runEvidence,
-  type Evidence,
+  dedupeDraws,
+  type DatedEvidence,
   type PooledEvidence,
 } from "../lib/stats";
 import { WorkspaceToggle } from "./WorkspaceToggle";
@@ -126,9 +127,18 @@ function buildGroups(runs: RunRecord[]): ConfigGroup[] {
     const values = oks
       .filter((r) => r.headline_value != null)
       .map((r) => Math.min(1, Math.max(0, r.headline_value as number)));
-    const evs = oks
-      .map((r) => runEvidence(r.response))
-      .filter((e): e is Evidence => e != null);
+    // Exact replays counted once (dedupeDraws): pooling a pinned
+    // replay twice would narrow the band with no new evidence.
+    const evs = dedupeDraws(
+      oks
+        .map((r): DatedEvidence | null => {
+          const ev = runEvidence(r.response);
+          return ev
+            ? { ...ev, created_at: r.created_at, root_seed: r.root_seed }
+            : null;
+        })
+        .filter((e): e is DatedEvidence => e != null),
+    );
     groups.push({
       hash,
       hue: hashHue(hash),
@@ -380,7 +390,7 @@ function OutcomeStrip({
           stroke={hueCss(hue, 0.6)}
           strokeWidth={0.75}
         >
-          <title>{`pooled 95% interval: ${(pooled.ci95[0] * 100).toFixed(1)}–${(pooled.ci95[1] * 100).toFixed(1)}% (${pooled.successes}/${pooled.shots} pooled counts over ${pooled.nRuns} runs)`}</title>
+          <title>{`pooled 95% interval: ${(pooled.ci95[0] * 100).toFixed(1)}–${(pooled.ci95[1] * 100).toFixed(1)}% (${pooled.successes}/${pooled.shots} pooled counts over ${pooled.nRuns} runs; exact replays counted once)`}</title>
         </rect>
       )}
       <line x1={X0} x2={X1} y1={H / 2} y2={H / 2} stroke="rgb(var(--color-edge))" strokeWidth={1} />
@@ -558,7 +568,7 @@ function PooledLine({ pooled, hue }: { pooled: PooledEvidence; hue: number }) {
                 stroke={hueCss(hue, 0.7)}
                 strokeWidth={0.75}
               >
-                <title>{`pooled 95% interval: ${(pooled.ci95[0] * 100).toFixed(1)}–${(pooled.ci95[1] * 100).toFixed(1)}% (${pooled.successes}/${pooled.shots} counts over ${pooled.nRuns} runs)`}</title>
+                <title>{`pooled 95% interval: ${(pooled.ci95[0] * 100).toFixed(1)}–${(pooled.ci95[1] * 100).toFixed(1)}% (${pooled.successes}/${pooled.shots} counts over ${pooled.nRuns} runs; exact replays counted once)`}</title>
               </rect>
               <line
                 x1={px(pooled.point)}

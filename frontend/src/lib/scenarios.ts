@@ -419,7 +419,9 @@ async function pickOverlayPairRunIds(): Promise<string[]> {
   };
   const byHash = new Map<string, Array<{ r: (typeof runs)[number]; req: number }>>();
   for (const r of runs) {
-    if (!r.ok) continue;
+    // Scenario-boot records are scripted figure states, not evidence —
+    // never let an accumulated F0 group hijack the F7 pair.
+    if (!r.ok || r.scenario != null) continue;
     const req = tracedBudget(r);
     if (req === 0) continue;
     const arr = byHash.get(r.config_hash) ?? [];
@@ -467,6 +469,14 @@ export async function activateScenario(rawKey: string): Promise<boolean> {
       sourceRunId: null, // scenario boot is not a fork of an archived run
       precisionTarget: sc.precisionTarget ?? null,
       autoRunAfter: sc.autoRun === true,
+      // Archive pollution guard: every scenario auto-run archives a
+      // RunRecord like any run (each F0 boot adds one bell-state
+      // record). Tagging it RunRecord.scenario keeps scripted figure
+      // states out of the theater's prior-evidence pool and out of
+      // pickOverlayPairRunIds below — otherwise repeated F0 boots
+      // would accumulate into a fake "replicate" group and distort
+      // (or hijack) the evidence the figures claim to show.
+      ...(sc.autoRun === true ? { scenario: sc.key } : {}),
     });
   }
 

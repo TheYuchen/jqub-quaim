@@ -93,7 +93,8 @@ import { getRun, listRunsByConfig, type RunRecord } from "../lib/runStore";
 import {
   poolEvidence,
   runEvidence,
-  type Evidence,
+  dedupeDraws,
+  type DatedEvidence,
   type PooledEvidence,
 } from "../lib/stats";
 import { hashHue, hueCss } from "../lib/hues";
@@ -523,7 +524,7 @@ function Panel({
             <tspan x={W - M.r + 10} dy={12}>
               over {fmtShots(pool.shots)} shots from {poolRuns} run{poolRuns === 1 ? "" : "s"}
             </tspan>
-            <title>Evidence this exact configuration already accumulated in your run archive (pooled Wilson interval over all archived shots — valid because replicates of one configuration share the same underlying probability). The streaming run adds to this.</title>
+            <title>Evidence this exact configuration already accumulated in your run archive (pooled Wilson interval over all archived shots — valid because replicates of one configuration share the same underlying probability). Exact replays are counted once; scenario-boot runs are excluded. The streaming run adds to this.</title>
           </text>
         </g>
       )}
@@ -1019,11 +1020,14 @@ export function EvidenceTheater() {
   const [autoOpenPref, setAutoOpenPref] = useState(theaterAutoOpenEnabled());
 
   // Do the displayed run and the retained traces describe the same
-  // run? While streaming the partial RunResponse has no run_id yet;
-  // once finished it must match the run_meta the stream announced.
-  // A restored OLD run must not inherit another run's timings/pool.
+  // run? While streaming the partial RunResponse has no run_id yet —
+  // that is the ONLY case an id-less run is trustworthy; once finished
+  // it must match the run_meta the stream announced. A restored or
+  // cache-served run without an id must NOT inherit the previous run's
+  // seed / config chips / wall-times.
   const timesTrusted =
-    theaterRun != null && (run?.run_id == null || run.run_id === theaterRun.runId);
+    theaterRun != null &&
+    (run?.run_id == null ? running : run.run_id === theaterRun.runId);
 
   const series = useMemo(() => {
     const out: Series[] = [];
@@ -1134,15 +1138,27 @@ export function EvidenceTheater() {
     listRunsByConfig(ch)
       .then((rs) => {
         if (cancelled) return;
-        const evs = rs
-          .filter(
-            (r) =>
-              r.ok &&
-              r.created_at < (theaterRun?.startedAt ?? 0) &&
-              r.run_id !== theaterRun?.runId,
-          )
-          .map((r) => runEvidence(r.response))
-          .filter((e): e is Evidence => e != null);
+        // Honest pool: scenario-boot records are scripted figure
+        // states, not prior evidence, and exact replays are counted
+        // once (dedupeDraws — the same rule the difference funnel
+        // applies).
+        const evs = dedupeDraws(
+          rs
+            .filter(
+              (r) =>
+                r.ok &&
+                r.scenario == null &&
+                r.created_at < (theaterRun?.startedAt ?? 0) &&
+                r.run_id !== theaterRun?.runId,
+            )
+            .map((r): DatedEvidence | null => {
+              const ev = runEvidence(r.response);
+              return ev
+                ? { ...ev, created_at: r.created_at, root_seed: r.root_seed }
+                : null;
+            })
+            .filter((e): e is DatedEvidence => e != null),
+        );
         const p = evs.length > 0 ? poolEvidence(evs) : null;
         setPool(p ? { p, n: evs.length } : null);
       })

@@ -233,6 +233,10 @@ interface AppState {
      *  quick action "+3 replicates"). Consumed by that single run
      *  only — never written into the global toolbar replicateCount. */
     replicateOnce?: number;
+    /** Scenario key when this restore is a scenario boot: threads into
+     *  the auto-run's archived RunRecord (RunRecord.scenario) so
+     *  scripted figure-state runs never masquerade as user evidence. */
+    scenario?: string;
   } | null;
   requestRestore: (r: NonNullable<AppState["pendingRestore"]>) => void;
   clearRestore: () => void;
@@ -338,10 +342,14 @@ interface AppState {
    * boot-time default circuit is still loaded (restore's sample load is
    * async and races the default bell_state auto-load).
    */
-  pendingAutoRun: { sampleKey: string | null; replicateOnce?: number } | null;
+  pendingAutoRun: {
+    sampleKey: string | null;
+    replicateOnce?: number;
+    scenario?: string;
+  } | null;
   requestAutoRun: (
     sampleKey: string | null,
-    opts?: { replicateOnce?: number },
+    opts?: { replicateOnce?: number; scenario?: string },
   ) => void;
   clearAutoRun: () => void;
 
