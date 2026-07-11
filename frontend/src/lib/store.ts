@@ -229,6 +229,10 @@ interface AppState {
      *  restore consumer, so it can't race the boot-time default-
      *  circuit load). */
     autoRunAfter?: boolean;
+    /** One-shot replicate count for the requested auto-run (board
+     *  quick action "+3 replicates"). Consumed by that single run
+     *  only — never written into the global toolbar replicateCount. */
+    replicateOnce?: number;
   } | null;
   requestRestore: (r: NonNullable<AppState["pendingRestore"]>) => void;
   clearRestore: () => void;
@@ -334,8 +338,11 @@ interface AppState {
    * boot-time default circuit is still loaded (restore's sample load is
    * async and races the default bell_state auto-load).
    */
-  pendingAutoRun: { sampleKey: string | null } | null;
-  requestAutoRun: (sampleKey: string | null) => void;
+  pendingAutoRun: { sampleKey: string | null; replicateOnce?: number } | null;
+  requestAutoRun: (
+    sampleKey: string | null,
+    opts?: { replicateOnce?: number },
+  ) => void;
   clearAutoRun: () => void;
 
   /** Scenario bridge: which Evidence tab ResultsPane should switch to.
@@ -510,7 +517,8 @@ export const useApp = create<AppState>((set) => ({
   pendingTouchDrop: null,
   setPendingTouchDrop: (v) => set({ pendingTouchDrop: v }),
   pendingAutoRun: null,
-  requestAutoRun: (sampleKey) => set({ pendingAutoRun: { sampleKey } }),
+  requestAutoRun: (sampleKey, opts) =>
+    set({ pendingAutoRun: { sampleKey, ...(opts ?? {}) } }),
   clearAutoRun: () => set({ pendingAutoRun: null }),
   pendingEvidenceTab: null,
   setPendingEvidenceTab: (t) => set({ pendingEvidenceTab: t }),

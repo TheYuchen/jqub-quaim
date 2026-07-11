@@ -315,9 +315,21 @@ export function FlowCanvas() {
       };
     });
 
-    setNodes((ns) => {
-      const merged = [...ns, ...newNodes];
-      const result = autoConnect(merged, [], useApp.getState().plugins);
+    // Append only — never touch existing nodes/edges inside the
+    // updater. Side effects (setEdges/setNotice) are hoisted OUT of
+    // the setNodes updater: StrictMode double-invokes updaters, so a
+    // setEdges inside one fires twice.
+    setNodes((ns) => [...ns, ...newNodes]);
+    if (edges.length > 0) {
+      // The canvas already has wiring (hand-drawn or restored).
+      // Recomputing the whole edge set would silently destroy it —
+      // leave the new blocks unwired and say so.
+      setNotice({
+        text: `Added ${kinds.length} block${kinds.length > 1 ? "s" : ""} — wire ${kinds.length > 1 ? "them" : "it"} in manually or press Auto-connect.`,
+        tone: "ok",
+      });
+    } else {
+      const result = autoConnect([...nodes, ...newNodes], [], plugins);
       if (result.connected) {
         setEdges(result.edges);
         setNotice(
@@ -333,8 +345,7 @@ export function FlowCanvas() {
               },
         );
       }
-      return merged;
-    });
+    }
 
     requestAnimationFrame(() => fitView({ padding: 0.2, duration: 300, maxZoom: 1 }));
   }, [pendingBlockKinds]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -741,6 +752,15 @@ export function FlowCanvas() {
     setEdges(g.edges);
     setRun(null);
     setNotice(null);
+    // Provenance hygiene: a preset is a NEW definition, not a fork of
+    // whatever was restored before. Drop the restored parentage, the
+    // pinned seed, the stopping rule and the editor framing, or the
+    // next archived run would claim a false lineage / replay a stale
+    // seed that has nothing to do with this graph.
+    setPinnedSeed(null);
+    setPrecisionTarget(null);
+    useApp.getState().setRestoredFrom(null);
+    useApp.getState().setEditorContext(null);
     // Sample selection: an explicit override beats the preset's
     // defaultCircuit, which beats keeping the current sample. Skip the network round-trip if we're already on
     // the requested sample.
@@ -771,6 +791,13 @@ export function FlowCanvas() {
     setEdges([]);
     setRun(null);
     setNotice(null);
+    // Same provenance hygiene as loadPreset: a cleared canvas is not a
+    // fork of anything and carries no pinned seed / stopping rule /
+    // card identity (mirrors the New-configuration bridge below).
+    setPinnedSeed(null);
+    setPrecisionTarget(null);
+    useApp.getState().setRestoredFrom(null);
+    useApp.getState().setEditorContext(null);
   };
 
   // Share flow for the toolbar's ⋯ menu (Share lives there at every
@@ -930,6 +957,7 @@ export function FlowCanvas() {
     setEdges([]);
     setRun(null);
     setPinnedSeed(null);
+    setPrecisionTarget(null);
     useApp.getState().setRestoredFrom(null);
     setNotice({
       text: "New configuration — drag blocks from the strip above or pick a preset, then Run to archive its first evidence.",
@@ -954,6 +982,7 @@ export function FlowCanvas() {
       sourceRunId,
       precisionTarget: restoredTarget,
       autoRunAfter,
+      replicateOnce,
     } = pendingRestore;
     useApp.getState().clearRestore();
 
@@ -1008,7 +1037,10 @@ export function FlowCanvas() {
     }, 1400);
     setRun(null);
     useApp.getState().setRestoredFrom(sourceRunId);
-    if (pinSeed != null) setPinnedSeed(pinSeed);
+    // Always write the pin — INCLUDING null: restoring a fresh-draw
+    // run (board Open) must clear any stale pin left by an unrelated
+    // earlier replay, or the next run silently replays the wrong seed.
+    setPinnedSeed(pinSeed);
     // The optional-stopping target is part of the restored run's
     // configuration in BOTH modes: a pinned replay of an early-stopped
     // run must re-send it to reproduce the stopping point bit-exactly,
@@ -1026,7 +1058,10 @@ export function FlowCanvas() {
             // Scenario boot: the graph is on the canvas and the right
             // circuit is loaded — NOW it is safe to request the auto
             // run (see the pendingAutoRun consumer below).
-            useApp.getState().requestAutoRun(sk);
+            useApp.getState().requestAutoRun(
+              sk,
+              replicateOnce != null ? { replicateOnce } : undefined,
+            );
             return;
           }
           setNotice({
@@ -1052,7 +1087,7 @@ export function FlowCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRestore]);
 
-  const runPipeline = async () => {
+  const runPipeline = async (opts?: { replicateOnce?: number }) => {
     if (!circuit) {
       // Open the left pane so the user can see where to pick a circuit.
       useApp.getState().bumpHintExpandLeftPane();
@@ -1160,6 +1195,11 @@ export function FlowCanvas() {
           precisionTarget: useApp.getState().precisionTarget,
         });
         await saveRun(record);
+        // forked_from is a one-shot claim: only the FIRST run archived
+        // after a restore descends from the restored run. Consume it so
+        // later runs of this canvas don't inherit a false lineage.
+        if (useApp.getState().restoredFrom != null)
+          useApp.getState().setRestoredFrom(null);
         useApp.getState().setLastConfigHash(record.config_hash);
         useApp.getState().bumpHistoryVersion();
       } catch (e) {
@@ -1169,7 +1209,7 @@ export function FlowCanvas() {
 
     // Replicates only make sense for fresh draws; under a pinned seed
     // every repeat would return the identical numbers.
-    const count = pinnedSeed != null ? 1 : replicateCount;
+    const count = pinnedSeed != null ? 1 : (opts?.replicateOnce ?? replicateCount);
     try {
       for (let i = 0; i < count; i++) {
         if (count > 1) {
@@ -1236,8 +1276,9 @@ export function FlowCanvas() {
     )
       return;
     autoRunFiredRef.current = true;
+    const { replicateOnce } = pendingAutoRun;
     useApp.getState().clearAutoRun();
-    void runPipeline();
+    void runPipeline(replicateOnce != null ? { replicateOnce } : undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runPipeline is stable-enough (reads live state via closures/store)
   }, [pendingAutoRun, circuit, sampleKey, nodes, running]);
 
@@ -1495,7 +1536,7 @@ export function FlowCanvas() {
               md-gates, so no hidden/md:flex here — on mobile the
               bottom-right Run FAB takes over. */}
           <button
-            onClick={runPipeline}
+            onClick={() => void runPipeline()}
             disabled={running || !circuit}
             className="btn-primary h-8 disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={running ? "Running" : "Run pipeline"}
@@ -1589,7 +1630,7 @@ export function FlowCanvas() {
             so it stays clear of the iOS home indicator. */}
         <button
           type="button"
-          onClick={runPipeline}
+          onClick={() => void runPipeline()}
           disabled={running || !circuit}
           className="md:hidden absolute right-4 z-20 flex items-center gap-2 px-4 py-3 rounded-full bg-accent text-canvas shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm active:scale-95 transition-transform"
           style={{

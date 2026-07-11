@@ -605,8 +605,6 @@ export function MultiverseBoard() {
   const setWorkspaceMode = useApp((s) => s.setWorkspaceMode);
   const setEditorContext = useApp((s) => s.setEditorContext);
   const requestNewConfig = useApp((s) => s.requestNewConfig);
-  const setReplicateCount = useApp((s) => s.setReplicateCount);
-  const setPinnedSeed = useApp((s) => s.setPinnedSeed);
   const compareIds = useApp((s) => s.compareIds);
   const toggleCompare = useApp((s) => s.toggleCompare);
 
@@ -715,10 +713,10 @@ export function MultiverseBoard() {
   const runThreeReplicates = (g: ConfigGroup) => {
     const src = g.latestOk;
     if (!src || src.sample_key == null) return;
-    // Fresh draws: clear any stale pinned seed (a pin forces ×1 and
-    // identical numbers) and ask for 3 replicates.
-    setPinnedSeed(null);
-    setReplicateCount(3);
+    // Fresh draws, one-shot: pinSeed:null clears any stale pin via
+    // the restore bridge, and replicateOnce asks THIS auto-run for 3
+    // replicates without mutating the global toolbar replicateCount —
+    // a board quick action must not rewrite the user's Run settings.
     requestRestore({
       graph: src.graph,
       sampleKey: src.sample_key,
@@ -726,6 +724,7 @@ export function MultiverseBoard() {
       sourceRunId: src.run_id,
       precisionTarget: src.precision_target ?? null,
       autoRunAfter: true,
+      replicateOnce: 3,
     });
   };
 
