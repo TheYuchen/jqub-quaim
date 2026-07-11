@@ -10,11 +10,16 @@ export function EmptyCanvas() {
     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
       <div className="panel px-6 py-5 pointer-events-auto text-center max-w-sm">
         <div className="text-ink font-medium mb-1">Canvas is empty</div>
+        {/* Control names, not labels (audit S3): "Load preset" and
+            "Run pipeline" render icon-only in the 768–1024 band, so
+            the copy describes where to look instead of quoting text
+            the user cannot see. */}
         <div className="text-sm text-mute mb-3">
-          Drag blocks from the strip above, or pick a preset from{" "}
-          <span className="kbd">Load preset</span> — then hit{" "}
-          <span className="kbd">Run pipeline</span> and evidence collects
-          in the right-hand pane.
+          Drag blocks from the strip above, or load a preset from the
+          toolbar's layers-icon menu — then hit{" "}
+          <span className="kbd">Run</span> (toolbar top-right; round
+          button bottom-right on phones) and evidence collects in the
+          right-hand pane.
         </div>
         <div className="flex flex-wrap gap-1 justify-center">
           {NODE_CATALOG.slice(0, 6).map((n) => (

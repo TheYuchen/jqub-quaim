@@ -141,11 +141,28 @@ export async function pruneCompareSelection(): Promise<void> {
   }
 }
 
+/** Shared newest-first read window for interactive archive surfaces
+ *  (audit S3 cap consolidation — per-call-site caps used to disagree
+ *  at 50/100/200/500 for no reason). Surfaces that display a TOTAL
+ *  pair their windowed list with countRuns() so the number stays
+ *  honest past the window; one-shot pipelines (archive export, demo
+ *  scan, scenario boot, figure export) scan unbounded instead. */
+export const ARCHIVE_WINDOW = 200;
+
 /** Archive size without materializing records — IDBObjectStore.count.
  *  Cheap enough to call on every historyVersion bump (badge material
  *  for the Evidence pane's History tab). */
 export function countRuns(): Promise<number> {
   return tx("readonly", (s) => s.count());
+}
+
+/** Exact archive count for ONE configuration via the config_hash
+ *  index — no window, no materialized records (audit S3: replaces a
+ *  listRuns(500)-then-filter that undercounted past the window). */
+export function countRunsByConfig(configHash: string): Promise<number> {
+  return tx("readonly", (s) =>
+    s.index("config_hash").count(IDBKeyRange.only(configHash)),
+  );
 }
 
 /** Newest-first list. Uses the created_at index with a reverse cursor
@@ -174,7 +191,10 @@ export function listRuns(limit = 100): Promise<RunRecord[]> {
 }
 
 /** All archived runs of one configuration, oldest first (natural
- *  order for convergence displays). */
+ *  order for convergence displays). Past `limit`, the NEWEST `limit`
+ *  records are kept (still oldest-first) — the old early-stopping
+ *  cursor kept an arbitrary primary-key-ordered subset instead
+ *  (audit S3). */
 export function listRunsByConfig(
   configHash: string,
   limit = 200,
@@ -188,12 +208,12 @@ export function listRunsByConfig(
         const cur = idx.openCursor(IDBKeyRange.only(configHash));
         cur.onsuccess = () => {
           const c = cur.result;
-          if (c && out.length < limit) {
+          if (c) {
             out.push(c.value as RunRecord);
             c.continue();
           } else {
             out.sort((a, b) => a.created_at - b.created_at);
-            resolve(out);
+            resolve(out.length > limit ? out.slice(out.length - limit) : out);
             db.close();
           }
         };
@@ -265,8 +285,10 @@ export function computeConfigHash(
 // ---------------------------------------------------------------------------
 
 /** Pull a timeline-friendly headline out of a finished response: the
- *  last fidelity value if present, else the last numeric summary
- *  metric of the output step, else nothing. */
+ *  last successful fidelity step's value, else nothing. (Deliberately
+ *  NO fallback to other summary metrics — mixing metrics in one
+ *  headline column would make rows incomparable. The docstring used
+ *  to claim an output-step fallback that never existed; audit S3.) */
 function extractHeadline(
   steps: StepResult[],
 ): { label: string | null; value: number | null } {
@@ -367,7 +389,9 @@ export interface ArchiveFile {
 /** Serialize archived runs (all by default, or a run_id subset) and
  *  trigger a browser download. Returns the number of records written. */
 export async function exportArchive(runIds?: string[]): Promise<number> {
-  let records = await listRuns(1000);
+  // Unbounded scan: the export is the user-study data hand-off —
+  // silently truncating past a cap would lose evidence (audit S3).
+  let records = await listRuns(Infinity);
   if (runIds && runIds.length > 0) {
     const want = new Set(runIds);
     records = records.filter((r) => want.has(r.run_id));
@@ -467,6 +491,16 @@ export async function importArchive(file: File): Promise<ImportReport> {
           : null,
       scenario: typeof entry.scenario === "string" ? entry.scenario : null,
     });
+    // Synthesized-id records (a server that sent no run_id): letting
+    // buildRunRecord mint a FRESH random id on import would duplicate
+    // them on every re-import of the same file. Preserve the file's
+    // id verbatim — it is the dedupe key (audit S3).
+    if (
+      typeof entry.run_id === "string" &&
+      entry.run_id !== "" &&
+      !entry.response.run_id
+    )
+      rec.run_id = entry.run_id;
     // Preserved verbatim: the original archive timestamp (the lineage
     // layout orders by it) and the demo honesty flag.
     if (Number.isFinite(entry.created_at)) rec.created_at = entry.created_at;

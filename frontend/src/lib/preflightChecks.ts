@@ -11,8 +11,9 @@
 //   * `error` — the run definitely won't produce useful output.
 //     (e.g. dangling Output node, no Input upstream of an Algorithm.)
 //
-// Each finding can name a `node_id` so the canvas can highlight the
-// offending node when the banner is hovered or clicked.
+// Each finding can name a `node_id` identifying the offending node.
+// (Carried for a future highlight affordance — the banner currently
+// renders messages only; nothing consumes node_id yet.)
 
 import type { Edge, Node } from "@xyflow/react";
 import type { CircuitInfo } from "./api";
@@ -213,6 +214,63 @@ export function runPreflight(input: PreflightInput): PreflightFinding[] {
     findings.push({
       severity: "warn",
       message: "Pipeline has no Output block. Add one to see final metrics.",
+    });
+  }
+
+  // 6b. Cycle: the backend rejects cyclic graphs outright
+  //     (topological_order raises ValueError before any step runs) —
+  //     surface that before the round-trip. Kahn's algorithm, same as
+  //     the server. Edges to/from unknown ids are ignored, matching
+  //     the defensive findUpstream walk above.
+  if (nodes.length > 0 && edges.length > 0) {
+    const indeg = new Map<string, number>(nodes.map((n) => [n.id, 0]));
+    for (const e of edges) {
+      if (indeg.has(e.target) && indeg.has(e.source))
+        indeg.set(e.target, (indeg.get(e.target) ?? 0) + 1);
+    }
+    const queue = [...indeg.entries()]
+      .filter(([, d]) => d === 0)
+      .map(([id]) => id);
+    let visited = 0;
+    while (queue.length) {
+      const id = queue.shift()!;
+      visited += 1;
+      for (const child of outgoing.get(id) ?? []) {
+        if (!indeg.has(child)) continue;
+        const d = (indeg.get(child) ?? 1) - 1;
+        indeg.set(child, d);
+        if (d === 0) queue.push(child);
+      }
+    }
+    if (visited < indeg.size) {
+      findings.push({
+        severity: "error",
+        message:
+          "Pipeline contains a cycle — the runner rejects cyclic graphs before executing anything.",
+      });
+    }
+  }
+
+  // 6c. Duplicate sources / backends (mirrors autoConnect's advisory
+  //     facts about the runner): extra Inputs only add duplicate
+  //     summary rows; every backend handler overwrites ctx["backend"],
+  //     so with several backends the last one to run silently wins.
+  const sourceCount = nodes.filter(
+    (n) => specOf(n.data.kind)?.family === "source",
+  ).length;
+  if (sourceCount > 1) {
+    findings.push({
+      severity: "warn",
+      message: `${sourceCount} Input blocks — extras produce duplicate summary rows.`,
+    });
+  }
+  const backendCount = nodes.filter(
+    (n) => specOf(n.data.kind)?.family === "backend",
+  ).length;
+  if (backendCount > 1) {
+    findings.push({
+      severity: "warn",
+      message: `${backendCount} backend blocks — each overwrites the shared noise profile; the last one to run wins.`,
     });
   }
 

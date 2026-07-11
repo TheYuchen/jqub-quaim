@@ -46,10 +46,15 @@ export interface RibbonEdgeData extends Record<string, unknown> {
    *  band stays uniform at the source thickness. */
   tgtSize: number | null;
   /** Downstream step's transformation delta.size (<0 = shrank the
-   *  circuit, >0 = grew it, 0 = pass-through / unknown). */
-  deltaSize: number;
-  /** Human-readable flow label ("2 qubits · depth 4 · 7 ops"). */
+   *  circuit, >0 = grew it, 0 = size unchanged). null = the step
+   *  reported no transformation at all — "unknown" is distinct from
+   *  "unchanged" (audit S3). */
+  deltaSize: number | null;
+  /** Human-readable flow label ("2 qubits · depth 4 · 7 gates"). */
   flowLabel?: string;
+  /** Canvas was edited after the run that produced these numbers —
+   *  the whole encoding renders dimmed (FlowCanvas hash check). */
+  stale?: boolean;
 }
 
 const CURVATURE = 0.25;
@@ -170,9 +175,9 @@ export function RibbonEdge({
   const basePath = outlinePath(samples, 0, SAMPLES);
   const half = SAMPLES / 2;
   const tint =
-    d.deltaSize < 0
+    d.deltaSize != null && d.deltaSize < 0
       ? "rgb(var(--color-ok))"
-      : d.deltaSize > 0
+      : d.deltaSize != null && d.deltaSize > 0
         ? "rgb(var(--color-warn))"
         : null;
   const tintPath = tint ? outlinePath(samples, half, SAMPLES) : null;
@@ -182,9 +187,19 @@ export function RibbonEdge({
     <>
       <g
         className="circuit-ribbon"
+        // role="img": aria-label on a bare <g> is ignored by most
+        // screen readers without an image role (audit S3).
+        role="img"
+        opacity={d.stale ? 0.45 : undefined}
         aria-label={`circuit-ribbon: ${d.srcSize ?? 0} gates flowing in, ${outGates} gates out${
-          d.deltaSize < 0 ? " (step shrank the circuit)" : d.deltaSize > 0 ? " (step grew the circuit)" : ""
-        }`}
+          d.deltaSize == null
+            ? ""
+            : d.deltaSize < 0
+              ? " (step shrank the circuit)"
+              : d.deltaSize > 0
+                ? " (step grew the circuit)"
+                : " (size unchanged)"
+        }${d.stale ? " — canvas edited since this run" : ""}`}
       >
         {/* base band — low-opacity accent so ribbons layer politely
             over the dot grid and under node cards */}
@@ -203,6 +218,7 @@ export function RibbonEdge({
             className="nodrag nopan absolute pointer-events-none font-mono text-[9px] font-medium text-ink bg-surface/95 border border-edge rounded px-1 py-px"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+              ...(d.stale ? { opacity: 0.45 } : {}),
             }}
           >
             {d.flowLabel}

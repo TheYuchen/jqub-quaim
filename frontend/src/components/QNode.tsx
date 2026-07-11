@@ -34,8 +34,8 @@ export interface QNodeData extends Record<string, unknown> {
  * full parameter editor / results viewer lives in the ResultsPane on the
  * right. Noisy per-node inline editors make the graph hard to read.
  *
- * A small × button appears on hover so users can delete a node without
- * knowing the Backspace shortcut.
+ * A small × button (always rendered, dimmed until hover/focus) lets
+ * users delete a node without knowing the Backspace shortcut.
  */
 export function QNode({ id, data, selected }: NodeProps) {
   const d = data as QNodeData;

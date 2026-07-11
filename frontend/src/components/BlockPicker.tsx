@@ -126,7 +126,7 @@ export function BlockPicker({
         <div
           role="menu"
           aria-label="Block catalog"
-          className="fixed left-3 top-14 sm:absolute sm:left-0 sm:top-full sm:mt-1 z-40 w-[min(320px,calc(100vw-1.5rem))] max-h-[70vh] rounded-lg border border-edge bg-surface shadow-xl flex flex-col"
+          className="fixed left-3 top-14 sm:absolute sm:left-0 sm:top-full sm:mt-1 z-30 w-[min(320px,calc(100vw-1.5rem))] max-h-[70vh] rounded-lg border border-edge bg-surface shadow-xl flex flex-col"
         >
           {/* Search */}
           <div className="p-2 border-b border-edge">

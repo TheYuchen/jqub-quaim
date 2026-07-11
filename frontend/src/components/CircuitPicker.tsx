@@ -9,6 +9,7 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
   const [err, setErr] = useState<string | null>(null);
   const [openPreview, setOpenPreview] = useState<string | null>(null);
   const circuit = useApp((s) => s.circuit);
+  const sampleKey = useApp((s) => s.sampleKey);
   // Authoring lock (audit S2): swapping the input circuit mid-run
   // would desync the canvas from the run in flight.
   const running = useApp((s) => s.running);
@@ -139,7 +140,11 @@ export function CircuitPicker({ onCollapse }: { onCollapse?: () => void } = {}) 
         </div>
         <div className="text-[11px] text-mute uppercase tracking-wider mb-1">Samples</div>
         {samples.map((s) => {
-          const active = circuit?.name === s.display_name;
+          // Match by sample KEY, not display name: an upload could
+          // share a sample's display name, and renaming a sample must
+          // not silently break the highlight (audit S3). sampleKey is
+          // null for uploads, so no sample row lights up then.
+          const active = sampleKey === s.key;
           const previewOpen = openPreview === s.key;
           return (
             <div

@@ -58,7 +58,7 @@ import {
   X,
 } from "lucide-react";
 import { useApp } from "../lib/store";
-import { listRuns, type RunRecord } from "../lib/runStore";
+import { ARCHIVE_WINDOW, countRuns, listRuns, type RunRecord } from "../lib/runStore";
 import type { SharePayload, ShareNode } from "../lib/share";
 import { resolveNodeSpec, type NodeSpec } from "../lib/nodeCatalog";
 import type { PluginManifest } from "../lib/api";
@@ -273,8 +273,13 @@ function topoOrder(g: SharePayload): ShareNode[] {
   return out;
 }
 
+// source is a hardcoded slate-500 hex ON PURPOSE: no theme token is
+// "neutral but visible on both themes" (mute is taken by sink, ink
+// flips to near-white in dark mode). Same trade the MiniMap palette
+// makes — see FlowCanvas colorForKind (audit S3: documented, not a
+// leftover).
 const FAMILY_FILL: Record<NodeSpec["family"], string> = {
-  source: "#64748b", // slate
+  source: "#64748b", // slate-500
   backend: "rgb(var(--color-accent))",
   algorithm: "rgb(var(--color-accent2))",
   metric: "rgb(var(--color-ok))",
@@ -383,7 +388,10 @@ function OutcomeStrip({
         <rect
           x={px(pooled.ci95[0])}
           y={H / 2 + 6}
-          width={Math.max(1.5, px(pooled.ci95[1]) - px(pooled.ci95[0]))}
+          // 2px floor = PooledLine's, so a hairline interval reads as
+          // a mark in both renderings (audit S3: 1.5px vanished on
+          // low-DPI screens).
+          width={Math.max(2, px(pooled.ci95[1]) - px(pooled.ci95[0]))}
           height={4}
           rx={2}
           fill={hueCss(hue, 0.3)}
@@ -631,6 +639,10 @@ export function MultiverseBoard() {
   const gridRef = useRef<HTMLDivElement>(null);
   const [canSpan, setCanSpan] = useState(false);
   const [runs, setRuns] = useState<RunRecord[] | null>(null);
+  // True archive size for the header count — the card list below is
+  // windowed, and a windowed length must not masquerade as a total
+  // (audit S3 cap sweep).
+  const [totalRuns, setTotalRuns] = useState<number | null>(null);
   const [hintDismissed, setHintDismissed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(MULTIVERSE_HINT_LS_KEY) === "1";
@@ -646,12 +658,23 @@ export function MultiverseBoard() {
   const [hintForced, setHintForced] = useState(false);
   useEffect(() => {
     let alive = true;
-    listRuns(200)
+    // ARCHIVE_WINDOW newest runs suffice for the cards: groups are a
+    // recency view of what the user is actively comparing; the header
+    // total comes from countRuns() so nothing pretends the window is
+    // the archive.
+    listRuns(ARCHIVE_WINDOW)
       .then((r) => {
         if (alive) setRuns(r);
       })
       .catch(() => {
         if (alive) setRuns([]);
+      });
+    countRuns()
+      .then((n) => {
+        if (alive) setTotalRuns(n);
+      })
+      .catch(() => {
+        /* count unavailable — fall back to the windowed length */
       });
     return () => {
       alive = false;
@@ -744,9 +767,13 @@ export function MultiverseBoard() {
       className="multiverse-board flex-1 flex flex-col min-h-0 bg-canvas"
       aria-label="Evidence board: all configurations as small multiples"
     >
-      {/* Header mirrors the FlowCanvas toolbar height so flipping modes
-          doesn't jump the layout. The toggle is duplicated here because
-          the canvas toolbar is covered while this board is up. */}
+      {/* Board header — h-12, deliberately NOT the editor toolbar's
+          two-row height (the board needs one row; the center column
+          re-lays-out on mode flips anyway — audit S3: the old comment
+          claimed a height mirror that stopped being true when the
+          toolbar grew its second row). The toggle is duplicated here
+          because the canvas toolbar is covered while this board is
+          up. */}
       <div className="h-12 shrink-0 border-b border-edge px-3 sm:px-4 flex items-center gap-3">
         <WorkspaceToggle />
         <div className="text-xs text-mute truncate">
@@ -759,7 +786,8 @@ export function MultiverseBoard() {
             <>
               {" "}
               · {groups.length} configuration{groups.length === 1 ? "" : "s"} ·{" "}
-              {runs.length} archived run{runs.length === 1 ? "" : "s"}
+              {totalRuns ?? runs.length} archived run
+              {(totalRuns ?? runs.length) === 1 ? "" : "s"}
             </>
           )}
         </div>
@@ -778,7 +806,10 @@ export function MultiverseBoard() {
           <Plus className="w-3 h-3" />
           <span className="hidden sm:inline">New configuration</span>
         </button>
-        {!hintVisible && (
+        {/* hasCards gate (audit S3): the hint strip only renders over
+            a non-empty grid, so on an empty board this "?" was a
+            no-op — the empty state below teaches instead. */}
+        {!hintVisible && hasCards && (
           <button
             type="button"
             data-export-strip

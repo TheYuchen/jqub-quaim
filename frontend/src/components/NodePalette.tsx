@@ -135,6 +135,7 @@ export function NodePalette() {
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-mute pointer-events-none" />
           <input
             type="text"
+            aria-label="Search blocks"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."

@@ -91,7 +91,10 @@ export interface AutoConnectResult {
   warnings: string[];
   /** `true` when at least one edge was produced. */
   connected: boolean;
-  /** Number of pre-existing edges that this result would replace. */
+  /** Number of pre-existing edges this result actually REWIRES —
+   *  edges whose (source, target) pair survives verbatim don't count
+   *  (audit S3: re-running Auto-connect on an already-canonical chain
+   *  used to claim it replaced everything). */
   replacedCount: number;
 }
 
@@ -298,5 +301,17 @@ export function autoConnect(
     });
   }
 
-  return { edges, warnings, connected: true, replacedCount };
+  // Identity is the (source, target) pair — edge ids and styling are
+  // cosmetic, so a rewire that reproduces the same pair replaced
+  // nothing the user would recognise as a change.
+  const newPairs = new Set(edges.map((e) => `${e.source}>${e.target}`));
+  const actuallyReplaced = existingEdges.filter(
+    (e) => !newPairs.has(`${e.source}>${e.target}`),
+  ).length;
+  return {
+    edges,
+    warnings,
+    connected: true,
+    replacedCount: actuallyReplaced,
+  };
 }

@@ -372,8 +372,10 @@ interface AppState {
   bumpHintExpandRightPane: () => void;
 
   /** Scenario F5: render gate-level circuit diffs expanded by default
-   *  on QuCAD cards (the <details> boots open). Not consumed/cleared —
-   *  deterministic for the whole scenario session. */
+   *  on QuCAD cards (the <details> boots open). Not consumed per-read
+   *  (deterministic while the scripted state lasts); FlowCanvas clears
+   *  it on preset load / canvas clear — the user actively leaving the
+   *  scripted state ends its framing (audit S3). */
   gateDiffDefaultOpen: boolean;
   setGateDiffDefaultOpen: (v: boolean) => void;
 }
@@ -522,7 +524,10 @@ export const useApp = create<AppState>((set) => ({
     set({ useLiveIbm: v });
   },
   pendingBlockKinds: [],
-  addBlocksToCanvas: (kinds) => set({ pendingBlockKinds: kinds }),
+  // Append, don't replace: two adds landing before FlowCanvas's
+  // consumer effect runs must both survive (audit S3).
+  addBlocksToCanvas: (kinds) =>
+    set((s) => ({ pendingBlockKinds: [...s.pendingBlockKinds, ...kinds] })),
   clearPendingBlocks: () => set({ pendingBlockKinds: [] }),
   canvasKinds: [],
   setCanvasKinds: (kinds) => set({ canvasKinds: kinds }),

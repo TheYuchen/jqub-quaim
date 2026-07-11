@@ -302,7 +302,9 @@ const emitFidelity: Emitter = (b, _step, ctx) => {
     const targetLines =
       ctx.precisionTarget != null
         ? [
-            `    precision_target=${ctx.precisionTarget},  # stop at ±${(ctx.precisionTarget * 100).toFixed(1)}pp (95%-CI half-width)`,
+            // ±5pp, not ±5.0pp — mirror the toolbar's label; keep the
+            // decimal only when the target actually has one (audit S3).
+            `    precision_target=${ctx.precisionTarget},  # stop at ±${(ctx.precisionTarget * 100).toFixed(1).replace(/\.0$/, "")}pp (95%-CI half-width)`,
           ]
         : [];
     return [

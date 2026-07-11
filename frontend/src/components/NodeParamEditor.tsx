@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { NodeParamSpec } from "../lib/nodeCatalog";
 import { TipIcon } from "./TipIcon";
 
@@ -14,9 +15,12 @@ import { TipIcon } from "./TipIcon";
  *     option surfaces it so the user can see what's stuck rather than
  *     silently snapping to a default.
  *   - `number` / `int` — `<input type="number">` with min/max/step
- *     constraints. We also clamp on the way in (defensive) so the
- *     stored value can never persist outside the declared range, even
- *     if the user types past the spinner buttons.
+ *     constraints. Edits are held as a local draft while typing and
+ *     committed (rounded for ints, clamped to the declared range) on
+ *     blur/Enter, so the stored value can never persist outside the
+ *     range — but typing "15" into a min-10 field works (audit S3:
+ *     the old per-keystroke clamp snapped the leading "1" to 10, and
+ *     an emptied field silently diverged from the stored value).
  *
  * Hints don't render inline — they live on a small ⓘ icon next to the
  * label, surfaced as a native browser tooltip on hover. Keeps the
@@ -41,8 +45,10 @@ export function NodeParamEditor({
    *  the graph that is actually executing. */
   disabled?: boolean;
 }) {
+  // No border-t here: QNode's params section already draws the seam
+  // above its header row — a second rule doubled it (audit S3).
   return (
-    <div className="nodrag mt-2 pt-2 border-t border-edge/60 space-y-2">
+    <div className="nodrag mt-2 space-y-2">
       {spec.map((p) =>
         p.type === "select" ? (
           <SelectField
@@ -121,6 +127,18 @@ function NumberField({
   const safe = Number.isFinite(value) ? value : (spec.min ?? 0);
   const precision =
     spec.displayPrecision ?? (spec.type === "int" ? 0 : 2);
+  // Draft-while-typing; null = field mirrors the stored value.
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft == null) return;
+    setDraft(null);
+    const raw = parseFloat(draft);
+    if (!Number.isFinite(raw)) return; // unparseable → revert to stored
+    let next = spec.type === "int" ? Math.round(raw) : raw;
+    if (spec.min !== undefined) next = Math.max(spec.min, next);
+    if (spec.max !== undefined) next = Math.min(spec.max, next);
+    onChange(next);
+  };
   // Show range hint underneath if both bounds are set.
   const rangeText =
     spec.min !== undefined && spec.max !== undefined
@@ -140,18 +158,13 @@ function NumberField({
         min={spec.min}
         max={spec.max}
         step={spec.step}
-        value={safe}
+        value={draft ?? safe}
         disabled={disabled}
         title={disabled ? "Locked while a run is in progress" : undefined}
-        onChange={(e) => {
-          const raw = parseFloat(e.target.value);
-          if (!Number.isFinite(raw)) return;
-          let next = spec.type === "int" ? Math.round(raw) : raw;
-          // Clamp on the way in so the stored value can't drift outside
-          // the declared range — protects backends that trust the schema.
-          if (spec.min !== undefined) next = Math.max(spec.min, next);
-          if (spec.max !== undefined) next = Math.min(spec.max, next);
-          onChange(next);
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
         }}
         className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink font-mono focus:outline-none focus:border-accent/60 disabled:opacity-50 disabled:cursor-not-allowed"
       />

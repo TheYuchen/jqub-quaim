@@ -314,7 +314,13 @@ export default function App() {
   // first-visit path are the same path). Returning users boot into
   // their persisted mode the same way. A scenario's mode write lands
   // after this effect resolves, so scenario still wins over both.
+  const bootedRef = useRef(false);
   useEffect(() => {
+    // StrictMode dev-mounts run effects twice on one component
+    // instance; the boot sequence (demo import + scenario auto-run)
+    // must fire exactly once (audit S3). Refs survive the re-invoke.
+    if (bootedRef.current) return;
+    bootedRef.current = true;
     const scenarioKey = new URLSearchParams(window.location.search).get(
       "scenario",
     );
@@ -602,8 +608,12 @@ function PaneResizer({
   const dragging = useRef(false);
   const lastX = useRef(0);
 
-  const onMouseMove = useCallback(
-    (e: MouseEvent) => {
+  // Pointer events, not mouse events (audit S3): identical drag code
+  // path for mouse, touch and pen; pointercancel ends a drag the OS
+  // interrupts. touch-action:none (className) keeps mobile browsers
+  // from claiming the gesture for scrolling.
+  const onPointerMove = useCallback(
+    (e: PointerEvent) => {
       if (!dragging.current) return;
       const dx = e.clientX - lastX.current;
       lastX.current = e.clientX;
@@ -612,24 +622,26 @@ function PaneResizer({
     [onResize],
   );
 
-  const onMouseUp = useCallback(() => {
+  const onPointerUp = useCallback(() => {
     dragging.current = false;
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
     onDragChange?.(false);
-    window.removeEventListener("mousemove", onMouseMove);
-    window.removeEventListener("mouseup", onMouseUp);
-  }, [onMouseMove, onDragChange]);
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onPointerUp);
+  }, [onPointerMove, onDragChange]);
 
-  const onMouseDown = (e: React.MouseEvent) => {
+  const onPointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     dragging.current = true;
     lastX.current = e.clientX;
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
     onDragChange?.(true);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
   };
 
   return (
@@ -637,10 +649,24 @@ function PaneResizer({
       role="separator"
       aria-orientation="vertical"
       aria-label={ariaLabel}
-      title="Drag to resize. Double-click to reset."
-      onMouseDown={onMouseDown}
+      // Keyboard parity for the separator role (audit S3): arrows
+      // nudge 16px per press, Enter resets like double-click.
+      tabIndex={0}
+      title="Drag to resize. Arrow keys nudge. Double-click (or Enter) to reset."
+      onPointerDown={onPointerDown}
       onDoubleClick={onDoubleClick}
-      className="group shrink-0 w-1 cursor-col-resize bg-edge/40 hover:bg-accent/60 active:bg-accent transition-colors"
+      onKeyDown={(e) => {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          onResize(-16);
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          onResize(16);
+        } else if (e.key === "Enter") {
+          onDoubleClick?.();
+        }
+      }}
+      className="group shrink-0 w-1 cursor-col-resize touch-none bg-edge/40 hover:bg-accent/60 active:bg-accent focus-visible:bg-accent focus-visible:outline-none transition-colors"
     />
   );
 }

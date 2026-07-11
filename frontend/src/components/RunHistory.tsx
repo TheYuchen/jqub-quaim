@@ -58,7 +58,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download, GitCompareArrows, History, KeyRound, Play, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { useApp } from "../lib/store";
-import { countRuns, deleteRun, exportArchive, importArchive, listRuns, type RunRecord } from "../lib/runStore";
+import { ARCHIVE_WINDOW, countRuns, deleteRun, exportArchive, importArchive, listRuns, type RunRecord } from "../lib/runStore";
 import { hashHue, hueCss } from "../lib/hues";
 import { R_MIN, evidenceRadius } from "../lib/evidenceMass";
 import { runEvidence, wilson95 } from "../lib/stats";
@@ -535,7 +535,7 @@ function LineageLegend() {
       </KeyItem>
       <KeyItem
         label="curve = forked from"
-        hint="A curved edge links a run to the ancestor it was forked from (restore or replay), drawn in the child's hue -- follow a color upward through time to trace where a configuration came from. A short dashed stub means the ancestor was deleted or lies outside the 50-run window."
+        hint="A curved edge links a run to the ancestor it was forked from (restore or replay), drawn in the child's hue -- follow a color upward through time to trace where a configuration came from. A short dashed stub means the ancestor was deleted or lies outside the lineage window (see footer)."
       >
         <circle cx={4.5} cy={3.5} r={2.2} fill={ACC} fillOpacity={0.95} />
         <circle cx={19.5} cy={10.5} r={2.2} fill={ACC} fillOpacity={0.55} />
@@ -588,16 +588,19 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const compareIds = useApp((s) => s.compareIds);
   const toggleCompare = useApp((s) => s.toggleCompare);
   const [records, setRecords] = useState<RunRecord[]>([]);
-  // Total archive size — the lineage renders a 50-run window, and a
-  // window must SAY it is a window (audit S2: older runs silently
-  // vanished from the view with no hint they still exist).
+  // Total archive size — the lineage renders an ARCHIVE_WINDOW-run
+  // window, and a window must SAY it is a window (audit S2: older runs
+  // silently vanished from the view with no hint they still exist).
   const [total, setTotal] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    listRuns(50)
+    // ARCHIVE_WINDOW newest runs suffice here: the lineage is a
+    // recency view, the footer names the window whenever it clips,
+    // and export/import always operate on the FULL archive.
+    listRuns(ARCHIVE_WINDOW)
       .then((rs) => {
         if (!cancelled) setRecords(rs);
       })

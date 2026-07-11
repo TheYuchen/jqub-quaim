@@ -56,8 +56,10 @@ import {
   type SharePayload,
 } from "../lib/share";
 import {
+  ARCHIVE_WINDOW,
   buildRunRecord,
   computeConfigHash,
+  countRunsByConfig,
   listRuns,
   saveRun,
 } from "../lib/runStore";
@@ -81,8 +83,10 @@ import { FigureExportButton } from "./FigureExportButton";
 /** One-shot feedback surfaced as a toast at the bottom of the canvas.
  *
  *  - `tone: "danger"` is runner errors; stays until explicitly dismissed.
- *  - `tone: "warn"` / `"ok"` come from Auto-connect; auto-dismiss after a
- *    few seconds.
+ *  - `tone: "warn"` / `"ok"` come from Auto-connect, restores, the
+ *    replicate loop and boot fallbacks; auto-dismiss after a few
+ *    seconds. `sticky: true` opts a notice out of the auto-fade (the
+ *    replicate-loop progress line must outlive the fade window).
  *  - `detail`, when present, is rendered underneath `text` in the toast
  *    body (one warning per line), so long advisories no longer have to
  *    fit on a single truncated header line.
@@ -91,9 +95,18 @@ type Notice = {
   text: string;
   tone: "danger" | "warn" | "ok";
   detail?: string;
+  /** Never auto-fades (replicate-loop progress). */
+  sticky?: boolean;
 } | null;
 
 type RFNode = Node<QNodeData>;
+
+/** Collision-proof node id: Date.now() alone collides when two adds
+ *  land in the same millisecond (drop + quick palette add). A module
+ *  counter disambiguates within the page's lifetime (audit S3). */
+let nodeIdSeq = 0;
+const freshNodeId = () =>
+  `n${Date.now().toString(36)}-${(nodeIdSeq++).toString(36)}`;
 
 const nodeTypes: NodeTypes = { qnode: QNode as unknown as NodeTypes[string] };
 
@@ -194,6 +207,11 @@ export function FlowCanvas() {
   // (historyVersion bump). Purely client-side — see lib/costModel.ts.
   const historyVersion = useApp((s) => s.historyVersion);
   const [costEst, setCostEst] = useState<PipelineEstimate | null>(null);
+  // Live nodes for async consumers: the cost effect keys on kindsKey,
+  // so its closed-over `nodes` can be stale by the time listRuns
+  // resolves (audit S3) — read through the ref instead.
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
   // Kind multiset key: dragging nodes around must not refetch, but
   // adding/removing/retyping a block must.
   const kindsKey = useMemo(
@@ -220,12 +238,18 @@ export function FlowCanvas() {
       setCostEst(null);
       return;
     }
-    listRuns(100)
+    // ARCHIVE_WINDOW recent runs are plenty here: the chip wants
+    // per-kind duration medians, is purely advisory, and old timings
+    // age poorly anyway (server load, code changes).
+    listRuns(ARCHIVE_WINDOW)
       .then((records) => {
         if (!alive) return;
         setCostEst(
           estimatePipeline(
-            nodes.map((n) => ({ id: n.id, kind: (n.data as QNodeData).kind })),
+            nodesRef.current.map((n) => ({
+              id: n.id,
+              kind: (n.data as QNodeData).kind,
+            })),
             records,
           ),
         );
@@ -291,7 +315,7 @@ export function FlowCanvas() {
   // losing a stack trace to a 6-second fade is a much worse UX than a
   // sticky notice you can dismiss with ×.
   useEffect(() => {
-    if (!notice || notice.tone === "danger") return;
+    if (!notice || notice.tone === "danger" || notice.sticky) return;
     const ms = notice.tone === "ok" ? 4000 : 8000;
     const t = window.setTimeout(() => setNotice(null), ms);
     return () => window.clearTimeout(t);
@@ -324,7 +348,7 @@ export function FlowCanvas() {
     const newNodes: RFNode[] = kinds.map((kind, i) => {
       const spec = resolveNodeSpec(kind, plugins);
       return {
-        id: `n${Date.now().toString(36)}${i}`,
+        id: freshNodeId(),
         type: "qnode",
         position: { x: startX + i * SPACING_X, y: Y },
         data: {
@@ -516,7 +540,7 @@ export function FlowCanvas() {
       const spec = resolveNodeSpec(kind, plugins);
       if (!spec) return;
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      const id = `n${Date.now().toString(36)}`;
+      const id = freshNodeId();
       const node: RFNode = {
         id,
         type: "qnode",
@@ -573,8 +597,9 @@ export function FlowCanvas() {
     () =>
       runPreflight({
         // Pass kind + params (params are the only data fields the
-        // preflight rules actually read). Stripping the rest keeps
-        // the memo key small so unrelated UI churn doesn't re-fire.
+        // preflight rules actually read). Note the memo key is the
+        // `nodes` array identity, so this DOES re-fire on drags —
+        // runPreflight is O(nodes+edges), cheap enough not to care.
         nodes: nodes.map((n) => ({
           ...n,
           data: {
@@ -589,6 +614,25 @@ export function FlowCanvas() {
     [nodes, edges, circuit, preflightPlugins],
   );
 
+  // ---- Stale post-run encodings (audit S3) --------------------------
+  // Ribbons/edge labels describe the graph AS IT RAN. Editing the
+  // graph afterwards (params, wiring, blocks) leaves those marks
+  // describing a pipeline that no longer exists — dim them so
+  // "evidence" and "draft" stay visually distinct. Layout moves don't
+  // count: the structural hash ignores positions.
+  const theaterRunHash = useApp((s) => s.theaterRun?.configHash ?? null);
+  const staleEncodings = useMemo(() => {
+    if (!run || theaterRunHash == null || nodes.length === 0) return false;
+    return (
+      computeConfigHash(
+        sampleKey,
+        circuit?.name ?? null,
+        buildSharePayload(nodes, edges, sampleKey),
+        useLiveIbm,
+      ) !== theaterRunHash
+    );
+  }, [run, theaterRunHash, nodes, edges, sampleKey, circuit, useLiveIbm]);
+
   const styledEdges = useMemo(() => {
     return edges.map((edge) => {
       const isTarget = edge.id === dropTargetEdgeId;
@@ -602,7 +646,7 @@ export function FlowCanvas() {
       // wider on canvas, but every edge gets the same width budget
       // since labels are bg-colored.
       const label = shape
-        ? `${shape.num_qubits} qubits · depth ${shape.depth} · ${shape.size} ops`
+        ? `${shape.num_qubits} qubits · depth ${shape.depth} · ${shape.size} gates`
         : undefined;
       let next = edge;
 
@@ -629,8 +673,10 @@ export function FlowCanvas() {
           | { delta?: { size?: number } }
           | null
           | undefined;
+        // null = the downstream step reported no transformation —
+        // "unknown" must not render as "pass-through" (audit S3).
         const deltaSize =
-          typeof tf?.delta?.size === "number" ? tf.delta.size : 0;
+          typeof tf?.delta?.size === "number" ? tf.delta.size : null;
         return {
           ...next,
           type: "ribbon",
@@ -643,6 +689,7 @@ export function FlowCanvas() {
             tgtSize: tgtShape ? tgtShape.size : null,
             deltaSize,
             flowLabel: label,
+            stale: staleEncodings,
           },
         } as Edge;
       }
@@ -658,12 +705,13 @@ export function FlowCanvas() {
             fontSize: 9,
             fontFamily: "monospace",
             fontWeight: 500,
+            ...(staleEncodings ? { fillOpacity: 0.45 } : {}),
           },
           labelBgStyle: {
             fill: "rgb(var(--color-surface))",
             stroke: "rgb(var(--color-edge))",
             strokeWidth: 0.5,
-            fillOpacity: 0.95,
+            fillOpacity: staleEncodings ? 0.45 : 0.95,
           },
         };
       }
@@ -681,7 +729,7 @@ export function FlowCanvas() {
       }
       return next;
     });
-  }, [edges, dropTargetEdgeId, stepByNodeId, nodes, preflightPlugins]);
+  }, [edges, dropTargetEdgeId, stepByNodeId, nodes, preflightPlugins, staleEncodings]);
 
   // ---- Touch drag bridge (mobile drag-to-insert) ---------------------
   //
@@ -700,7 +748,15 @@ export function FlowCanvas() {
   // dropTargetEdgeId so the same dashed-accent highlight that mouse
   // drag uses also lights up for the touch user.
   useEffect(() => {
-    if (!touchDrag) return;
+    if (!touchDrag) {
+      // Drag ended or was cancelled: clear the highlight, or an
+      // aborted touch drag leaves an edge lit indefinitely (audit
+      // S3). Safe for the drop path — the commit effect below reads
+      // this render's dropTargetEdgeId, not the cleared next-render
+      // value.
+      setDropTargetEdgeId(null);
+      return;
+    }
     const next = findClosestEdge(touchDrag.x, touchDrag.y);
     setDropTargetEdgeId((prev) => (prev === next ? prev : next));
   }, [touchDrag, findClosestEdge]);
@@ -727,7 +783,7 @@ export function FlowCanvas() {
     }
 
     const position = screenToFlowPosition({ x, y });
-    const id = `n${Date.now().toString(36)}`;
+    const id = freshNodeId();
     const node: RFNode = {
       id,
       type: "qnode",
@@ -772,6 +828,18 @@ export function FlowCanvas() {
   // paths supersede each other, too (audit S2).
   const sampleGenRef = useRef(0);
 
+  // restore-pulse strip timer: kept in a ref so a rapid second restore
+  // (or unmount) clears the previous timer instead of leaking it and
+  // firing a setNodes on a superseded canvas (audit S3).
+  const pulseTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (pulseTimerRef.current != null)
+        window.clearTimeout(pulseTimerRef.current);
+    },
+    [],
+  );
+
   const loadPreset = (key: string, sampleOverride?: string) => {
     const preset = PRESET_BY_KEY[key];
     if (!preset) return;
@@ -793,6 +861,10 @@ export function FlowCanvas() {
     setPrecisionTarget(null);
     useApp.getState().setRestoredFrom(null);
     useApp.getState().setEditorContext(null);
+    // Scenario F5's gate-diff default framing also ends here — a
+    // preset load / canvas clear is the user leaving the scripted
+    // state (audit S3).
+    useApp.getState().setGateDiffDefaultOpen(false);
     // Sample selection: an explicit override beats the preset's
     // defaultCircuit, which beats keeping the current sample. Skip the network round-trip if we're already on
     // the requested sample.
@@ -830,6 +902,10 @@ export function FlowCanvas() {
     setPrecisionTarget(null);
     useApp.getState().setRestoredFrom(null);
     useApp.getState().setEditorContext(null);
+    // Scenario F5's gate-diff default framing also ends here — a
+    // preset load / canvas clear is the user leaving the scripted
+    // state (audit S3).
+    useApp.getState().setGateDiffDefaultOpen(false);
     // ...and no queued auto-run may fire against an empty canvas later.
     if (useApp.getState().pendingAutoRun) useApp.getState().clearAutoRun();
   };
@@ -968,10 +1044,12 @@ export function FlowCanvas() {
       return;
     }
     let alive = true;
-    listRuns(500)
-      .then((rs) => {
-        if (alive)
-          setLiveCount(rs.filter((r) => r.config_hash === liveHash).length);
+    // Exact per-configuration count via the config_hash index — the
+    // old listRuns(500) window undercounted once the archive outgrew
+    // it (audit S3 cap sweep).
+    countRunsByConfig(liveHash)
+      .then((n) => {
+        if (alive) setLiveCount(n);
       })
       .catch(() => {
         /* archive unreadable — the bar just omits the count */
@@ -1086,7 +1164,9 @@ export function FlowCanvas() {
     // Strip the pulse class after the animation ends (functional update:
     // must not clobber a drag that happened inside the window) so the
     // NEXT restore re-triggers the animation on reused DOM nodes.
-    window.setTimeout(() => {
+    if (pulseTimerRef.current != null)
+      window.clearTimeout(pulseTimerRef.current);
+    pulseTimerRef.current = window.setTimeout(() => {
       setNodes((ns) =>
         ns.map((n) =>
           n.className?.includes("restore-pulse")
@@ -1292,8 +1372,19 @@ export function FlowCanvas() {
     try {
       for (let i = 0; i < count; i++) {
         if (count > 1) {
-          setNotice({ text: `Replicate ${i + 1}/${count}…`, tone: "ok" });
+          // sticky: the progress line must outlive the 4s ok-fade —
+          // a slow replicate otherwise runs with no progress notice
+          // at all (audit S3). The end-of-loop notice replaces it.
+          setNotice({
+            text: `Replicate ${i + 1}/${count}…`,
+            tone: "ok",
+            sticky: true,
+          });
           setRun(null); // each replicate rebuilds the step list
+          // Drop the PREVIOUS replicate's final live frame, or every
+          // node face briefly replays run i's finished CI as if it
+          // were run i+1's opening state (audit S3).
+          useApp.getState().clearLiveProgress();
         }
         const response = await runOnce();
         setRun(response);
@@ -1779,7 +1870,7 @@ export function FlowCanvas() {
         )}
         {/* Mobile-only Run FAB. The Run button in the canvas toolbar
             sits ~108px from the top — well outside thumb arc on tall
-            phones. This bottom-right FAB at sm:hidden is what mobile
+            phones. This bottom-right FAB at md:hidden is what mobile
             users actually reach for. It respects safe-area-inset-bottom
             so it stays clear of the iOS home indicator. */}
         <button
@@ -1902,7 +1993,7 @@ function ConfigContextBar({
       aria-label="Configuration context"
       className="shrink-0 border-b border-edge/60 bg-surfaceAlt/40 px-3 sm:px-4 py-1 flex items-center gap-1.5 text-[11px] text-mute min-w-0"
     >
-      <span className="flex items-center gap-1.5 min-w-0 truncate">
+      <span className="flex items-center gap-1.5 min-w-0 overflow-hidden whitespace-nowrap">
         {ctx.source === "card" ? (
           canvasEmpty ? (
             <>
@@ -1955,7 +2046,9 @@ function ConfigContextBar({
       </span>
       <button
         type="button"
-        className="ml-auto btn shrink-0"
+        // h-6/11px: match the bar's compact rhythm — the default .btn
+        // height made this row taller than its own container (audit S3).
+        className="ml-auto btn h-6 px-2 gap-1 text-[11px] shrink-0"
         title="Back to the Evidence board (home)"
         onClick={() => setWorkspaceMode("multiverse")}
       >
@@ -2009,7 +2102,10 @@ function PreflightBanner({ findings }: { findings: PreflightFinding[] }) {
         <span className="text-mute/80">— click to {open ? "hide" : "see details"}</span>
       </button>
       {open && (
-        <ul className="px-3 pb-2 space-y-1 text-[11px]">
+        // Height budget (audit S3): the banner stacks above the canvas
+        // with the toolbar and context bar — a long finding list must
+        // scroll, not push the canvas off-screen.
+        <ul className="px-3 pb-2 space-y-1 text-[11px] max-h-40 overflow-y-auto">
           {findings.map((f, i) => (
             <li key={i} className="flex items-start gap-1.5">
               <span
@@ -2175,14 +2271,15 @@ function RibbonLegend() {
       return false;
     }
   });
-  // Visual-calm contract: the key teaches, then leaves. It only mounts
-  // after the session's FIRST run (the parent gates on `run`, which is
-  // in-memory store state — a fresh session starts without it), fades
+  // Visual-calm contract: the key teaches, then leaves. The parent
+  // gates on `run`, which is nulled at every run start / preset /
+  // restore — so the key REMOUNTS (fresh 20 s timer and all) after
+  // each completed run until the user dismisses it with ×. It fades
   // out on its own after 20 s and unmounts a second later so it stops
-  // occluding the canvas. The timer is mount-scoped, so later runs in
-  // the same session don't resurrect it. The × dismissal stays the
-  // only PERSISTED state — an auto-faded key returns next session
-  // until explicitly dismissed.
+  // occluding the canvas. The × dismissal is the only PERSISTED
+  // state — an auto-faded key returns with the next run or session
+  // until explicitly dismissed (audit S3: this comment used to claim
+  // later runs could not resurrect it, which was never true).
   const [fading, setFading] = useState(false);
   const [expired, setExpired] = useState(false);
   useEffect(() => {
