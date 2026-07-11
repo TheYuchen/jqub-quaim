@@ -1717,3 +1717,28 @@ Board / theater / infra:
     resets on editorContext change and renders "computing identity…"
     while null (empty canvas keeps its own wording).
 25. **qshot preset lints clean** — ships with its output sink.
+
+## Deep audit 2026-07-10 — Wave 3 sweep (SHIPPED 2026-07-11)
+
+The S3 deferred-polish backlog (docs/AUDIT_BACKLOG.md) was worked top
+to bottom: 71 of 76 bullets fixed across three commits (canvas
+728039f, evidence 64aa288, infra cab6fcb), 5 deferred with reasons in
+the backlog file (global-toast idiom, plugin-default rehydration at
+boot, sticky lineage legend / guidance-strip budget, CircuitDiff
+shared scroll container, export triple-download packaging). Highlights:
+the four listRuns caps consolidated into runStore.ARCHIVE_WINDOW (200)
+with countRuns()/countRunsByConfig() behind every displayed total and
+unbounded scans on one-shot paths (archive export, demo scan, scenario
+pickers, provenance id lookups); dedupeDraws upgraded (approved) to
+key on (root_seed, shots, successes) so an early-stopped replay counts
+as new evidence — node-lane assertions added and the documented F8
+numbers verified unchanged; post-run canvas encodings dim when the
+live structural hash diverges from the run's; preflight gained
+cycle/duplicate-input/duplicate-backend checks worded from the
+runner's actual semantics; the theater's y-axis stopped re-zooming
+mid-stream; figure provenance names F0..F8 and derives the live run's
+hash from theaterRun; svgPaper's class-strip can no longer edit the
+embedded provenance JSON (lane-asserted); plus ~40 smaller honesty,
+a11y and stale-comment repairs. All gates green: tsc, vite build
+(default and VITE_ANON=1), backend pytest, svg_paper / export_python /
+difference_funnel node lanes.
