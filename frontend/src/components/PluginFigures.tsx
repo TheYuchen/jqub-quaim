@@ -365,6 +365,18 @@ function BarBlock({
     ),
   );
 
+  // Empty data guard (audit S2): a plugin returning data: [] made the
+  // reduce below crash on top.value and took the whole Evidence pane
+  // down with it. Say what happened instead.
+  if (data.length === 0) {
+    return (
+      <div className="text-[11px] text-mute italic">
+        Bar figure has no data points (the plugin returned an empty
+        list).
+      </div>
+    );
+  }
+
   // Screen-reader friendly summary of the chart. Without this, an
   // assistive-tech user just hears "Bar chart" and can't interrogate
   // the actual data. We keep it brief: count, max, top bar.

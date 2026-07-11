@@ -488,7 +488,9 @@ export const useApp = create<AppState>((set) => ({
         return { compareIds: s.compareIds.filter((x) => x !== runId) };
       return { compareIds: [...s.compareIds, runId].slice(-2) };
     }),
-  setCompareIds: (ids) => set({ compareIds: ids.slice(-2) }),
+  // Dedupe defensively: a caller passing [x, x] would render a
+  // "comparison" of a run with itself.
+  setCompareIds: (ids) => set({ compareIds: [...new Set(ids)].slice(-2) }),
   clearCompare: () => set({ compareIds: [] }),
   differenceRunIds: null,
   setDifferenceRunIds: (ids) =>

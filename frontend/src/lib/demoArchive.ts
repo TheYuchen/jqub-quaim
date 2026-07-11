@@ -30,6 +30,7 @@ import {
   countRuns,
   deleteRun,
   listRuns,
+  pruneCompareSelection,
   saveRun,
 } from "./runStore";
 import { useApp } from "./store";
@@ -156,5 +157,7 @@ export async function clearDemoRuns(): Promise<void> {
   } catch {
     /* nothing to clear if the archive is unreadable */
   }
+  // Deleted demo runs must not stay selected for comparison (audit S2).
+  await pruneCompareSelection();
   useApp.getState().bumpHistoryVersion();
 }

@@ -187,22 +187,37 @@ export function CompareView() {
   // view kept rendering the deleted run's data.
   const historyVersion = useApp((s) => s.historyVersion);
   const [recs, setRecs] = useState<[RunRecord, RunRecord] | null>(null);
+  // Distinguishes "lookup in flight" (render nothing, brief) from
+  // "records gone" (render an honest explanation — audit S2: a null
+  // return here left the Compare tab silently blank after Clear demo
+  // data / delete).
+  const [missing, setMissing] = useState(false);
 
   useEffect(() => {
     if (compareIds.length !== 2) {
       setRecs(null);
+      setMissing(false);
       return;
     }
     let cancelled = false;
     Promise.all([getRun(compareIds[0]), getRun(compareIds[1])])
       .then(([a, b]) => {
         if (cancelled) return;
-        // Either record gone (deleted / IndexedDB hiccup) → show
-        // nothing rather than a stale or half pair.
-        setRecs(a && b ? [a, b] : null);
+        // Either record gone (deleted / IndexedDB hiccup) → say so
+        // rather than rendering a stale or half pair.
+        if (a && b) {
+          setRecs([a, b]);
+          setMissing(false);
+        } else {
+          setRecs(null);
+          setMissing(true);
+        }
       })
       .catch(() => {
-        if (!cancelled) setRecs(null);
+        if (!cancelled) {
+          setRecs(null);
+          setMissing(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -215,7 +230,33 @@ export function CompareView() {
   // funnel will actually render.
   const diffData = useDifferenceEvidence(recs?.[0] ?? null, recs?.[1] ?? null);
 
-  if (compareIds.length !== 2 || !recs) return null;
+  if (compareIds.length !== 2) return null;
+  if (!recs) {
+    if (!missing) return null; // lookup in flight — resolves in ms
+    return (
+      <div className="panel-alt p-3 space-y-2 border !border-warn/40">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-ink">
+            Comparing two runs
+          </span>
+          <button
+            type="button"
+            className="ml-auto p-0.5 text-mute hover:text-ink rounded hover:bg-surfaceAlt"
+            onClick={clearCompare}
+            aria-label="Clear comparison selection"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <p className="text-[11px] text-mute leading-relaxed">
+          The selected runs are no longer archived — they were deleted or
+          removed with the demo data. Tick two runs in the{" "}
+          <span className="text-ink">“This configuration”</span> tab to
+          start a new comparison.
+        </p>
+      </div>
+    );
+  }
   const [A, B] = recs;
   const diffs = paramDiff(A, B);
   const fa = fidelityStep(A);
@@ -346,12 +387,12 @@ export function CompareView() {
               <div className="absolute top-1 h-1.5 bg-accent/30 rounded"
                 style={{ left: `${ciA[0] * 100}%`, width: `${Math.max(0.5, (ciA[1] - ciA[0]) * 100)}%` }} />
             )}
-            <div className="absolute top-0.5 h-2.5 w-0.5 bg-accent" style={{ left: `${va * 100}%` }} title={`A: ${(va * 100).toFixed(2)}%`} />
+            <div className="absolute top-0.5 h-2.5 w-0.5 bg-accent" style={{ left: `clamp(0px, calc(${va * 100}% - 1px), calc(100% - 2px))` }} title={`A: ${(va * 100).toFixed(2)}%`} />
             {ciB && (
               <div className="absolute bottom-1 h-1.5 bg-warn/30 rounded"
                 style={{ left: `${ciB[0] * 100}%`, width: `${Math.max(0.5, (ciB[1] - ciB[0]) * 100)}%` }} />
             )}
-            <div className="absolute bottom-0.5 h-2.5 w-0.5 bg-warn" style={{ left: `${vb * 100}%` }} title={`B: ${(vb * 100).toFixed(2)}%`} />
+            <div className="absolute bottom-0.5 h-2.5 w-0.5 bg-warn" style={{ left: `clamp(0px, calc(${vb * 100}% - 1px), calc(100% - 2px))` }} title={`B: ${(vb * 100).toFixed(2)}%`} />
           </div>
           <div className="text-[10px] text-mute font-mono">
             A {(va * 100).toFixed(2)}% · B {(vb * 100).toFixed(2)}% · Δ(B−A){" "}

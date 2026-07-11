@@ -122,6 +122,25 @@ export function getRun(runId: string): Promise<RunRecord | undefined> {
   return tx("readonly", (s) => s.get(runId)) as Promise<RunRecord | undefined>;
 }
 
+/** Drop compare selections whose records no longer resolve (bulk
+ *  deletions: Clear demo data, archive replacement). Row-level deletes
+ *  prune inline; this is the sweep for everything else (audit S2).
+ *  At most two getRun lookups — cheap enough to call after any bulk
+ *  archive mutation. */
+export async function pruneCompareSelection(): Promise<void> {
+  const s = useApp.getState();
+  if (s.compareIds.length === 0) return;
+  try {
+    const alive: string[] = [];
+    for (const id of s.compareIds) {
+      if (await getRun(id)) alive.push(id);
+    }
+    if (alive.length !== s.compareIds.length) s.setCompareIds(alive);
+  } catch {
+    /* archive unreadable — CompareView's missing-record state covers it */
+  }
+}
+
 /** Archive size without materializing records — IDBObjectStore.count.
  *  Cheap enough to call on every historyVersion bump (badge material
  *  for the Evidence pane's History tab). */
@@ -461,5 +480,6 @@ export async function importArchive(file: File): Promise<ImportReport> {
     report.imported += 1;
   }
   if (report.imported > 0) useApp.getState().bumpHistoryVersion();
+  await pruneCompareSelection();
   return report;
 }

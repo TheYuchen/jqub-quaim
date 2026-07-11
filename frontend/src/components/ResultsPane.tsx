@@ -90,9 +90,13 @@ export function ResultsPane({ onCollapse }: { onCollapse?: () => void } = {}) {
     setTab(pendingTab);
     useApp.getState().setPendingEvidenceTab(null);
   }, [pendingTab]);
+  // Keyed on the ARRAY IDENTITY, not .length: one-hop affordances
+  // (e.g. "compare vs previous run") replace a 2-element selection
+  // with another 2-element selection — a length dep never re-fires
+  // and the pane silently stayed on the old tab (audit S2).
   useEffect(() => {
     if (compareIds.length === 2) setTab("compare");
-  }, [compareIds.length]);
+  }, [compareIds]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0">

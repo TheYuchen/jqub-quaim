@@ -510,7 +510,11 @@ function UncertaintyBlock({
         />
         <div
           className="absolute top-0 h-full w-0.5 bg-accent"
-          style={{ left: `${point * 100}%` }}
+          // clamp: a fidelity of exactly 0/1 must render AT the scale
+          // edge, not clipped by overflow-hidden (audit S2)
+          style={{
+            left: `clamp(0px, calc(${point * 100}% - 1px), calc(100% - 2px))`,
+          }}
         />
         {/* Optional-stopping target rendered as the width the user
             asked for: two ticks at point ± target. When the interval

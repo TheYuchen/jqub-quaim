@@ -58,7 +58,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download, GitCompareArrows, History, KeyRound, Play, RotateCcw, Trash2, Upload, X } from "lucide-react";
 import { useApp } from "../lib/store";
-import { deleteRun, exportArchive, importArchive, listRuns, type RunRecord } from "../lib/runStore";
+import { countRuns, deleteRun, exportArchive, importArchive, listRuns, type RunRecord } from "../lib/runStore";
 import { hashHue, hueCss } from "../lib/hues";
 import { R_MIN, evidenceRadius } from "../lib/evidenceMass";
 import { runEvidence, wilson95 } from "../lib/stats";
@@ -588,6 +588,10 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
   const compareIds = useApp((s) => s.compareIds);
   const toggleCompare = useApp((s) => s.toggleCompare);
   const [records, setRecords] = useState<RunRecord[]>([]);
+  // Total archive size — the lineage renders a 50-run window, and a
+  // window must SAY it is a window (audit S2: older runs silently
+  // vanished from the view with no hint they still exist).
+  const [total, setTotal] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
@@ -599,6 +603,13 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
       })
       .catch(() => {
         /* IndexedDB unavailable (private mode etc.) — panel stays empty */
+      });
+    countRuns()
+      .then((n) => {
+        if (!cancelled) setTotal(n);
+      })
+      .catch(() => {
+        /* count unavailable — footer simply doesn't render */
       });
     return () => {
       cancelled = true;
@@ -839,7 +850,11 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                         <button
                           type="button"
                           className="p-0.5 text-mute hover:text-ink rounded hover:bg-surfaceAlt"
-                          title="Restore this run's graph + circuit onto the canvas"
+                          title={
+                            r.sample_key == null
+                              ? "Restore this run's graph — it used an uploaded circuit; re-upload it on the left to reproduce the numbers"
+                              : "Restore this run's graph + circuit onto the canvas"
+                          }
                           aria-label="Restore run"
                           onClick={() => restore(r, false)}
                         >
@@ -849,9 +864,11 @@ export function RunHistory({ embedded = false }: { embedded?: boolean } = {}) {
                           type="button"
                           className="p-0.5 text-mute hover:text-accent rounded hover:bg-surfaceAlt disabled:opacity-30"
                           title={
-                            r.root_seed != null
-                              ? "Replay: restore + pin this run's seed. Pressing Run then reproduces the exact numbers."
-                              : "This run has no recorded seed (cached response) — plain restore is available."
+                            r.root_seed == null
+                              ? "This run has no recorded seed (cached response) — plain restore is available."
+                              : r.sample_key == null
+                                ? "Replay: restore + pin this run's seed — this run used an uploaded circuit; re-upload it on the left to reproduce the exact numbers."
+                                : "Replay: restore + pin this run's seed. Pressing Run then reproduces the exact numbers."
                           }
                           aria-label="Replay run"
                           disabled={r.root_seed == null}
@@ -1054,6 +1071,13 @@ cumulative Wilson CI half-width of this configuration's pooled counts, widest (o
               </svg>
             </div>
           </div>
+          {total != null && total > records.length && (
+            <div className="px-3 py-1.5 border-t border-edge/40 text-[10px] text-mute">
+              showing the {records.length} most recent of {total} archived
+              runs — older runs stay archived (and exported) even though this
+              lineage view doesn't draw them
+            </div>
+          )}
         </>
       )}
     </div>
