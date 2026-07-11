@@ -60,6 +60,13 @@ export function FigureExportButton({
       pressTimer.current = null;
     }
   };
+  // Abandoned press (pointer leaves without a click): the 4× flag must
+  // not leak into the NEXT normal click (audit S3). pointerup keeps
+  // the flag — the click event that consumes it follows immediately.
+  const pressCancel = () => {
+    pressEnd();
+    longPress.current = false;
+  };
 
   const onClick = async (e: React.MouseEvent) => {
     const hires = e.altKey || longPress.current;
@@ -104,7 +111,8 @@ export function FigureExportButton({
       onClick={(e) => void onClick(e)}
       onPointerDown={pressStart}
       onPointerUp={pressEnd}
-      onPointerLeave={pressEnd}
+      onPointerLeave={pressCancel}
+      onPointerCancel={pressCancel}
       data-marker="figure-export"
       className={`btn ${className}`}
       title="Export this view as a paper figure: SVG + PNG with embedded provenance (run ids, seeds, config hashes, graph) + a .provenance.json sidecar. Alt/⌥-click or press-and-hold for the 4× print-resolution PNG (default 2.5×)."

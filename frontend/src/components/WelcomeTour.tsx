@@ -89,6 +89,7 @@ export function WelcomeTour({
       {/* Card */}
       <div className="relative panel w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-[0_40px_80px_-20px_rgba(0,0,0,0.6)]">
         <button
+          type="button"
           onClick={dismiss}
           aria-label="Close tour"
           className="absolute top-3 right-3 z-10 w-8 h-8 rounded-md border border-edge bg-surface/80 text-mute hover:text-ink hover:border-edge transition flex items-center justify-center"
@@ -109,6 +110,7 @@ export function WelcomeTour({
           <div className="flex items-center gap-1.5">
             {ORDER.map((s, i) => (
               <button
+                type="button"
                 key={s}
                 onClick={() => setSlide(s)}
                 aria-label={`Go to slide ${i + 1}`}
@@ -123,6 +125,7 @@ export function WelcomeTour({
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={goPrev}
               disabled={isFirst}
               className="btn disabled:opacity-30 disabled:cursor-not-allowed"
@@ -130,11 +133,11 @@ export function WelcomeTour({
               <ChevronLeft className="w-3.5 h-3.5" /> Back
             </button>
             {isLast ? (
-              <button onClick={dismiss} className="btn-primary">
+              <button type="button" onClick={dismiss} className="btn-primary">
                 <Play className="w-3.5 h-3.5" /> Get started
               </button>
             ) : (
-              <button onClick={goNext} className="btn-primary">
+              <button type="button" onClick={goNext} className="btn-primary">
                 Next <ChevronRight className="w-3.5 h-3.5" />
               </button>
             )}
@@ -516,9 +519,13 @@ function TrySlide({ onDone }: { onDone: () => void }) {
         </button>
       }
     >
+      {/* Honest tense (audit S3): the tour is re-openable — by then
+          the user may have cleared the demo data, so this slide must
+          not assert the archive is still there. */}
       <p className="mb-2">
-        Real seeded runs ship with your first visit, so the evidence views
-        have something to show. Three good first moves:
+        Real seeded runs shipped with your first visit, so the evidence
+        views have something to show from minute one. (Cleared the demo
+        data? Your own runs fill the same views.) Three good first moves:
       </p>
       <ol className="list-decimal list-inside space-y-1 text-[13px]">
         <li>

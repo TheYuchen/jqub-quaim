@@ -190,9 +190,19 @@ export function inlinePresentation(
  * it is trivially testable and never depends on a DOM.
  */
 export function finalizeSvgMarkup(svg: string): string {
-  const cleaned = svg
+  // The <metadata> provenance block is verbatim JSON: the class/style
+  // strips below must never edit inside it (a circuit name or param
+  // containing `class="` would be silently mangled — audit S3).
+  // Shelve metadata blocks, clean the rest, restore.
+  const shelf: string[] = [];
+  const shelved = svg.replace(/<metadata\b[\s\S]*?<\/metadata>/g, (m) => {
+    shelf.push(m);
+    return `\u0000META${shelf.length - 1}\u0000`;
+  });
+  const cleaned = shelved
     .replace(/\s+class="[^"]*"/g, "")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/g, "");
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/g, "")
+    .replace(/\u0000META(\d+)\u0000/g, (_, i) => shelf[Number(i)]);
   return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n${cleaned}`;
 }
 

@@ -119,6 +119,7 @@ export function TopBar({
               type="button"
               onClick={() => setUseLiveIbm(!useLiveIbm)}
               aria-pressed={effectiveLive}
+              aria-label="Toggle live IBM calibration"
               className={`chip transition-colors gap-1 ${chipClass}`}
             >
               <span>{mobile ? chipLabelShort : chipLabel}</span>

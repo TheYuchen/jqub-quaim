@@ -379,7 +379,9 @@ export function activeScenarioKey(): string | null {
 /** Pick the latest successful run of each of the two most-replicated
  *  configurations — deterministic over the bundled archive. */
 async function pickTopTwoRunIds(): Promise<string[]> {
-  const all = await listRuns(500);
+  // Unbounded one-shot scan (audit S3 cap sweep): the documented F6/F8
+  // pair must be found even when it has aged past any display window.
+  const all = await listRuns(Infinity);
   // Scenario-boot records are scripted figure states, not evidence —
   // the same exclusion pickOverlayPairRunIds (F7) applies. And when
   // demo-flagged records exist, prefer them EXCLUSIVELY: on a well-used
@@ -414,7 +416,8 @@ async function pickTopTwoRunIds(): Promise<string[]> {
  *  largest requested shot budget (bell-2048 in the bundled archive),
  *  then its two most recent runs, older one as A. */
 async function pickOverlayPairRunIds(): Promise<string[]> {
-  const runs = await listRuns(500);
+  // Unbounded one-shot scan — same reasoning as pickTopTwoRunIds.
+  const runs = await listRuns(Infinity);
   const tracedBudget = (r: (typeof runs)[number]): number => {
     let req = 0;
     for (const st of r.response.steps) {
@@ -463,13 +466,16 @@ export async function activateScenario(rawKey: string): Promise<boolean> {
   activeKey = sc.key;
   const app = useApp.getState();
 
+  // Mode first, before any await (audit S3): the forced demo import
+  // below can take long enough that the persisted workspace mode
+  // visibly paints and then flips. Scripted figure state, not a user
+  // preference: write directly so the persisted quda.workspaceMode
+  // survives (setWorkspaceMode would persist it).
+  useApp.setState({ workspaceMode: sc.workspaceMode });
+
   if (sc.needsArchive) await ensureDemoArchive({ force: true });
   if (sc.openGateDiff) app.setGateDiffDefaultOpen(true);
   if (sc.openTheater) app.setTheaterOpen(true);
-  // Scripted figure state, not a user preference: write the mode
-  // directly so a scenario boot never overwrites the persisted
-  // quda.workspaceMode (setWorkspaceMode would persist it).
-  useApp.setState({ workspaceMode: sc.workspaceMode });
 
   if (sc.graph) {
     app.requestRestore({

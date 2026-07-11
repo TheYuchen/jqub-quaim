@@ -45,7 +45,7 @@
 import type { SharePayload } from "./share";
 import { APP_NAME } from "./anon";
 import { useApp } from "./store";
-import { listRuns } from "./runStore";
+import { ARCHIVE_WINDOW, listRuns } from "./runStore";
 import { activeScenarioKey } from "./scenarios";
 import {
   auditIllustratorSafety,
@@ -61,7 +61,7 @@ export interface FigureProvenance {
   app_version: string | null;
   exported_at: string;
   view: string;
-  /** Scenario key (?scenario=F0..F7) active at export time, if any —
+  /** Scenario key (?scenario=F0..F8) active at export time, if any —
    *  the one-URL recipe that regenerates this figure's app state. */
   scenario: string | null;
   /** Evidence-theater trace scrubber position at export time: the
@@ -87,7 +87,10 @@ async function runsForView(
 ): Promise<FigureProvenance["runs"]> {
   const st = useApp.getState();
   if (view === "multiverse" || view === "evidence-history") {
-    const all = await listRuns(500);
+    // Exactly what those views render: the ARCHIVE_WINDOW most recent
+    // runs (board cards / lineage window) — provenance names what the
+    // figure shows, no more, no less (audit S3 cap sweep).
+    const all = await listRuns(ARCHIVE_WINDOW);
     return all.map((r) => ({
       run_id: r.run_id,
       root_seed: r.root_seed,
@@ -98,7 +101,8 @@ async function runsForView(
     // Theater in overlay-comparison mode: the two staged archived
     // runs, not the store's current run.
     const ids = st.theaterOverlayIds;
-    const all = await listRuns(500);
+    // Unbounded id lookup: the staged pair may be old (audit S3).
+    const all = await listRuns(Infinity);
     return all
       .filter((r) => ids.includes(r.run_id))
       .map((r) => ({
@@ -117,7 +121,8 @@ async function runsForView(
       ...st.compareIds,
       ...(st.differenceRunIds ?? []),
     ]);
-    const all = await listRuns(500);
+    // Unbounded id lookup — same reason as the overlay branch.
+    const all = await listRuns(Infinity);
     return all
       .filter((r) => wanted.has(r.run_id))
       .map((r) => ({
@@ -133,7 +138,11 @@ async function runsForView(
       {
         run_id: run.run_id,
         root_seed: run.root_seed ?? null,
-        config_hash: st.lastConfigHash,
+        // theaterRun.configHash is stamped at RUN START for exactly
+        // the displayed run; lastConfigHash is stamped at ARCHIVE time
+        // and goes stale when archiving fails or a restore intervenes
+        // (audit S3). Fall back for pre-theater states.
+        config_hash: st.theaterRun?.configHash ?? st.lastConfigHash,
       },
     ];
   }
@@ -156,7 +165,7 @@ export async function collectProvenance(
     regenerate:
       "Rebuild the pipeline via '#s=' + base64url(graph) on any deployment; " +
       "pin a run's root_seed to replay its draws bit-exactly; " +
-      "?scenario=F0..F7 boots the paper's scripted figure states.",
+      "?scenario=F0..F8 boots the paper's scripted figure states.",
   };
 }
 

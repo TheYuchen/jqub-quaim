@@ -55,6 +55,7 @@ export function ThemeSwitcher() {
         // Desktop (≥sm): anchor right-0 to the button.
         <div
           role="menu"
+          aria-label="Color theme"
           className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-40 p-2 flex flex-col gap-1 w-[min(17rem,calc(100vw-1.5rem))]"
         >
           {/* w- is viewport-aware: 17rem (272px) on wide screens, else

@@ -36,8 +36,10 @@
 //   * Target band = two dashed warn-colored lines at point ± target
 //     ("the corridor the interval must fit inside"), with the early
 //     stop annotated as a vertical line at the stop x plus the
-//     unspent-shots region lightly hatched — the reward for steering,
-//     stated in the cost currency (shots not spent).
+//     unspent-shots region lightly shaded (a 5%-opacity wash — audit
+//     S3: this comment used to promise a hatch that was never drawn)
+//     — the reward for steering, stated in the cost currency (shots
+//     not spent).
 //   * Cost axis: a secondary tick row under the X axis with the
 //     wall-clock gap between consecutive batch arrivals, plus a total
 //     "evidence spent: N shots · T s". CAVEAT: per-batch times are
@@ -284,7 +286,10 @@ function yDomain(
     lo = Math.min(lo, f.lo);
     hi = Math.max(hi, f.hi);
   }
-  const anchor = frames[frames.length - 1].point;
+  // f0, NOT the newest frame (audit S3): re-anchoring the target band
+  // on every streamed frame re-zoomed the axis mid-run. The domain
+  // still extends monotonically (loop above) whenever data escapes it.
+  const anchor = f0.point;
   if (target != null) {
     lo = Math.min(lo, anchor - target * 1.6);
     hi = Math.max(hi, anchor + target * 1.6);
@@ -602,8 +607,11 @@ function Panel({
       )}
 
       {/* per-batch Wilson intervals (vertical), opacity ramps toward now */}
+      {/* Composite keys (audit S3): shots_done can repeat across
+          frames (a zero-progress batch at an early stop) and duplicate
+          React keys drop marks silently. */}
       {s.frames.map((f, i) => (
-        <g key={f.shots}>
+        <g key={`${i}-${f.shots}`}>
           <line
             x1={x(f.shots)}
             x2={x(f.shots)}
@@ -633,7 +641,7 @@ function Panel({
       )}
       {s.frames.map((f, i) => (
         <circle
-          key={f.shots}
+          key={`${i}-${f.shots}`}
           cx={x(f.shots)}
           cy={y(f.point)}
           r={i === s.frames.length - 1 ? 3.5 : 2.2}
@@ -652,8 +660,8 @@ function Panel({
 
       {/* x axis: shot ticks per batch + the full requested budget */}
       <line x1={M.l} x2={M.l + plotW} y1={axisY} y2={axisY} stroke="rgb(var(--color-mute))" strokeWidth={1} />
-      {s.frames.map((f) => (
-        <g key={f.shots}>
+      {s.frames.map((f, i) => (
+        <g key={`${i}-${f.shots}`}>
           <line x1={x(f.shots)} x2={x(f.shots)} y1={axisY} y2={axisY + 4} stroke="rgb(var(--color-mute))" strokeWidth={1} />
           <text x={x(f.shots)} y={axisY + 15} fontSize={9.5} textAnchor="middle" fill="rgb(var(--color-mute))">
             {fmtShots(f.shots)}
@@ -839,7 +847,7 @@ function OverlayPanel({
         )}
         {s2.frames.map((f, i) => (
           <line
-            key={f.shots}
+            key={`${i}-${f.shots}`}
             x1={x(f.shots) + dx}
             x2={x(f.shots) + dx}
             y1={y(f.hi)}
@@ -867,7 +875,7 @@ function OverlayPanel({
         )}
         {s2.frames.map((f, i) => (
           <circle
-            key={f.shots}
+            key={`${i}-${f.shots}`}
             cx={x(f.shots) + dx}
             cy={y(f.point)}
             r={i === s2.frames.length - 1 ? 3.5 : 2.2}
@@ -882,6 +890,12 @@ function OverlayPanel({
     if (!s2.stoppedEarly || s2.shotsExecuted == null) return null;
     const sx = x(s2.shotsExecuted);
     const ty = M.t + 12 + row * 30;
+    // Flip to the right of the line when the default left side would
+    // run off the plot (audit S3: the overlay's stop label never
+    // flipped — an early stop clipped at the left edge). Same shared
+    // estimator as the single view's flip.
+    const label = `⏹ ${key} stopped at ${fmtShots(s2.shotsExecuted)} of ${fmtShots(s2.shotsRequested)} shots`;
+    const flip = sx - 8 - estimateTextW(label.length, 11) < M.l;
     return (
       <g>
         <line
@@ -894,14 +908,14 @@ function OverlayPanel({
           strokeDasharray="5 3"
         />
         <text
-          x={sx - 8}
-          textAnchor="end"
+          x={flip ? sx + 8 : sx - 8}
+          textAnchor={flip ? "start" : "end"}
           y={ty}
           fontSize={11}
           fontWeight={600}
           fill={COLORS[key]}
         >
-          ⏹ {key} stopped at {fmtShots(s2.shotsExecuted)} of {fmtShots(s2.shotsRequested)} shots
+          {label}
           <title>{GLOSSARY.precisionTarget}</title>
         </text>
       </g>
@@ -1126,8 +1140,12 @@ export function EvidenceTheater() {
     : series.reduce((m, sr) => Math.max(m, sr.frames.length), 0);
   const cur = scrub == null ? maxB : Math.min(scrub, maxB);
   useEffect(() => {
-    // A new run (or a restored one, or a new overlay pair) gets a
-    // fresh, unscrubbed theater.
+    // A new run, a restore (setRun(null) changes run_id), a run
+    // finishing (`running` edge) or a newly staged overlay pair each
+    // reset to the final, unscrubbed state; closing the theater
+    // unmounts it (App gates on theaterOpen), so REOPENING is fresh
+    // by construction (audit S3: verified, and the previous draft of
+    // this dep list accidentally referenced window.open).
     setScrub(null);
   }, [run?.run_id, running, overlayIds]);
   const shown = useMemo(

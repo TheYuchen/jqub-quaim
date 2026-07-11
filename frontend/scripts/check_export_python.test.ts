@@ -99,7 +99,7 @@ const prov = (over: Partial<ExportProvenance> = {}): ExportProvenance => ({
   // Call kwarg re-sends the rule so the script stops where the run did.
   assert.match(
     s,
-    /precision_target=0\.02,\s+# stop at ±2\.0pp \(95%-CI half-width\)/,
+    /precision_target=0\.02,\s+# stop at ±2pp \(95%-CI half-width\)/,
   );
   // Kwarg order: seed before precision_target, both inside the call.
   const call = s.slice(s.indexOf("sampledFidelityEstimator("));
@@ -119,7 +119,7 @@ const prov = (over: Partial<ExportProvenance> = {}): ExportProvenance => ({
     prov({ rootSeed: null, seedMode: "fresh", precisionTarget: 0.05 }),
   );
   assert.doesNotMatch(s, /_derive_seed/); // no seed -> no helper
-  assert.match(s, /precision_target=0\.05,\s+# stop at ±5\.0pp/);
+  assert.match(s, /precision_target=0\.05,\s+# stop at ±5pp/);
 }
 
 // -- 4. statevector fidelity: no stochastic threading at all ------------------

@@ -191,15 +191,19 @@ export function ClaimsMapButton() {
                           <td className="py-2 pr-3 text-mute">{r.where}</td>
                           <td className="py-2 whitespace-nowrap">
                             {r.scenarios.map((k, i) => (
-                              <a
-                                key={k}
-                                href={`?scenario=${k}`}
-                                className="text-accent hover:underline font-mono"
-                                title={`Boot ?scenario=${k} (reloads the app into that figure state)`}
-                              >
-                                {i > 0 ? " · " : ""}
-                                {k}
-                              </a>
+                              <React.Fragment key={k}>
+                                {/* Separator OUTSIDE the link (audit
+                                    S3): " · " was part of the anchor —
+                                    clickable, underlined, read aloud. */}
+                                {i > 0 && <span aria-hidden="true"> · </span>}
+                                <a
+                                  href={`?scenario=${k}`}
+                                  className="text-accent hover:underline font-mono"
+                                  title={`Boot ?scenario=${k} (reloads the app into that figure state)`}
+                                >
+                                  {k}
+                                </a>
+                              </React.Fragment>
                             ))}
                           </td>
                         </tr>

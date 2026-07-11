@@ -38,6 +38,11 @@ import { useApp } from "./store";
 /** Set once the demo question is settled — either because we imported
  *  the archive, because the visitor already had runs of their own, or
  *  because they clicked "Clear demo data". Never auto-import again. */
+// NAMING EXCEPTION (audit S3, documented): every other persisted key
+// is dot-namespaced ("quda.workspaceMode", "quda.theme", …); this one
+// shipped hyphenated before the convention settled. Renaming it would
+// make every returning browser look undecided and re-import demo data
+// into real archives — the exception is permanent.
 const DECIDED_FLAG = "quda-demo-decided";
 
 /** Honesty flag (audit S2): true when the demo archive was re-imported
@@ -107,7 +112,9 @@ export async function ensureDemoArchive(
   if (!force && decidedBefore) return false;
   try {
     if (force) {
-      const existing = await listRuns(1000);
+      // Unbounded: the demo flag may sit on old records pushed past
+      // any window by user runs (audit S3 cap sweep).
+      const existing = await listRuns(Infinity);
       if (existing.some((r) => r.demo)) return false;
     } else if ((await countRuns()) > 0) {
       // Existing evidence (e.g. pre-flag build): never mix demo runs
@@ -151,9 +158,11 @@ export async function ensureDemoArchive(
     markDecided();
     useApp.getState().bumpHistoryVersion();
     return true;
-  } catch {
+  } catch (e) {
     // IndexedDB unavailable (private mode), chunk fetch failed, etc.
-    // The app is fully functional without the demo archive.
+    // The app is fully functional without the demo archive — but say
+    // so in the console instead of swallowing the reason (audit S3).
+    console.warn("demo archive import skipped:", e);
     return false;
   }
 }
@@ -164,12 +173,14 @@ export async function clearDemoRuns(): Promise<void> {
   markDecided();
   scenarioReimported = false;
   try {
-    const all = await listRuns(1000);
+    // Unbounded for the same reason as the force-scan above: "clear
+    // demo data" must clear ALL of it, not the newest window.
+    const all = await listRuns(Infinity);
     for (const r of all) {
       if (r.demo) await deleteRun(r.run_id);
     }
-  } catch {
-    /* nothing to clear if the archive is unreadable */
+  } catch (e) {
+    console.warn("clear demo runs: archive unreadable:", e);
   }
   // Deleted demo runs must not stay selected for comparison (audit S2).
   await pruneCompareSelection();

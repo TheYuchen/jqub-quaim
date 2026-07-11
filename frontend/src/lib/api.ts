@@ -317,7 +317,9 @@ export const api = {
   /**
    * Stream pipeline execution via SSE. Calls `onStep` for each step as
    * it completes, then calls `onDone` with the assembled RunResponse.
-   * Falls back to the non-streaming endpoint if the server errors.
+   * Errors surface through `onError` — there is NO silent fallback to
+   * the non-streaming endpoint (an older build had one; the docstring
+   * outlived it — audit S3).
    */
   runStream: async (
     body: RunRequest,

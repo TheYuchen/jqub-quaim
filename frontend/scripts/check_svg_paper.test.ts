@@ -153,6 +153,28 @@ assert.equal(stripPxList("5px, 3px"), "5, 3");
       '<text fill="rgb(31, 41, 55)" font-family="Helvetica, Arial, sans-serif" font-size="13.75">hi</text></svg>',
   );
   assert.deepEqual(auditIllustratorSafety(clean), []);
+
+  // Metadata is verbatim JSON — the class/style strips must never edit
+  // inside it (audit S3): a circuit name containing `class="x"` and an
+  // embedded "<style>" string both survive byte-for-byte, while the
+  // real class attribute outside still strips.
+  const withMeta = finalizeSvgMarkup(
+    '<svg xmlns="http://www.w3.org/2000/svg"><metadata id="provenance">' +
+      '{"circuit_name": "my class=\\"x\\" circuit", "note": "<style>fake</style>"}' +
+      '</metadata><rect class="chip" width="1" height="1"/></svg>',
+  );
+  assert.ok(
+    withMeta.includes('my class=\\"x\\" circuit'),
+    "metadata JSON untouched by the class strip",
+  );
+  assert.ok(
+    withMeta.includes("<style>fake</style>"),
+    "metadata JSON untouched by the style strip",
+  );
+  assert.ok(
+    !withMeta.includes('class="chip"'),
+    "real class attributes outside metadata still strip",
+  );
 }
 
 console.log("svgPaper: all Illustrator-safety checks passed");

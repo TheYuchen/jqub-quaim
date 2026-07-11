@@ -141,6 +141,16 @@ export default function App() {
   useEffect(() => {
     if (!band) setBandEvidenceOpen(false);
   }, [band]);
+  // Esc dismisses the overlay (audit S3): it floats over the center
+  // column like a modal, so it should leave like one.
+  useEffect(() => {
+    if (!band || !bandEvidenceOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBandEvidenceOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [band, bandEvidenceOpen]);
 
   // FlowCanvas can ask us to surface the CircuitPicker when the user
   // tries to run without a circuit selected.
@@ -324,9 +334,22 @@ export default function App() {
     const scenarioKey = new URLSearchParams(window.location.search).get(
       "scenario",
     );
-    void ensureDemoArchive().then(async () => {
-      if (scenarioKey) await activateScenario(scenarioKey);
-    });
+    // Scenario first (audit S3, mode-flash): activateScenario writes
+    // the scripted workspace mode synchronously before its own awaits,
+    // and force-imports the archive itself when the figure needs it.
+    // The plain ensureDemoArchive afterwards is idempotent (first-visit
+    // seeding for scenarios that don't need the archive). Unknown keys
+    // fall through to a normal boot — loudly, not silently (audit S3).
+    void (async () => {
+      if (scenarioKey) {
+        const ok = await activateScenario(scenarioKey);
+        if (!ok)
+          console.warn(
+            `Unknown scenario key "?scenario=${scenarioKey}" — booting normally (known keys: F0..F8).`,
+          );
+      }
+      await ensureDemoArchive();
+    })();
   }, []);
 
   const leftWidth = leftCollapsed ? COLLAPSED_W : leftW;
