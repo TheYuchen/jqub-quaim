@@ -7,7 +7,15 @@
 //      (an early-stopped run's script must re-send the stopping rule
 //      or it would run all shots and reproduce nothing);
 //   3. absence cases: no seed helper without a root seed / without a
-//      sampled step; no precision_target kwarg when the run had none.
+//      sampled step; no precision_target kwarg when the run had none;
+//   4. circuit provenance (Wave 1 audit): sample-key runs emit a real
+//      QPY loader against /api/circuits/samples/<key>/download —
+//      never a silent placeholder; uploaded-circuit runs emit a
+//      sys.exit guard BEFORE the placeholder so the script can never
+//      print wrong numbers silently;
+//   5. Qiskit >= 1.0 imports (qiskit_ibm_runtime.fake_provider, the
+//      same family the studio backend imports) and no dead qc_bound
+//      in the QuCAD step; plugin steps are announced, not skipped.
 //
 // exportPython imports lib/anon.ts, which touches import.meta.env at
 // module scope, so this cannot run under plain node strip-types.
@@ -65,6 +73,16 @@ const prov = (over: Partial<ExportProvenance> = {}): ExportProvenance => ({
   // No target on this run -> the kwarg must NOT appear.
   assert.doesNotMatch(s, /precision_target=/);
   assert.doesNotMatch(s, /stop_target/);
+  // Circuit provenance: a REAL loader for the sample QPY, not a
+  // placeholder — and no refuse-to-run guard on a fetchable circuit.
+  assert.match(s, /urlretrieve\(/);
+  assert.match(s, /\/api\/circuits\/samples\/bell_state\/download/);
+  assert.match(s, /qc = qpy\.load\(f\)\[0\]/);
+  assert.doesNotMatch(s, /sys\.exit/);
+  // Qiskit >= 1.0: the fake-provider family the studio backend uses.
+  assert.match(s, /from qiskit_ibm_runtime\.fake_provider import FakeFez/);
+  assert.doesNotMatch(s, /from qiskit\.providers\.fake_provider import/);
+  assert.doesNotMatch(s, /FakeFezV2/);
 }
 
 // -- 2. early-stopped run: precision_target threaded -------------------------
@@ -127,6 +145,60 @@ const prov = (over: Partial<ExportProvenance> = {}): ExportProvenance => ({
   const { nodes, edges } = graph("sampled");
   const s = generatePythonScript(nodes, edges, "bell_state", null);
   assert.doesNotMatch(s, /_derive_seed|ROOT_SEED|precision_target|stop_target|run_id/);
+}
+
+// -- 6. uploaded circuit: refuse-to-run guard, never a silent placeholder ----
+{
+  const { nodes, edges } = graph("sampled");
+  const s = generatePythonScript(nodes, edges, null, prov());
+  assert.match(s, /sys\.exit\(/);
+  assert.match(s, /replace the placeholder circuit/);
+  assert.doesNotMatch(s, /urlretrieve/);
+  // The guard must come BEFORE the placeholder assignment.
+  assert.ok(
+    s.indexOf("sys.exit(") < s.indexOf("qc = QuantumCircuit(4"),
+    "sys.exit guard precedes the placeholder circuit",
+  );
+}
+
+// -- 7. plugin / unknown step: announced in the script, not skipped ----------
+{
+  const { nodes, edges } = graph("sampled");
+  const withPlugin = [
+    ...nodes,
+    { id: "n9", data: { kind: "plugin:my_pass", params: {} } },
+  ] as any[];
+  const s = generatePythonScript(
+    withPlugin,
+    [...edges, { id: "e9", source: "n4", target: "n9" }] as any[],
+    "bell_state",
+    prov(),
+  );
+  assert.match(
+    s,
+    /# Step \d+: plugin:my_pass — plugin step, not exportable/,
+  );
+}
+
+// -- 8. QuCAD: trains the parameterized circuit, no dead qc_bound ------------
+{
+  const nodes = [
+    { id: "n1", data: { kind: "input_circuit", params: {} } },
+    {
+      id: "n2",
+      data: { kind: "fake_backend", params: { backend_name: "FakeFez", shots: 1024 } },
+    },
+    { id: "n3", data: { kind: "qucad", params: {} } },
+  ] as any[];
+  const edges = [
+    { id: "e1", source: "n1", target: "n2" },
+    { id: "e2", source: "n2", target: "n3" },
+  ] as any[];
+  const s = generatePythonScript(nodes, edges, "vqc_2q_small", prov());
+  assert.match(s, /run_qucad_training_noisy\(/);
+  assert.doesNotMatch(s, /qc_bound/);
+  // The trained parameters ARE bound after training (backend parity).
+  assert.match(s, /qc = qc\.assign_parameters\(theta \* \(mask != 0\)\)/);
 }
 
 console.log("check_export_python: all assertions passed");

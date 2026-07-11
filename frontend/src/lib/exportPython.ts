@@ -112,31 +112,57 @@ function asNum(v: unknown, dflt: number): number {
 }
 
 const emitInputCircuit: Emitter = (_b, _step, { sampleKey }) => {
-  const lines: string[] = [];
   if (sampleKey) {
-    lines.push(`# Sample: ${sampleKey}`);
-    lines.push(`# Option A: Load from a .qpy file`);
-    lines.push(`# from qiskit import qpy`);
-    lines.push(`# with open("${sampleKey}.qpy", "rb") as f:`);
-    lines.push(`#     qc = qpy.load(f)[0]`);
-    lines.push(``);
-    lines.push(`# Option B: Build programmatically (replace with your circuit)`);
-  } else {
-    lines.push(`# Replace with your circuit`);
+    // Bit-exact circuit provenance: download the SAME QPY the studio
+    // run executed (backend endpoint
+    // /api/circuits/samples/<key>/download), cached beside the script.
+    // A hardcoded placeholder here would silently break every
+    // "reproduces the archived numbers" claim in the header.
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    return [
+      `# Sample circuit: ${sampleKey} — fetched bit-exact (QPY) from the`,
+      `# deployment this run executed on; cached next to the script.`,
+      `from pathlib import Path`,
+      `from urllib.request import urlretrieve`,
+      `from qiskit import qpy`,
+      ``,
+      `_qpy_path = Path("${sampleKey}.qpy")`,
+      `if not _qpy_path.exists():`,
+      `    urlretrieve(`,
+      `        "${origin}/api/circuits/samples/${sampleKey}/download",`,
+      `        _qpy_path,`,
+      `    )`,
+      `with _qpy_path.open("rb") as f:`,
+      `    qc = qpy.load(f)[0]`,
+      `print(f"Loaded {qc.name}: {qc.num_qubits}q, depth {qc.depth()}")`,
+    ];
   }
-  lines.push(`qc = QuantumCircuit(4, name="my_circuit")`);
-  lines.push(`# qc.ry(0.5, 0)`);
-  lines.push(`# qc.cx(0, 1)`);
-  lines.push(`# ... add your gates here`);
-  return lines;
+  // Uploaded circuit: this script cannot re-materialize it. Refuse to
+  // run rather than silently produce numbers from a placeholder — a
+  // wrong-but-plausible print would corrupt the provenance chain.
+  return [
+    `import sys`,
+    ``,
+    `sys.exit(`,
+    `    "replace the placeholder circuit: this run used an UPLOADED circuit, "`,
+    `    "which this script cannot fetch. Load it below (qiskit.qpy / "`,
+    `    "QuantumCircuit.from_qasm_file), then delete this guard."`,
+    `)`,
+    `qc = QuantumCircuit(4, name="my_circuit")  # placeholder — REPLACE (see guard above)`,
+  ];
 };
 
 const emitFakeBackend: Emitter = (b) => {
   const name = asStr(b.params.backend_name, "FakeFez");
   const shots = asNum(b.params.shots, 1024);
   return [
-    `from qiskit.providers.fake_provider import ${name}V2`,
-    `backend = ${name}V2()`,
+    `# Requires: pip install qiskit-ibm-runtime — the same fake-backend`,
+    `# family the studio backend imports (qiskit.providers.fake_provider`,
+    `# was removed in Qiskit 1.0).`,
+    `from qiskit_ibm_runtime.fake_provider import ${name}`,
+    ``,
+    `backend = ${name}()`,
     `noise_model = NoiseModel.from_backend(backend)`,
     `shots = ${shots}  # user-set measurement count`,
   ];
@@ -153,8 +179,8 @@ const emitIbmBackend: Emitter = (b) => {
     `# noise_model = NoiseModel.from_backend(backend)`,
     `#`,
     `# For now, falling back to fake backend:`,
-    `from qiskit.providers.fake_provider import FakeFezV2`,
-    `backend = FakeFezV2()`,
+    `from qiskit_ibm_runtime.fake_provider import FakeFez`,
+    `backend = FakeFez()`,
     `noise_model = NoiseModel.from_backend(backend)`,
     `shots = ${shots}`,
   ];
@@ -167,12 +193,9 @@ const emitQucad: Emitter = (b) => {
   return [
     `from qlib.qucad import run_qucad_training_noisy`,
     ``,
-    `# Bind free parameters to zero if circuit is parameterized`,
-    `if qc.num_parameters > 0:`,
-    `    qc_bound = qc.assign_parameters([0.0] * qc.num_parameters)`,
-    `else:`,
-    `    qc_bound = qc`,
-    ``,
+    `# QuCAD trains the PARAMETERIZED circuit directly (mirrors the`,
+    `# studio backend's _handle_qucad — binding first would leave zero`,
+    `# trainable parameters); theta/mask are bound after training below.`,
     `theta, mask, history = run_qucad_training_noisy(`,
     `    qc, noise_model, backend,`,
     `    iterations=${iters}, lam=${lam}, rho=${rho},`,
@@ -220,8 +243,8 @@ const emitCompvqc: Emitter = () => [
   `if qc.num_parameters > 0:`,
   `    comp_backend = backend if 'backend' in dir() else None`,
   `    if comp_backend is None:`,
-  `        from qiskit.providers.fake_provider import FakeFezV2`,
-  `        comp_backend = FakeFezV2()`,
+  `        from qiskit_ibm_runtime.fake_provider import FakeFez`,
+  `        comp_backend = FakeFez()`,
   `    lut = get_LUT(qc, comp_backend)`,
   `    if lut:`,
   `        qp = quadraticProgram_luttoqp(qc, lut)`,
@@ -434,8 +457,17 @@ export function generatePythonScript(
   blocks.forEach((b, i) => {
     const stepNum = i + 1;
     const emitter = EMITTERS[b.kind];
-    if (!emitter) return; // Plugin / unknown — skip silently.
     lines.push(sep);
+    if (!emitter) {
+      // Plugin / unknown kind: say so IN the script instead of leaving
+      // a silent hole — the reader must be able to see the exported
+      // pipeline is not the whole studio pipeline.
+      lines.push(
+        `# Step ${stepNum}: ${b.kind} — plugin step, not exportable (runs only inside ${APP_NAME}'s backend)`,
+      );
+      lines.push(``);
+      return;
+    }
     lines.push(`# Step ${stepNum}: ${STEP_TITLES[b.kind] ?? b.kind}`);
     lines.push(...emitter(b, stepNum, ctx));
     lines.push(``);
