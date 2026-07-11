@@ -13,10 +13,6 @@ deferred.
 
 ## Evidence
 
-- CircuitDiff per-lane scrollbars desync [deferred — the honest fix is
-  one shared horizontal scroll container for all qubit lanes, which
-  restructures the per-lane DOM; explicitly out of scope for this
-  sweep.]
 
 ## Infra
 

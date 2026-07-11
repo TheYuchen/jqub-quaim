@@ -14,6 +14,7 @@
 // Payload is capped server-side (12 qubits / 600 ops) — over the cap
 // we show a one-line pointer back to the channel strip.
 
+import { Fragment } from "react";
 import type { TransformationPayload } from "./TransformationSignature";
 
 interface GateDiffEntry {
@@ -91,25 +92,39 @@ export default function CircuitDiff({
       <summary className="cursor-pointer select-none text-[10px] text-mute hover:text-ink transition-colors">
         Gate-level diff · {nRemoved} removed · {nAdded} added
       </summary>
-      <div className="mt-1.5 space-y-1">
-        {lanes.map(([qi, ops]) => (
-          <div key={qi} className="flex items-center gap-1.5 min-w-0">
-            <span className="w-6 shrink-0 text-right font-mono text-[9px] text-mute">
-              q{qi}
-            </span>
-            <div className="flex items-center gap-1 overflow-x-auto min-w-0 pb-0.5">
-              {ops.map((e, i) => (
-                <span
-                  key={`${qi}-${i}`}
-                  title={`${e.op} — ${CHIP[e.s].title}`}
-                  className={`shrink-0 rounded border px-1 py-px font-mono text-[9px] leading-none whitespace-nowrap ${CHIP[e.s].cls}`}
-                >
-                  {e.op}
-                </span>
-              ))}
-            </div>
-          </div>
-        ))}
+      {/* ONE shared horizontal scroll container (audit backlog): the
+          old per-lane overflow-x-auto gave every lane its own
+          scrollbar, so lanes desynced the moment any one of them was
+          scrolled — column k on q0 stopped aligning with column k on
+          q1, which is exactly the correspondence a 2-qubit gate's
+          ·c/·t chips rely on. A single scrolling grid moves all lanes
+          in lockstep; the qN label column is sticky-left with an
+          opaque panel-alt background (the SignatureCard host surface)
+          so labels stay readable mid-scroll while chips pass under. */}
+      <div className="mt-1.5 overflow-x-auto pb-0.5">
+        <div
+          className="grid w-max min-w-full items-center gap-y-1"
+          style={{ gridTemplateColumns: "max-content 1fr" }}
+        >
+          {lanes.map(([qi, ops]) => (
+            <Fragment key={qi}>
+              <span className="sticky left-0 z-10 bg-surfaceAlt min-w-[24px] pr-1.5 text-right font-mono text-[9px] text-mute">
+                q{qi}
+              </span>
+              <div className="flex items-center gap-1">
+                {ops.map((e, i) => (
+                  <span
+                    key={`${qi}-${i}`}
+                    title={`${e.op} — ${CHIP[e.s].title}`}
+                    className={`shrink-0 rounded border px-1 py-px font-mono text-[9px] leading-none whitespace-nowrap ${CHIP[e.s].cls}`}
+                  >
+                    {e.op}
+                  </span>
+                ))}
+              </div>
+            </Fragment>
+          ))}
+        </div>
       </div>
     </details>
   );
