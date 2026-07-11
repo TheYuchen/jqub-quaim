@@ -1382,10 +1382,13 @@ further evidence.
   guarantee), so it is the SAME evidence recorded twice, and a
   sequential inference must not pool it twice. The bundled archive
   contains exactly this case (bell-512 run 7e401b5270b9 replays
-  f0cb7403bbae, seed 815033775, 247/512 twice). KNOWN LOOSENESS, now
-  documented rather than silent: the multiverse pooled band and the
-  theater's archive band do NOT dedupe replays — their bands are
-  descriptive summaries, but a future pass should align them.
+  f0cb7403bbae, seed 815033775, 247/512 twice). UNIFORM RULE (Deep
+  audit 2026-07-10 closed the former "known looseness"): every
+  pooling surface now applies this dedupe — the difference funnel,
+  the theater's archive band (which also excludes scenario-tagged
+  records), the multiverse pooled band and pooled line, the fidelity
+  card's replicate strip, and the lineage certainty funnel — and each
+  label/tooltip says "exact replays counted once".
 * `differenceTrace(runsA, runsB)` — chronological accumulation: sort
   each side by created_at, dedupe, then step t pools each side's
   first min(t, len) runs and puts a Newcombe interval on Δ(B−A) (sign
@@ -1550,8 +1553,10 @@ Four moves, one inversion (see §1.1 for the position statement):
    RunHistory into lib/evidenceMass.ts — dot area ∝ √shots, ring =
    pinned seed, hollow slash = errored), the pooled Wilson interval as
    a labeled line, and quick actions — ▷ replay latest (pins the seed,
-   auto-runs), +3 replicates (clears stale pin, replicateCount=3,
-   auto-runs), open in editor, A/B. Replay/replicates stay ON the
+   auto-runs), +3 replicates (fresh draws via a one-shot
+   replicateOnce on the restore bridge — the global toolbar
+   replicateCount is never touched; the bridge clears any stale pin),
+   open in editor, A/B. Replay/replicates stay ON the
    board: the covered canvas consumes the same pendingRestore/
    pendingAutoRun bridge scenarios ride (the auto-run guard now
    re-arms after each consumed request), the theater overlays the
@@ -1580,3 +1585,48 @@ green; svg_paper / export_python (esbuild recipe) / difference_funnel
 node lanes green; scenario modes re-checked (editor scenarios land in
 the editor with the theater; F2 board unchanged); live bundle carries
 the new labels + `card-expand` + `config-context` markers.
+
+## Deep audit 2026-07-10 — Wave 1 fixes (SHIPPED 2026-07-10)
+
+S1 / provenance-corruption findings: each made the system lie about
+provenance or reproducibility. One line per fix:
+
+1. **False fork lineage / stale provenance state** — clearGraph and
+   loadPreset now clear restoredFrom / pinnedSeed / precisionTarget /
+   editorContext (the New-configuration bridge also clears
+   precisionTarget); restoredFrom is consumed after the FIRST
+   post-restore run archives; the restore consumer writes the pin
+   unconditionally, so board "Open" (pinSeed null) clears a stale
+   unrelated pin.
+2. **Board "+3 replicates" no longer mutates global state** — a
+   one-shot `replicateOnce` rides pendingRestore → pendingAutoRun →
+   runPipeline; the toolbar replicateCount is never written.
+3. **Gauge fill renders** — results/viz color tokens are RGB triplets;
+   every `var(--color-*)` fill is now `rgb(var(--color-*))`.
+4. **Preflight agrees with the backend on QuCAD** — no-backend-upstream
+   is severity "error": "QuCAD needs a backend node upstream — it will
+   error at run time" (aligned with autoConnect and _handle_qucad).
+5. **exportPython reproducibility is real** — sample runs emit a
+   working QPY loader against `/api/circuits/samples/<key>/download`;
+   uploaded-circuit runs emit a `sys.exit` guard before the
+   placeholder; fake-provider imports switched to
+   `qiskit_ibm_runtime.fake_provider` (backend parity); QuCAD emitter
+   drops the dead `qc_bound` and mirrors _handle_qucad; plugin steps
+   are announced as "not exportable" comments; export_python lane
+   asserts all of it.
+6. **Palette-add keeps hand wiring** — adding blocks appends nodes
+   only; when edges exist the user is told to wire manually or press
+   Auto-connect; setEdges/setNotice hoisted out of the setNodes
+   updater (StrictMode).
+7. **Archive pollution + pool double-count closed** — scenario
+   auto-runs archive with a `scenario` tag and are excluded from the
+   theater prior-evidence pool and the F7 overlay picker; dedupeDraws
+   ("exact replays counted once") now applies to the theater archive
+   band, the replicate strip, the multiverse pooled band/line and the
+   lineage certainty funnel, with labels updated.
+8. **timesTrusted misattribution** — an id-less displayed run is only
+   trusted while streaming; restored cache-served runs no longer
+   inherit the previous run's seed / config chips / wall-times.
+9. **SSE parser** — decoder flushed after the read loop and the
+   remaining buffer parsed (no lost final event); unknown JSON events
+   are treated as StepResults only when `node_id` is a string.

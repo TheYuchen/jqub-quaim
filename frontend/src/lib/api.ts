@@ -346,44 +346,53 @@ export const api = {
       let cachedResponse: RunResponse | null = null;
       let runMeta: Partial<RunResponse> | null = null;
 
+      // One parser for every SSE line: "data: {...}\n\n".
+      const handleLine = (line: string) => {
+        if (!line.startsWith("data: ")) return;
+        const payload = line.slice(6).trim();
+        if (payload === "[DONE]" || payload === "[CACHED]") return;
+        try {
+          const parsed = JSON.parse(payload);
+          // Run-level provenance envelope, sent as the first event.
+          if (parsed.run_meta) {
+            runMeta = parsed.run_meta as Partial<RunResponse>;
+            onMeta?.(runMeta);
+            return;
+          }
+          // Anytime-evidence frame: a shot batch landed mid-step.
+          if (parsed.step_progress) {
+            onProgress?.(parsed.step_progress as StepProgress);
+            return;
+          }
+          // Cache hit sends a full RunResponse object (has .steps array)
+          if (Array.isArray(parsed.steps)) {
+            cachedResponse = parsed as RunResponse;
+          } else if (typeof parsed.node_id === "string") {
+            // Individual StepResult — only an object carrying node_id
+            // is one. An unknown future event type must NOT masquerade
+            // as a pipeline step in the assembled RunResponse.
+            steps.push(parsed as StepResult);
+            onStep(parsed as StepResult, steps.length - 1);
+          }
+        } catch {
+          // Ignore malformed lines
+        }
+      };
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-
-        // Parse SSE lines: "data: {...}\n\n"
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6).trim();
-          if (payload === "[DONE]" || payload === "[CACHED]") continue;
-          try {
-            const parsed = JSON.parse(payload);
-            // Run-level provenance envelope, sent as the first event.
-            if (parsed.run_meta) {
-              runMeta = parsed.run_meta as Partial<RunResponse>;
-              onMeta?.(runMeta);
-              continue;
-            }
-            // Anytime-evidence frame: a shot batch landed mid-step.
-            if (parsed.step_progress) {
-              onProgress?.(parsed.step_progress as StepProgress);
-              continue;
-            }
-            // Cache hit sends a full RunResponse object (has .steps array)
-            if (Array.isArray(parsed.steps)) {
-              cachedResponse = parsed as RunResponse;
-            } else {
-              // Individual StepResult
-              steps.push(parsed as StepResult);
-              onStep(parsed as StepResult, steps.length - 1);
-            }
-          } catch {
-            // Ignore malformed lines
-          }
-        }
+        for (const line of lines) handleLine(line);
       }
+      // Flush: a final event without a trailing newline — or a multi-
+      // byte character split across the last chunk, still held inside
+      // the streaming decoder — would otherwise be dropped, losing the
+      // last step (or the whole cached response).
+      buffer += decoder.decode();
+      for (const line of buffer.split("\n")) handleLine(line);
 
       if (cachedResponse) {
         onDone(cachedResponse);
