@@ -54,6 +54,10 @@ export function QNode({ id, data, selected }: NodeProps) {
   // surface its own headline metric + duration badge. Cheap because
   // run only changes once per Run click.
   const run = useApp((s) => s.run);
+  // Authoring lock (audit S2): while a run streams, node deletion and
+  // param edits are disabled — mutating the graph mid-run would leave
+  // the canvas out of sync with what is actually executing/archiving.
+  const running = useApp((s) => s.running);
   const step = run?.steps.find((s) => s.node_id === id);
   // Anytime evidence: while a run streams, sampled steps report each
   // shot batch here BEFORE their StepResult exists — the node face
@@ -82,8 +86,13 @@ export function QNode({ id, data, selected }: NodeProps) {
         <button
           type="button"
           aria-label="Delete this block"
-          title="Delete this orphaned block"
-          className="nodrag absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-70 hover:opacity-100 focus:opacity-100 transition-opacity z-10"
+          title={
+            running
+              ? "Locked while a run is in progress"
+              : "Delete this orphaned block"
+          }
+          disabled={running}
+          className="nodrag absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-70 hover:opacity-100 focus:opacity-100 transition-opacity z-10 disabled:opacity-30 disabled:cursor-not-allowed"
           onClick={(e) => {
             e.stopPropagation();
             deleteElements({ nodes: [{ id }] });
@@ -134,8 +143,13 @@ export function QNode({ id, data, selected }: NodeProps) {
       <button
         type="button"
         aria-label="Delete this block"
-        title="Delete this block"
-        className="nodrag absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-70 hover:opacity-100 focus:opacity-100 transition-opacity z-10"
+        title={
+          running
+            ? "Locked while a run is in progress"
+            : "Delete this block"
+        }
+        disabled={running}
+        className="nodrag absolute -top-2 -right-2 w-6 h-6 rounded-full bg-surface border border-edge text-mute hover:text-danger hover:border-danger/60 flex items-center justify-center opacity-70 hover:opacity-100 focus:opacity-100 transition-opacity z-10 disabled:opacity-30 disabled:cursor-not-allowed"
         onClick={(e) => {
           e.stopPropagation();
           deleteElements({ nodes: [{ id }] });
@@ -273,6 +287,7 @@ export function QNode({ id, data, selected }: NodeProps) {
               spec={spec.params}
               values={d.params ?? {}}
               onChange={patchParams}
+              disabled={running}
             />
           )}
         </div>

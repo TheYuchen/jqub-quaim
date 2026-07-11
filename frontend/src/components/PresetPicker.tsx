@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { ChevronDown, Layers } from "lucide-react";
 import { PIPELINE_PRESETS } from "../lib/presets";
+import { useApp } from "../lib/store";
 import { useDismissOn } from "../lib/useDismissOn";
 
 /**
@@ -11,6 +12,9 @@ import { useDismissOn } from "../lib/useDismissOn";
 export function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Authoring lock (audit S2): a preset swap replaces the whole graph —
+  // never allowed under a run in progress.
+  const running = useApp((s) => s.running);
 
   useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
 
@@ -25,8 +29,13 @@ export function PresetPicker({ onPick }: { onPick: (key: string) => void }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="btn h-8"
-        title="Load a preset pipeline onto the canvas"
+        disabled={running}
+        className="btn h-8 disabled:opacity-40 disabled:cursor-not-allowed"
+        title={
+          running
+            ? "Locked while a run is in progress"
+            : "Load a preset pipeline onto the canvas"
+        }
         aria-label="Load a preset pipeline"
       >
         <Layers className="w-3.5 h-3.5" />

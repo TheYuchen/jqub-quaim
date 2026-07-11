@@ -31,10 +31,15 @@ export function NodeParamEditor({
   spec,
   values,
   onChange,
+  disabled = false,
 }: {
   spec: NodeParamSpec[];
   values: Record<string, unknown>;
   onChange: (patch: Record<string, unknown>) => void;
+  /** Authoring lock (audit S2): true while a run is in progress —
+   *  every control renders disabled so params can't drift away from
+   *  the graph that is actually executing. */
+  disabled?: boolean;
 }) {
   return (
     <div className="nodrag mt-2 pt-2 border-t border-edge/60 space-y-2">
@@ -45,6 +50,7 @@ export function NodeParamEditor({
             spec={p}
             value={String(values[p.key] ?? "")}
             onChange={(v) => onChange({ [p.key]: v })}
+            disabled={disabled}
           />
         ) : (
           <NumberField
@@ -56,6 +62,7 @@ export function NodeParamEditor({
                 : Number(values[p.key])
             }
             onChange={(v) => onChange({ [p.key]: v })}
+            disabled={disabled}
           />
         ),
       )}
@@ -67,10 +74,12 @@ function SelectField({
   spec,
   value,
   onChange,
+  disabled = false,
 }: {
   spec: Extract<NodeParamSpec, { type: "select" }>;
   value: string;
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   const known = spec.options.some((o) => o.value === value);
   return (
@@ -79,7 +88,9 @@ function SelectField({
       <select
         value={known ? value : ""}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink focus:outline-none focus:border-accent/60"
+        disabled={disabled}
+        title={disabled ? "Locked while a run is in progress" : undefined}
+        className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink focus:outline-none focus:border-accent/60 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {!known && (
           <option value="" disabled>
@@ -100,10 +111,12 @@ function NumberField({
   spec,
   value,
   onChange,
+  disabled = false,
 }: {
   spec: Extract<NodeParamSpec, { type: "number" | "int" }>;
   value: number;
   onChange: (v: number) => void;
+  disabled?: boolean;
 }) {
   const safe = Number.isFinite(value) ? value : (spec.min ?? 0);
   const precision =
@@ -128,6 +141,8 @@ function NumberField({
         max={spec.max}
         step={spec.step}
         value={safe}
+        disabled={disabled}
+        title={disabled ? "Locked while a run is in progress" : undefined}
         onChange={(e) => {
           const raw = parseFloat(e.target.value);
           if (!Number.isFinite(raw)) return;
@@ -138,7 +153,7 @@ function NumberField({
           if (spec.max !== undefined) next = Math.min(spec.max, next);
           onChange(next);
         }}
-        className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink font-mono focus:outline-none focus:border-accent/60"
+        className="w-full text-[11px] bg-surface border border-edge rounded px-1.5 py-0.5 text-ink font-mono focus:outline-none focus:border-accent/60 disabled:opacity-50 disabled:cursor-not-allowed"
       />
       {/* Range stays inline as a small mono cue (concrete bounds are
           worth glancing at every time). Long-form hint hides behind the

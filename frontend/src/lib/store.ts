@@ -291,6 +291,13 @@ interface AppState {
   addBlocksToCanvas: (kinds: NodeKind[]) => void;
   clearPendingBlocks: () => void;
 
+  /** Reverse bridge (audit S2): FlowCanvas publishes the kinds
+   *  currently on the canvas whenever the kind multiset changes, so
+   *  the palette's BlockPicker can render live "on canvas" badges and
+   *  skip pre-checking defaults that are already placed. */
+  canvasKinds: NodeKind[];
+  setCanvasKinds: (kinds: NodeKind[]) => void;
+
   /**
    * Hint flag set by FlowCanvas error paths: tells App.tsx to open
    * the left CircuitPicker pane (desktop: expand; mobile: open
@@ -515,6 +522,8 @@ export const useApp = create<AppState>((set) => ({
   pendingBlockKinds: [],
   addBlocksToCanvas: (kinds) => set({ pendingBlockKinds: kinds }),
   clearPendingBlocks: () => set({ pendingBlockKinds: [] }),
+  canvasKinds: [],
+  setCanvasKinds: (kinds) => set({ canvasKinds: kinds }),
   hintExpandLeftPane: 0,
   bumpHintExpandLeftPane: () =>
     set((s) => ({ hintExpandLeftPane: s.hintExpandLeftPane + 1 })),

@@ -25,6 +25,7 @@ import {
   Link2,
   Loader2,
   Play,
+  Square,
   Trash2,
   Wand2,
   X,
@@ -180,6 +181,14 @@ export function FlowCanvas() {
   const pendingRestore = useApp((s) => s.pendingRestore);
   const editorContext = useApp((s) => s.editorContext);
   const [notice, setNotice] = useState<Notice>(null);
+  // Replicate-loop cancel affordance (audit S2): while a ×N loop runs,
+  // the Run button turns into "Stop after this run". The ref is the
+  // flag the loop checks between iterations (no mid-run abort — the
+  // current run completes and archives); the state twins drive the
+  // button label / disabled treatment.
+  const stopLoopRef = useRef(false);
+  const [loopActive, setLoopActive] = useState(false);
+  const [stopRequested, setStopRequested] = useState(false);
   // cost-estimate: per-kind medians from this browser's run archive,
   // recomputed when the canvas kind-set changes or a run is archived
   // (historyVersion bump). Purely client-side — see lib/costModel.ts.
@@ -195,6 +204,16 @@ export function FlowCanvas() {
         .join("|"),
     [nodes],
   );
+  // BlockPicker bridge (audit S2): publish the kind-set actually on
+  // the canvas so the palette's picker renders live "on canvas"
+  // badges and skips pre-checking defaults that are already placed.
+  useEffect(() => {
+    useApp
+      .getState()
+      .setCanvasKinds(
+        kindsKey === "" ? [] : (kindsKey.split("|") as NodeKind[]),
+      );
+  }, [kindsKey]);
   useEffect(() => {
     let alive = true;
     if (nodes.length === 0) {
@@ -365,7 +384,15 @@ export function FlowCanvas() {
         useApp.getState().setCircuit(c);
         useApp.getState().setSampleKey(key);
       })
-      .catch(() => {});
+      .catch(() => {
+        // Boot fetch failed (backend cold, network hiccup) — without a
+        // word the user faces a silently disabled Run button. Say what
+        // is missing; the Run buttons' title mirrors it (audit S2).
+        setNotice({
+          text: "Could not load a sample circuit — pick one in the Pipeline input pane on the left, then Run.",
+          tone: "warn",
+        });
+      });
   }, [circuit, initial.hashPayload]);
 
   // Re-fit the canvas to the visible viewport on orientation change.
@@ -737,16 +764,21 @@ export function FlowCanvas() {
   ]);
 
   // Monotonic counter so we can tell stale `loadSample` resolutions
-  // (from a prior preset click) from the most recent one. Without this,
-  // a user who quickly toggles between two presets that pull different
-  // default circuits could end up with preset A's graph but preset B's
-  // sample, depending on which network call resolved last.
-  const presetGenerationRef = useRef(0);
+  // (from a prior preset click OR a prior restore) from the most
+  // recent one. Without this, a user who quickly toggles between two
+  // presets/restores that pull different circuits could end up with
+  // graph A but sample B, depending on which network call resolved
+  // last. Shared by loadPreset and the restore consumer so the two
+  // paths supersede each other, too (audit S2).
+  const sampleGenRef = useRef(0);
 
   const loadPreset = (key: string, sampleOverride?: string) => {
     const preset = PRESET_BY_KEY[key];
     if (!preset) return;
-    const myGen = ++presetGenerationRef.current;
+    const myGen = ++sampleGenRef.current;
+    // A superseded scenario/board auto-run request must not fire a
+    // surprise run against this fresh preset minutes later (audit S2).
+    if (useApp.getState().pendingAutoRun) useApp.getState().clearAutoRun();
     const g = buildPresetGraph(preset);
     setNodes(g.nodes);
     setEdges(g.edges);
@@ -771,7 +803,7 @@ export function FlowCanvas() {
         .then((c) => {
           // Drop the result if the user has clicked another preset in the
           // meantime — that newer click owns the sample state now.
-          if (presetGenerationRef.current !== myGen) return;
+          if (sampleGenRef.current !== myGen) return;
           useApp.getState().setCircuit(c);
           useApp.getState().setSampleKey(targetSample);
         })
@@ -798,6 +830,8 @@ export function FlowCanvas() {
     setPrecisionTarget(null);
     useApp.getState().setRestoredFrom(null);
     useApp.getState().setEditorContext(null);
+    // ...and no queued auto-run may fire against an empty canvas later.
+    if (useApp.getState().pendingAutoRun) useApp.getState().clearAutoRun();
   };
 
   // Share flow for the toolbar's ⋯ menu (Share lives there at every
@@ -904,6 +938,14 @@ export function FlowCanvas() {
   // a NEW configuration" vs "matches an archived one".
   const [liveHash, setLiveHash] = useState<string | null>(null);
   const [liveCount, setLiveCount] = useState<number | null>(null);
+  // Context switch (opening a different card, New configuration):
+  // drop the PREVIOUS canvas's hash immediately, or the bar flashes a
+  // stale identity for the whole debounce window below. The bar
+  // renders "computing identity…" while null (audit S2).
+  useEffect(() => {
+    setLiveHash(null);
+    setLiveCount(null);
+  }, [editorContext]);
   useEffect(() => {
     if (!editorContext) return;
     const t = window.setTimeout(() => {
@@ -975,6 +1017,23 @@ export function FlowCanvas() {
   // and an explicit "press Run" keeps the user in control.
   useEffect(() => {
     if (!pendingRestore) return;
+    if (running) {
+      // Refuse to swap the canvas under a run in progress (board quick
+      // actions are one click away — audit S2). The request stays
+      // queued in the store; this effect re-fires when `running` flips
+      // false and applies it then. Authoring is locked while running,
+      // so nothing can invalidate the queued request in the meantime.
+      setNotice({
+        text: "Run in progress — the restore will apply when it finishes.",
+        tone: "warn",
+      });
+      return;
+    }
+    // A stale auto-run request (superseded scenario boot / board quick
+    // action) must not ride into this restored canvas and fire a
+    // surprise run minutes later (audit S2).
+    if (useApp.getState().pendingAutoRun) useApp.getState().clearAutoRun();
+    const myGen = ++sampleGenRef.current;
     const {
       graph,
       sampleKey: sk,
@@ -1053,6 +1112,11 @@ export function FlowCanvas() {
       api
         .loadSample(sk)
         .then((ci) => {
+          // Same staleness guard as loadPreset (audit S2): a newer
+          // preset click or restore owns the sample state now —
+          // applying this resolution (or firing its auto-run) would
+          // race the newer request.
+          if (sampleGenRef.current !== myGen) return;
           useApp.getState().setCircuit(ci);
           useApp.getState().setSampleKey(sk);
           if (autoRunAfter) {
@@ -1073,12 +1137,13 @@ export function FlowCanvas() {
             tone: "ok",
           });
         })
-        .catch(() =>
+        .catch(() => {
+          if (sampleGenRef.current !== myGen) return;
           setNotice({
             text: "Graph restored, but the sample circuit failed to load — pick it manually on the left.",
             tone: "warn",
-          }),
-        );
+          });
+        });
     } else {
       setNotice({
         text: "Graph restored. This run used an uploaded circuit — re-upload it on the left to reproduce the numbers.",
@@ -1086,7 +1151,7 @@ export function FlowCanvas() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingRestore]);
+  }, [pendingRestore, running]);
 
   const runPipeline = async (opts?: {
     replicateOnce?: number;
@@ -1217,6 +1282,13 @@ export function FlowCanvas() {
     // Replicates only make sense for fresh draws; under a pinned seed
     // every repeat would return the identical numbers.
     const count = pinnedSeed != null ? 1 : (opts?.replicateOnce ?? replicateCount);
+    stopLoopRef.current = false;
+    if (count > 1) setLoopActive(true);
+    // Partial-outcome honesty (audit S2): track how many replicates
+    // actually completed, so a broken step or a user stop reports
+    // "stopped after i of N" instead of the unconditional success toast.
+    let completed = 0;
+    let stoppedBy: "failure" | "user" | null = null;
     try {
       for (let i = 0; i < count; i++) {
         if (count > 1) {
@@ -1234,21 +1306,50 @@ export function FlowCanvas() {
           rootSeed: response.root_seed ?? null,
         });
         await archive(response);
-        if (!response.ok) break; // don't burn replicates on a broken graph
+        completed = i + 1;
+        if (!response.ok) {
+          // don't burn replicates on a broken graph
+          stoppedBy = "failure";
+          break;
+        }
+        if (stopLoopRef.current && completed < count) {
+          stoppedBy = "user";
+          break;
+        }
       }
       if (count > 1) {
-        setNotice({
-          text: `Finished ${count} replicates — open a fidelity card to see the distribution build up.`,
-          tone: "ok",
-        });
+        if (stoppedBy === "failure") {
+          setNotice({
+            text: `Stopped after ${completed} of ${count} replicates — a step failed. Completed runs are archived.`,
+            tone: "warn",
+          });
+        } else if (stoppedBy === "user") {
+          setNotice({
+            text: `Stopped after ${completed} of ${count} replicates, as requested. Completed runs are archived.`,
+            tone: "ok",
+          });
+        } else {
+          setNotice({
+            text: `Finished ${count} replicates — open a fidelity card to see the distribution build up.`,
+            tone: "ok",
+          });
+        }
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       setNotice({
-        text: err instanceof Error ? err.message : String(err),
+        // Mid-loop transport errors get the same partial honesty as a
+        // failed step: say how far the loop got before it died.
+        text:
+          count > 1 && completed > 0
+            ? `Stopped after ${completed} of ${count} replicates — ${msg}`
+            : msg,
         tone: "danger",
       });
     } finally {
       setRunning(false);
+      setLoopActive(false);
+      setStopRequested(false);
       useApp.getState().clearLiveProgress();
     }
   };
@@ -1306,6 +1407,7 @@ export function FlowCanvas() {
           ctx={editorContext}
           liveHash={liveHash}
           liveCount={liveCount}
+          canvasEmpty={nodes.length === 0}
           circuitTag={sampleKey ?? circuit?.name ?? "no circuit"}
         />
       )}
@@ -1546,16 +1648,58 @@ export function FlowCanvas() {
               md-gates, so no hidden/md:flex here — on mobile the
               bottom-right Run FAB takes over. */}
           <button
-            onClick={() => void runPipeline()}
-            disabled={running || !circuit}
+            onClick={() => {
+              if (running && loopActive) {
+                // Loop cancel (audit S2): flag checked between
+                // iterations — the current replicate finishes and
+                // archives, then the loop stops.
+                stopLoopRef.current = true;
+                setStopRequested(true);
+              } else {
+                void runPipeline();
+              }
+            }}
+            disabled={
+              (running && (!loopActive || stopRequested)) ||
+              (!running && !circuit)
+            }
             className="btn-primary h-8 disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label={running ? "Running" : "Run pipeline"}
+            title={
+              !running && !circuit
+                ? "No circuit loaded — pick one on the left"
+                : running && loopActive && !stopRequested
+                  ? "Finish the current replicate, then stop the loop (completed runs stay archived)"
+                  : undefined
+            }
+            aria-label={
+              running
+                ? loopActive
+                  ? stopRequested
+                    ? "Stopping after this run"
+                    : "Stop after this run"
+                  : "Running"
+                : "Run pipeline"
+            }
           >
             {running ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Running…</span>
-              </>
+              loopActive ? (
+                stopRequested ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Stopping after this run…</span>
+                  </>
+                ) : (
+                  <>
+                    <Square className="w-3.5 h-3.5" />
+                    <span>Stop after this run</span>
+                  </>
+                )
+              ) : (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Running…</span>
+                </>
+              )
             ) : (
               <>
                 <Play className="w-3.5 h-3.5" />
@@ -1640,19 +1784,56 @@ export function FlowCanvas() {
             so it stays clear of the iOS home indicator. */}
         <button
           type="button"
-          onClick={() => void runPipeline()}
-          disabled={running || !circuit}
+          onClick={() => {
+            if (running && loopActive) {
+              stopLoopRef.current = true;
+              setStopRequested(true);
+            } else {
+              void runPipeline();
+            }
+          }}
+          disabled={
+            (running && (!loopActive || stopRequested)) ||
+            (!running && !circuit)
+          }
           className="md:hidden absolute right-4 z-20 flex items-center gap-2 px-4 py-3 rounded-full bg-accent text-canvas shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm active:scale-95 transition-transform"
           style={{
             bottom: "calc(env(safe-area-inset-bottom, 0px) + 1rem)",
           }}
-          aria-label={running ? "Running" : "Run pipeline"}
+          title={
+            !running && !circuit
+              ? "No circuit loaded — pick one on the left"
+              : undefined
+          }
+          aria-label={
+            running
+              ? loopActive
+                ? stopRequested
+                  ? "Stopping after this run"
+                  : "Stop after this run"
+                : "Running"
+              : "Run pipeline"
+          }
         >
           {running ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Running…</span>
-            </>
+            loopActive ? (
+              stopRequested ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Stopping…</span>
+                </>
+              ) : (
+                <>
+                  <Square className="w-4 h-4" />
+                  <span>Stop after run</span>
+                </>
+              )
+            ) : (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Running…</span>
+              </>
+            )
           ) : (
             <>
               <Play className="w-4 h-4" />
@@ -1687,10 +1868,15 @@ function ConfigContextBar({
   ctx,
   liveHash,
   liveCount,
+  canvasEmpty,
   circuitTag,
 }: {
   ctx: EditorCtx;
   liveHash: string | null;
+  /** liveHash == null is ambiguous on its own: it means BOTH "empty
+   *  canvas" and "debounced hash not computed yet". This flag
+   *  disambiguates so the bar can say "computing…" honestly. */
+  canvasEmpty: boolean;
   liveCount: number | null;
   circuitTag: string;
 }) {
@@ -1718,9 +1904,14 @@ function ConfigContextBar({
     >
       <span className="flex items-center gap-1.5 min-w-0 truncate">
         {ctx.source === "card" ? (
-          liveHash == null ? (
+          canvasEmpty ? (
             <>
               Configuration {chip(ctx.hash)} — canvas cleared
+            </>
+          ) : liveHash == null ? (
+            <>
+              Configuration {chip(ctx.hash)} —{" "}
+              <span className="text-mute/70">computing identity…</span>
             </>
           ) : liveHash === ctx.hash ? (
             <>
@@ -1741,8 +1932,13 @@ function ConfigContextBar({
               )}
             </>
           )
-        ) : liveHash == null ? (
+        ) : canvasEmpty ? (
           <>New configuration — empty canvas, not yet run</>
+        ) : liveHash == null ? (
+          <>
+            New configuration —{" "}
+            <span className="text-mute/70">computing identity…</span>
+          </>
         ) : matched ? (
           <>
             Defining configuration {chip(liveHash)} —{" "}
