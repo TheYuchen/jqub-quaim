@@ -54,6 +54,23 @@ detail). Internal ids stay frozen ("compose"/"multiverse" in scenario
 uiState, localStorage, provenance); only labels speak the new language
 ("Pipeline editor"/"Evidence board").
 
+**Palette as grammar (marker `pipeline-shelf`).** The block palette is
+laid out as the sentence structure a valid pipeline follows: five
+stage columns — Source → Backend → Algorithm → Metric → Sink — with
+faint arrows between headers and a one-line tagline per stage ("where
+the circuit comes from", "the noisy machine", …), blocks stacked
+vertically beneath. The previous strip enumerated tiles by family but
+read as inventory; the shelf makes the compositional constraint the
+IA already enforces (auto-connect chains in exactly this order, the
+BlockPicker's family hints say which stages are required) visible
+before the first drag. Growth is vertical — a column with ≥5 blocks
+(plugins join their declared family's column) scrolls internally —
+and the shelf wraps to two rows below 880px of container width
+(ResizeObserver, like the board grid). Rows keep every interaction of
+the old tiles: HTML5 drag, tap-to-add via pendingBlockKinds, the
+touch-drag bridge, plugin badges/delete, paper links, plus a count
+dot for kinds already on the canvas.
+
 ### 1.2 Grounding in documented practice
 
 The task analysis behind the three scales is corpus-grounded (two
@@ -1032,6 +1049,22 @@ itself only via APP_NAME, so anon builds show the neutral codename).
    first visit (flag `quda-tour-seen-v2`) EXCEPT under ?scenario=
    boots (figure states must not be covered); a TopBar "Tour" button
    reopens it. Keyboard: Esc / ← →.
+   *Guided lessons (2026-07-12, marker `guided-lessons`):* beginner
+   support beyond the tour — four micro-lessons (lib/lessons.ts +
+   components/LessonCard.tsx) riding the scenario machinery
+   (pendingRestore + auto-run; runs tagged RunRecord.scenario
+   "L1"…"L4" so they are excluded from evidence pools like F-boots).
+   L1 measurement-is-sampling (bell, 128 vs 4096 shots, watch the
+   funnel narrow), L2 noise-costs-fidelity (vqc_2q_small: statevector
+   is exactly 1.0 under bind_zero, sampled-on-FakeFez lands ~0.97;
+   ends in Between configurations), L3 what-did-the-optimizer-do (the
+   F5 QuCAD graph + pinned seed, gate diff open: both ry(θ) re-bound
+   to near-zero angles), L4 same-recipe-different-draw (two fresh
+   draws, then replay draw #1's seed → pinned ring + fork edge in the
+   lineage). Entry points: TopBar "Learn", the board's empty state,
+   tour slide 5. Small dismissable card, bottom-right z-40; question →
+   [Run it] → what-to-look-for once historyVersion bumps; progress in
+   localStorage `quda.lessonsDone`; glossary terms carry TipIcons.
 2. **GMU theme removed entirely** — theme.ts (ThemeKey = light|dark),
    index.css token block, vite.config.ts %THEME_KEYS% (now always
    ["dark"]) and the anon CSS-stripping generateBundle hook (nothing
