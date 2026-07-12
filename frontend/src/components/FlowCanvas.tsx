@@ -79,6 +79,7 @@ import { WorkspaceToggle } from "./WorkspaceToggle";
 import { EmptyCanvas } from "./EmptyCanvas";
 import { MoreMenu } from "./MoreMenu";
 import { FigureExportButton } from "./FigureExportButton";
+import { BlockPicker } from "./BlockPicker";
 
 /** One-shot feedback surfaced as a toast at the bottom of the canvas.
  *
@@ -326,10 +327,10 @@ export function FlowCanvas() {
   // get React Flow's animated stroke-dash loop.
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // Watch the Zustand pendingBlockKinds queue: NodePalette pushes block
-  // kinds here when the user checks tiles and clicks "Add to canvas" (or
-  // clicks the single-add + icon). We create nodes, append them to the
-  // canvas, and auto-connect the whole graph.
+  // Watch the Zustand pendingBlockKinds queue: the Add-block chooser
+  // (BlockPicker popover) pushes kinds here when the user clicks a
+  // catalog row. We create nodes, append them to the canvas, and
+  // auto-connect the whole graph.
   useEffect(() => {
     if (pendingBlockKinds.length === 0) return;
     const kinds = pendingBlockKinds;
@@ -1584,7 +1585,7 @@ export function FlowCanvas() {
       <div className="shrink-0 border-b border-edge">
         {/* ---- Row 1: WORKSPACE & AUTHORING -------------------------
             Everything here describes or edits the COMPOSITION — mode
-            toggle, block/link counters, preset, wiring, figure
+            toggle, the Add-block chooser, block/link counters, preset, wiring, figure
             snapshot, clear, overflow menu — none of it changes what
             the next run MEASURES. Rarely-used authoring actions
             (Share, Export .py) live in the ⋯ menu at EVERY width:
@@ -1597,6 +1598,12 @@ export function FlowCanvas() {
             in user testing. */}
         <div className="h-10 px-3 sm:px-4 flex items-center gap-2 min-w-0">
           <WorkspaceToggle className="h-8" />
+          {/* The palette after the tier-1 re-architecture: its PERMANENT
+              chrome cost is exactly this one button. The catalog lives
+              in the popover it opens (BlockPicker, marker
+              block-chooser); adds travel the pendingBlockKinds bridge
+              consumed above. */}
+          <BlockPicker />
           <span
             className="hidden sm:inline text-[11px] text-edge select-none"
             aria-hidden="true"
