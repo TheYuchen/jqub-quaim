@@ -290,9 +290,10 @@ interface AppState {
   setUseLiveIbm: (v: boolean) => void;
 
   /**
-   * Cross-component bridge: NodePalette pushes block kinds here when the
-   * user checks blocks and clicks "Add to canvas". FlowCanvas watches
-   * this via useEffect, creates the nodes, auto-connects, and clears.
+   * Cross-component bridge: the Add-block chooser (BlockPicker
+   * popover) pushes block kinds here when the user clicks a catalog
+   * row. FlowCanvas watches this via useEffect, creates the nodes,
+   * auto-connects, and clears.
    */
   pendingBlockKinds: NodeKind[];
   addBlocksToCanvas: (kinds: NodeKind[]) => void;
@@ -300,8 +301,8 @@ interface AppState {
 
   /** Reverse bridge (audit S2): FlowCanvas publishes the kinds
    *  currently on the canvas whenever the kind multiset changes, so
-   *  the palette's BlockPicker can render live "on canvas" badges and
-   *  skip pre-checking defaults that are already placed. */
+   *  the Add-block chooser can render live per-row "on canvas" count
+   *  dots. */
   canvasKinds: NodeKind[];
   setCanvasKinds: (kinds: NodeKind[]) => void;
 
@@ -314,39 +315,12 @@ interface AppState {
   bumpHintExpandLeftPane: () => void;
 
   /** Plugin manifests this user has uploaded. Refreshed on app boot
-   *  and after every upload/delete. NodePalette + BlockPicker merge
-   *  these into the canonical NodeCatalog so they appear alongside
-   *  built-in blocks. */
+   *  and after every upload/delete. The Add-block chooser and the
+   *  canvas insert menu merge these into the canonical NodeCatalog so
+   *  they appear alongside built-in blocks. */
   plugins: PluginManifest[];
   setPlugins: (p: PluginManifest[]) => void;
 
-  /**
-   * Touch-drag bridge between NodePalette (where the touch starts)
-   * and FlowCanvas (which renders the floating preview, computes the
-   * edge under the finger, and ultimately commits the drop).
-   *
-   *   touchDrag       — non-null while a touch drag is active. The
-   *                     palette tile updates x/y on every pointermove.
-   *                     The canvas reads x/y to render a floating
-   *                     preview and to compute which edge to splice.
-   *   pendingTouchDrop — set once by the palette on pointerup. The
-   *                     canvas's useEffect commits the drop (splice
-   *                     into the closest edge OR add at the cursor
-   *                     position) and clears it.
-   *
-   * Why a separate "pending" signal instead of just one field: the
-   * preview state should disappear immediately on release, but the
-   * actual node creation needs the cursor's final coordinates AND
-   * needs to fire from FlowCanvas (which owns the React Flow nodes).
-   */
-  touchDrag: { kind: NodeKind; x: number; y: number } | null;
-  setTouchDrag: (
-    v: { kind: NodeKind; x: number; y: number } | null,
-  ) => void;
-  pendingTouchDrop: { kind: NodeKind; x: number; y: number } | null;
-  setPendingTouchDrop: (
-    v: { kind: NodeKind; x: number; y: number } | null,
-  ) => void;
 
   /**
    * Scenario bridge (Wave P): a scenario boot (?scenario=Fn) can ask
@@ -554,10 +528,6 @@ export const useApp = create<AppState>((set) => ({
     set((s) => ({ hintExpandLeftPane: s.hintExpandLeftPane + 1 })),
   plugins: [],
   setPlugins: (p) => set({ plugins: p }),
-  touchDrag: null,
-  setTouchDrag: (v) => set({ touchDrag: v }),
-  pendingTouchDrop: null,
-  setPendingTouchDrop: (v) => set({ pendingTouchDrop: v }),
   pendingAutoRun: null,
   requestAutoRun: (sampleKey, opts) =>
     set({ pendingAutoRun: { sampleKey, ...(opts ?? {}) } }),

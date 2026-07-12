@@ -1,9 +1,11 @@
 import { NODE_CATALOG } from "../lib/nodeCatalog";
 
 /**
- * Empty-state overlay shown when the canvas has no nodes. Nudges the
- * user toward the two entry paths (drag a block, or pick a preset) and
- * teases the block catalog so the canvas doesn't feel bare.
+ * Empty-state overlay shown when the canvas has no nodes. Teaches the
+ * two add paths — the "+ Add block" chooser in the toolbar, and
+ * dragging out of a block's edge into empty space — plus the preset
+ * shortcut, and carries the five-stage grammar line the old pipeline
+ * shelf used to illustrate (the tour's slide 2 is the other carrier).
  */
 export function EmptyCanvas() {
   return (
@@ -15,11 +17,15 @@ export function EmptyCanvas() {
             the copy describes where to look instead of quoting text
             the user cannot see. */}
         <div className="text-sm text-mute mb-3">
-          Drag blocks from the shelf above — its columns read left to
-          right as the pipeline grammar (Source → … → Sink) — or load a
-          preset from the
-          toolbar's layers-icon menu — then hit{" "}
-          <span className="kbd">Run</span> (toolbar top-right; round
+          Hit <span className="kbd">+ Add block</span> in the toolbar
+          (click rows to add, or drag them in), or — once blocks exist —
+          drag from a block's right edge into empty space and pick what
+          legally comes next. Pipelines read left to right:{" "}
+          <span className="whitespace-nowrap">
+            Source → Backend → Algorithm → Metric → Sink
+          </span>
+          . Or load a preset from the toolbar's layers-icon menu, then
+          hit <span className="kbd">Run</span> (toolbar top-right; round
           button bottom-right on phones) and evidence collects in the
           right-hand pane.
         </div>

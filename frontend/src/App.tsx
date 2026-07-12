@@ -66,8 +66,8 @@ const WIDE_QUERY = "(min-width: 1200px)";
 // Minimum width we ever want to leave for the canvas (React Flow +
 // its two-row toolbar). The dynamic clamp in the resize handler caps
 // the side panes so the center column never falls below this,
-// regardless of viewport size. (The old rationale — pipeline-shelf
-// columns overflowing `<main>` — died with the shelf; the floor now
+// regardless of viewport size. (The old rationale — the pipeline
+// shelf's columns overflowing `<main>` — died with the shelf; the floor
 // simply keeps the toolbar rows and a useful slice of canvas usable.)
 const MIN_CANVAS_W = 280;
 // Reserve the side resizer's footprint when computing the canvas budget.

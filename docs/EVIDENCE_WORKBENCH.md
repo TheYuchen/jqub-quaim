@@ -54,22 +54,31 @@ detail). Internal ids stay frozen ("compose"/"multiverse" in scenario
 uiState, localStorage, provenance); only labels speak the new language
 ("Pipeline editor"/"Evidence board").
 
-**Palette as grammar (marker `pipeline-shelf`).** The block palette is
-laid out as the sentence structure a valid pipeline follows: five
-stage columns — Source → Backend → Algorithm → Metric → Sink — with
-faint arrows between headers and a one-line tagline per stage ("where
-the circuit comes from", "the noisy machine", …), blocks stacked
-vertically beneath. The previous strip enumerated tiles by family but
-read as inventory; the shelf makes the compositional constraint the
-IA already enforces (auto-connect chains in exactly this order, the
-BlockPicker's family hints say which stages are required) visible
-before the first drag. Growth is vertical — a column with ≥5 blocks
-(plugins join their declared family's column) scrolls internally —
-and the shelf wraps to two rows below 880px of container width
-(ResizeObserver, like the board grid). Rows keep every interaction of
-the old tiles: HTML5 drag, tap-to-add via pendingBlockKinds, the
-touch-drag bridge, plugin badges/delete, paper links, plus a count
-dot for kinds already on the canvas.
+**Palette as grammar, second pass (markers `block-chooser`,
+`canvas-insert-menu`; supersedes the pipeline shelf).** The shelf —
+an always-visible five-column strip above the canvas — taught the
+grammar at a permanent price: ~300px of chrome, mostly whitespace,
+growing with the block count and squeezing the very canvas it fed.
+It is gone; the palette's permanent chrome is now exactly ONE toolbar
+button, **+ Add block**. Its popover keeps the pedagogy: five stage
+sections in pipeline order (Source → Backend → Algorithm → Metric →
+Sink, each with the shelf's one-line tagline), compact rows with
+plugin badges, on-canvas count dots and plugin delete; click adds
+through pendingBlockKinds and the popover STAYS OPEN for multi-add
+(the row flashes "added ✓"), drag carries the unchanged dataTransfer
+payload so the splice-on-edge drop still works, search filters live,
+rows lock while a run is in progress. The grammar also moved into the
+canvas itself: releasing a connection drag from a node's source
+handle over empty pane opens a mini insert menu listing only blocks
+whose family can legally FOLLOW per auto-connect's ordering
+(`nextFamilies` in autoConnect.ts: algorithm→algorithm chains,
+source/backend never repeat, sink is terminal) — picking one places
+the block at the drop point and wires the pending connection;
+double-click on empty pane opens the same menu unfiltered. Design
+principle: chrome cost stays constant while the catalog grows —
+growth lands in on-demand surfaces (popover, contextual menu), never
+in permanent layout. Tap-to-add via the popover is the touch path;
+the shelf's PointerEvent touch-drag bridge was deleted with it.
 
 ### 1.2 Grounding in documented practice
 
