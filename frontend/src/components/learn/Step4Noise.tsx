@@ -173,7 +173,14 @@ export function Step4Noise() {
         <p className="text-[11px] text-center tabular-nums" aria-live="polite">
           <span className="text-mute">agreement score: </span>
           <span className="font-mono text-ok">{agreePct}%</span>
-          {noisy ? (
+          {noisy && matches === total ? (
+            // 100% vs 100% would read as "noise does nothing" — name
+            // the real situation: the dose is per look, luck so far.
+            <span className="text-mute">
+              {" "}
+              — no misreads yet; noise strikes per look, not every look
+            </span>
+          ) : noisy ? (
             <>
               <span className="text-mute"> — on a perfect machine it is </span>
               <span className="font-mono text-ink">100%</span>

@@ -29,9 +29,13 @@ import { useDrawLoop } from "./useDrawLoop";
  * (the 2×2 grid) reveals the link.
  *
  * Seeded rng, reset on reset/toggle → every replay of a mode is
- * deterministic. Batch animation timing lives in useDrawLoop.
+ * deterministic. Batch animation timing lives in useDrawLoop. The
+ * seed is CHOSEN, not arbitrary: 20260703 opened with five 11s in a
+ * row on the linked pair ("always the same side" read as "always
+ * 11"); 20260708 gives 00 11 00 11… linked — both sides inside two
+ * clicks — and a first-click disagreement (01) once broken.
  */
-const SEED = 20260703;
+const SEED = 20260708;
 const EMPTY: Record<string, number> = { "00": 0, "01": 0, "10": 0, "11": 0 };
 
 function recipeState(broken: boolean): State2 {

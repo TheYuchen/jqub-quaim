@@ -195,7 +195,7 @@ export function Step3Phase() {
           <>
             one H and they split:{" "}
             <span className="text-ink">
-              left snapped to 0, right snapped to 1 — with certainty.
+              left swung to 0, right swung to 1 — with certainty.
             </span>{" "}
             A gate told them apart; measurement never could. That difference is
             the hidden direction{" "}
