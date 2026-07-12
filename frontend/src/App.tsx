@@ -15,7 +15,6 @@ import { theaterAutoOpenEnabled, useApp } from "./lib/store";
 import { ensureDemoArchive } from "./lib/demoArchive";
 import { useIsDesktop, useMediaQuery } from "./lib/useMediaQuery";
 import { TopBar } from "./components/TopBar";
-import { NodePalette } from "./components/NodePalette";
 import { FlowCanvas } from "./components/FlowCanvas";
 import { ResultsPane } from "./components/ResultsPane";
 import { MultiverseBoard } from "./components/MultiverseBoard";
@@ -64,12 +63,12 @@ const COLLAPSED_W = 32;
 // Full-desktop threshold — below this (and ≥768px) is "the band".
 const WIDE_QUERY = "(min-width: 1200px)";
 
-// Minimum width we ever want to leave for the canvas (NodePalette + React
-// Flow). Below this, the NodePalette pipeline-shelf columns (min 96px each)
-// start overflowing horizontally because `<main>` has no overflow clip —
-// they visually escape the canvas column and cover whatever's in the
-// right pane. The dynamic clamp in the resize handler caps the side
-// panes so this never happens, regardless of viewport size.
+// Minimum width we ever want to leave for the canvas (React Flow +
+// its two-row toolbar). The dynamic clamp in the resize handler caps
+// the side panes so the center column never falls below this,
+// regardless of viewport size. (The old rationale — pipeline-shelf
+// columns overflowing `<main>` — died with the shelf; the floor now
+// simply keeps the toolbar rows and a useful slice of canvas usable.)
 const MIN_CANVAS_W = 280;
 // Reserve the side resizer's footprint when computing the canvas budget.
 const RESIZER_W = 4;
@@ -425,7 +424,6 @@ export default function App() {
             />
           )}
           <main className="relative flex-1 min-w-0 flex flex-col min-h-0 overflow-x-hidden">
-            <NodePalette />
             <ReactFlowProvider>
               <FlowCanvas />
             </ReactFlowProvider>
@@ -513,7 +511,6 @@ export default function App() {
         /* =====================  Mobile  ====================== */
         <div className="flex-1 flex flex-col min-h-0">
           <main className="relative flex-1 min-w-0 flex flex-col min-h-0 overflow-x-hidden">
-            <NodePalette />
             <ReactFlowProvider>
               <FlowCanvas />
             </ReactFlowProvider>
