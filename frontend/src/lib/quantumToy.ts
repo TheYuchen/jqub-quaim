@@ -6,16 +6,19 @@
 // HONESTY STANCE (for maintainers; none of this wording reaches the UI):
 // states are vectors of REAL amplitudes — [a, b] for one qubit with
 // a² + b² = 1, [a00, a01, a10, a11] for two. For the gate set the
-// lessons use (X, H, CX) the real-amplitude subset is EXACT quantum
+// lessons use (X, H, Z, CX) the real-amplitude subset is EXACT quantum
 // mechanics, not an approximation: these matrices have only real
 // entries, so a system started in |0…0⟩ never leaves the real
 // subspace. That exactness is load-bearing — H·H|0⟩ returns |0⟩
 // EXACTLY in step 2 because the minus sign in H cancels (interference,
 // not rounding), and the Bell construction in the two-qubit steps is
 // exactly half/half. What we defer, not deny: general quantum states
-// need COMPLEX amplitudes (phases; S/T/RZ create them). The lessons
-// never need a phase-only gate, and the UI never shows a formula
-// either way — leans, tallies and percentages only.
+// need COMPLEX amplitudes (S/T/RZ create them). The track's one phase
+// gate — Z, the sign flip — has real entries, so the subset stays
+// exact; its ± sign on the |1⟩ amplitude is precisely the "hidden
+// direction" the phase step makes visible on the circle (stateAngle
+// below). The UI never shows a formula either way — leans, tallies
+// and percentages only.
 
 /** One qubit: [amp(0), amp(1)]. */
 export type State1 = [number, number];
@@ -57,6 +60,35 @@ export function applyX1([a, b]: State1): State1 {
  *  sign is what makes H its own inverse — see the module comment. */
 export function applyH1([a, b]: State1): State1 {
   return [R2 * (a + b), R2 * (a - b)];
+}
+
+/** Z (sign flip): diag(1, −1) — negates the |1⟩ amplitude. Invisible
+ *  to measurement on its own (probabilities square the sign away),
+ *  visible the moment an H mixes the signed amplitudes: H·Z·H = X.
+ *  The learn track's "hidden direction", made concrete. */
+export function applyZ1([a, b]: State1): State1 {
+  return [a, -b];
+}
+
+/** Angle of a one-qubit REAL state on the learn track's circle (the
+ *  honest Bloch slice — the X–Z great circle of the sphere), in
+ *  radians, clockwise from the top as drawn on screen:
+ *    |0⟩ → 0 (top) · |+⟩ → π/2 (right) · |1⟩ → π (bottom) ·
+ *    |−⟩ → 3π/2 (left).
+ *  The signed amplitude pair (a, b) = ±(cos t, sin t) maps to angle
+ *  2t — the usual Bloch doubling — so the two signed pairs ±(a, b)
+ *  (a GLOBAL sign, unphysical: no gate or measurement distinguishes
+ *  them) land on the SAME angle. The circle shows physical states
+ *  only. Conventions asserted in scripts/check_quantum_toy.test.ts. */
+export function stateAngle([a, b]: State1): number {
+  // Mod out the global sign: first nonzero amplitude ≥ 0.
+  if (a < 0 || (a === 0 && b < 0)) {
+    a = -a;
+    b = -b;
+  }
+  let t = 2 * Math.atan2(b, a); // a ≥ 0 ⇒ t ∈ (−π, π]
+  if (t < 0) t += 2 * Math.PI;
+  return t;
 }
 
 /** X on qubit q of a two-qubit state. */

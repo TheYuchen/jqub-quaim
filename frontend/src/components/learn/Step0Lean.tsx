@@ -59,7 +59,7 @@ export function Step0Lean({
         <div className="text-[11px] text-mute text-center">
           holds: a lean (here{" "}
           <span className="font-mono text-ink tabular-nums">{pct}%</span> toward
-          1)
+          1) — a first approximation; step 4 refines it
         </div>
       </div>
     </div>

@@ -8,7 +8,10 @@ import { useCallback, useRef, useState } from "react";
  *
  * - `onChange` present → draggable (pointer capture; the whole svg is
  *   the hit target) and keyboard-adjustable (role=slider, arrows ±5pp).
- *   Absent → a read-only display dial (step 2's wire-end readout).
+ *   Absent → a read-only display dial (step 3's marginals). The
+ *   gates step's wire-end readout moved to CircleState (the full
+ *   circle) once Z joined the shelf — this semicircle can only show
+ *   leans, which is exactly why step 0 starts here.
  * - `snapped` (0|1) overrides the needle to a pole with a snap
  *   transition (~200ms — the track-wide collapse timing, shared with
  *   step 3's pair of dials) — measurement collapse. The tinted arc keeps

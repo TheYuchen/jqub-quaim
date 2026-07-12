@@ -3,7 +3,7 @@
 //   node --experimental-strip-types scripts/check_quantum_toy.test.ts
 //
 // The assertions ARE the honesty contract of the learn track: the
-// real-amplitude subset must be EXACT for X/H/CX (H·H cancels by sign,
+// real-amplitude subset must be EXACT for X/H/Z/CX (H·H cancels by sign,
 // Bell is exactly half/half), because step 2's "back where it
 // started — gates are reversible" caption and the Bell tallies are
 // claims the UI makes with certainty, not approximately.
@@ -15,11 +15,13 @@ import {
   applyH2,
   applyReadoutNoise,
   applyX1,
+  applyZ1,
   leanState,
   measureMany,
   measureOnce,
   mulberry32,
   probs,
+  stateAngle,
   zero1,
   zero2,
 } from "../src/lib/quantumToy.ts";
@@ -157,6 +159,74 @@ const close = (a: number, b: number, eps = 1e-12) =>
   const stopA = run();
   assert.ok(stopA > 0, "±2pp never reached inside the 2000-look budget");
   assert.equal(stopA, run()); // bit-identical replay
+}
+
+// -- Z, the sign flip: Z|+⟩ = |−⟩, H|−⟩ = |1⟩, Z·Z = I, H·Z·H = X -----------
+// The phase step's whole argument in four identities: |+⟩ and |−⟩
+// have IDENTICAL measurement odds (50/50), yet one H maps them to
+// different poles WITH CERTAINTY — the hidden direction is real.
+{
+  const plus = applyH1(zero1());
+  const minus = applyZ1(plus);
+  close(minus[0], Math.SQRT1_2);
+  close(minus[1], -Math.SQRT1_2);
+  // measurement alone cannot tell them apart…
+  close(probs(plus)[1], 0.5);
+  close(probs(minus)[1], 0.5);
+  // …but one H can: H|−⟩ = |1⟩ and H|+⟩ = |0⟩, exactly
+  const s = applyH1(minus);
+  close(s[0], 0);
+  close(s[1], 1);
+  close(probs(applyH1(plus))[0], 1);
+  // Z·Z = I (two sign flips cancel)
+  const zz = applyZ1(applyZ1(plus));
+  close(zz[0], plus[0]);
+  close(zz[1], plus[1]);
+  // Z at the poles is physically nothing: |0⟩ untouched; |1⟩ → −|1⟩,
+  // a GLOBAL sign (same probabilities, same angle — see below)
+  const z0 = applyZ1(zero1());
+  close(z0[0], 1);
+  close(z0[1], 0);
+  // H·Z·H = X — mix, sign-flip, mix reads as a visible flip
+  const hzh = applyH1(applyZ1(applyH1(zero1())));
+  close(hzh[0], 0);
+  close(hzh[1], 1);
+}
+
+// -- stateAngle: the circle convention (0 top, + right, 1 bottom, − left) ----
+{
+  close(stateAngle(zero1()), 0);
+  close(stateAngle(applyH1(zero1())), Math.PI / 2); // |+⟩ → right
+  close(stateAngle(applyX1(zero1())), Math.PI); // |1⟩ → bottom
+  close(stateAngle(applyZ1(applyH1(zero1()))), (3 * Math.PI) / 2); // |−⟩ → left
+  // a global sign is unphysical — both signed pairs land on ONE angle
+  close(stateAngle([-Math.SQRT1_2, Math.SQRT1_2]), (3 * Math.PI) / 2);
+  close(stateAngle([0, -1]), Math.PI);
+  // leans sweep the RIGHT half of the circle, top (0) to bottom (1)
+  const t = stateAngle(leanState(0.25));
+  assert.ok(t > 0 && t < Math.PI / 2, `lean 25% angle ${t}`);
+  close(stateAngle(leanState(0.5)), Math.PI / 2);
+}
+
+// -- step 2+Z truth: from |0⟩, X/H/Z reach EXACTLY four physical states ------
+// On SIGNED amplitude pairs the three gates generate a dihedral orbit
+// of 8 points at 45° multiples of the amplitude circle; global signs
+// pair them up, leaving 4 physical states — the four compass points
+// |0⟩, |+⟩, |1⟩, |−⟩. Step 2's "four compass points, never in
+// between" caption is exact, not approximate.
+{
+  const gates = [applyX1, applyH1, applyZ1];
+  const angles = new Set<number>();
+  const walk = (s: [number, number], depth: number): void => {
+    angles.add(Math.round((stateAngle(s) * 180) / Math.PI));
+    if (depth === 0) return;
+    for (const g of gates) walk(g(s), depth - 1);
+  };
+  walk(zero1(), 6); // every gate word up to length 6 — orbit closed long before
+  assert.deepEqual(
+    [...angles].sort((x, y) => x - y),
+    [0, 90, 180, 270],
+  );
 }
 
 console.log("check_quantum_toy: all assertions passed");

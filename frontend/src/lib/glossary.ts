@@ -10,7 +10,7 @@
 
 export const GLOSSARY = {
   shots:
-    "Shots = number of repeated measurements of the circuit. More shots → narrower uncertainty intervals, slower runs.",
+    "Shots = how many times the circuit is prepared and measured from scratch. Each shot is a fresh preparation — you never re-ask the same qubit. More shots → narrower uncertainty intervals, slower runs.",
   qubit:
     "Qubit = one quantum bit, the basic unit the circuit operates on. More qubits → larger, harder-to-simulate circuits.",
   measurement:
@@ -25,6 +25,10 @@ export const GLOSSARY = {
     "Depth = the longest sequence of operations that must run one after another. Deeper circuits accumulate more noise.",
   gates:
     "Gates = the individual operations in the circuit (like instructions in a program).",
+  phase:
+    "Phase = the hidden direction of a qubit's state — invisible to measurement (two states can share the exact same odds), visible to gates (one H turns the hidden difference into a definite 0 vs 1).",
+  amplitude:
+    "Amplitude = the signed number the state keeps for each outcome; its square is that outcome's probability. The sign is the simplest phase: measurement squares it away, but gates mix amplitudes, so signs can cancel or reinforce.",
   entanglement:
     "Entanglement = a link between qubits prepared together: measure one and the other's answer is fixed too. Two-qubit gates like the controlled flip (CX) create it.",
   noise:
