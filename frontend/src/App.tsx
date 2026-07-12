@@ -64,7 +64,7 @@ const COLLAPSED_W = 32;
 const WIDE_QUERY = "(min-width: 1200px)";
 
 // Minimum width we ever want to leave for the canvas (NodePalette + React
-// Flow). Below this, NodePalette tiles (each fixed at 108px and shrink-0)
+// Flow). Below this, the NodePalette pipeline-shelf columns (min 96px each)
 // start overflowing horizontally because `<main>` has no overflow clip —
 // they visually escape the canvas column and cover whatever's in the
 // right pane. The dynamic clamp in the resize handler caps the side

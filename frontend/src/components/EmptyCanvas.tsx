@@ -15,7 +15,9 @@ export function EmptyCanvas() {
             the copy describes where to look instead of quoting text
             the user cannot see. */}
         <div className="text-sm text-mute mb-3">
-          Drag blocks from the strip above, or load a preset from the
+          Drag blocks from the shelf above — its columns read left to
+          right as the pipeline grammar (Source → … → Sink) — or load a
+          preset from the
           toolbar's layers-icon menu — then hit{" "}
           <span className="kbd">Run</span> (toolbar top-right; round
           button bottom-right on phones) and evidence collects in the

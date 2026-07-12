@@ -306,8 +306,10 @@ function ComposeSlide() {
       <p>
         From the Evidence board (home), open the{" "}
         <span className="text-ink font-medium">Pipeline editor</span> to
-        define a configuration: drag blocks, wire them (or Auto-connect),
-        press <span className="kbd">Run pipeline</span>. Ribbons carry the circuit
+        define a configuration: drag blocks from the pipeline shelf — its
+        columns spell the grammar, Source → Backend → Algorithm → Metric →
+        Sink — wire them (or Auto-connect), press{" "}
+        <span className="kbd">Run pipeline</span>. Ribbons carry the circuit
         between blocks — a shrinking ribbon means a step compressed it (width
         tracks gate count
         <TipIcon className="mx-0.5 align-text-top" hint={gloss("gates")} />).

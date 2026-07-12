@@ -1113,7 +1113,7 @@ export function FlowCanvas() {
     setPrecisionTarget(null);
     useApp.getState().setRestoredFrom(null);
     setNotice({
-      text: "New configuration — drag blocks from the strip above or pick a preset, then Run to archive its first evidence.",
+      text: "New configuration — drag blocks from the pipeline shelf above or pick a preset, then Run to archive its first evidence.",
       tone: "ok",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1281,7 +1281,7 @@ export function FlowCanvas() {
     }
     if (nodes.length === 0) {
       setNotice({
-        text: "Canvas is empty. Drag blocks from the strip above, click \"Add blocks\" for a multi-select list, or pick a preset.",
+        text: "Canvas is empty. Drag blocks from the pipeline shelf above, click \"Add blocks\" for a multi-select list, or pick a preset.",
         tone: "danger",
       });
       return;
