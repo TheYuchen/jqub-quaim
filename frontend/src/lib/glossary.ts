@@ -29,6 +29,8 @@ export const GLOSSARY = {
     "Phase = the hidden direction of a qubit's state — invisible to measurement (two states can share the exact same odds), visible to gates (one H turns the hidden difference into a definite 0 vs 1).",
   amplitude:
     "Amplitude = the signed number the state keeps for each outcome; its square is that outcome's probability. The sign is the simplest phase: measurement squares it away, but gates mix amplitudes, so signs can cancel or reinforce.",
+  interference:
+    "Interference = what mixing gates do to signed amplitudes: arrows pointing the same way reinforce, arrows pointing opposite ways cancel. Quantum algorithms choreograph the cancelling so wrong answers fade and the right answer stands out.",
   entanglement:
     "Entanglement = a link between qubits prepared together: measure one and the other's answer is fixed too. Two-qubit gates like the controlled flip (CX) create it.",
   noise:
