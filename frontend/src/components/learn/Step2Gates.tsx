@@ -4,6 +4,7 @@ import { gloss } from "../../lib/glossary";
 import {
   applyH1,
   applyX1,
+  applyZ1,
   measureMany,
   mulberry32,
   probs,
@@ -11,24 +12,34 @@ import {
   type State1,
 } from "../../lib/quantumToy";
 import { TipIcon } from "../TipIcon";
-import { Dial } from "./Dial";
+import { CircleState } from "./CircleState";
 import { Tally } from "./Tally";
 
 /**
- * Step 2 — "Gates steer the lean." One horizontal wire, a shelf with X
- * and H chips, up to four removable slots. The state runs left→right
- * through the slots on every edit (exact sim — lib/quantumToy.ts), the
- * step-0 dial at the wire's end shows the resulting lean live, and the
- * step-1 histogram under it re-tallies a persistent seeded ×200
- * auto-measure of the current end state.
+ * Step 2 — "Gates steer the lean." One horizontal wire, a shelf with
+ * X, H and Z chips, up to four removable slots. The state runs
+ * left→right through the slots on every edit (exact sim —
+ * lib/quantumToy.ts), the CircleState at the wire's end shows the
+ * resulting state live (the full circle, because Z can push the
+ * needle to the left half — the semicircular dial could not show
+ * that), and the step-1 histogram under it re-tallies a persistent
+ * seeded ×200 auto-measure of the current end state.
  *
  * The dynamic caption's boldest claim — H twice is EXACTLY back where
  * you started — only holds because the toy sim carries real
- * amplitudes with signs (interference), not probabilities. With X/H
- * from |0⟩ the reachable leans are exactly {0%, 50%, 100%}, so the
- * caption's case analysis below is exhaustive, not heuristic.
+ * amplitudes with signs (interference), not probabilities.
+ *
+ * REACHABLE-SET TRUTH (asserted in scripts/check_quantum_toy.test.ts):
+ * from |0⟩, words in X/H/Z generate a dihedral orbit of 8 SIGNED
+ * amplitude pairs at 45° multiples of the amplitude circle — but a
+ * global sign is unphysical, so the pairs collapse two-by-two into
+ * exactly FOUR physical states: |0⟩, |+⟩, |1⟩, |−⟩, the circle's
+ * compass points. Leans stay {0%, 50%, 100%}; what Z adds is not a
+ * new lean but the left half of the circle (|−⟩), invisible to the
+ * tally, visible to H. The caption's case analysis below is
+ * exhaustive over those four states, not heuristic.
  */
-type GateKind = "X" | "H";
+type GateKind = "X" | "H" | "Z";
 const MAX_SLOTS = 4;
 const SHOTS = 200;
 const TALLY_SEED = 42; // fixed → the histogram is a pure function of the circuit
@@ -43,13 +54,23 @@ function describe(gates: GateKind[], states: State1[]): string {
   const last = gates[gates.length - 1];
   if (last === "X")
     return near(now, 0.5)
-      ? "X flips the lean — though a fifty-fifty lean looks the same flipped."
+      ? // X genuinely fixes BOTH fifty-fifty points here: X|+⟩ = |+⟩ and
+        // X|−⟩ = −|−⟩, and an overall sign is not a different state.
+        "X swaps 0-ness and 1-ness — but a fifty-fifty state is its own swap, so the needle stays put."
       : `X flips: the qubit now reads ${now > 0.5 ? "1" : "0"}, with certainty.`;
+  if (last === "Z")
+    return near(now, 0.5)
+      ? "Z flips a hidden sign: the needle swings across the circle, yet the tally will not budge."
+      : "On a definite 0 or 1, Z changes nothing at all — its sign flip only matters mid-lean.";
+  // last === "H"; a lean of exactly 0 or 1 before it means a fresh split
   if (near(prev, 0) || near(prev, 1))
-    return "H splits a definite value into a fifty-fifty lean.";
-  return gates[gates.length - 2] === "H"
-    ? "H twice: back where it started — gates are reversible."
-    : `The two mixes cancelled — a definite ${now > 0.5 ? "1" : "0"} again. Nothing here was random.`;
+    return "H splits a definite value into a fifty-fifty lean — the needle moves to the side of the circle.";
+  const before = gates[gates.length - 2];
+  if (before === "H")
+    return "H twice: exactly back where it started — thanks to a hidden direction you'll meet in a moment.";
+  if (before === "Z")
+    return `H turns the hidden sign into something visible: a definite ${now > 0.5 ? "1" : "0"}, with certainty.`;
+  return `The two mixes cancelled — a definite ${now > 0.5 ? "1" : "0"} again. Nothing here was random.`;
 }
 
 export function Step2Gates() {
@@ -57,13 +78,14 @@ export function Step2Gates() {
 
   const states = useMemo(() => {
     const acc: State1[] = [zero1()];
-    for (const g of gates)
-      acc.push(g === "X" ? applyX1(acc[acc.length - 1]) : applyH1(acc[acc.length - 1]));
+    for (const g of gates) {
+      const cur = acc[acc.length - 1];
+      acc.push(g === "X" ? applyX1(cur) : g === "H" ? applyH1(cur) : applyZ1(cur));
+    }
     return acc;
   }, [gates]);
 
   const end = states[states.length - 1];
-  const p1 = probs(end)[1];
   const tallies = useMemo(
     () => ({ "0": 0, "1": 0, ...measureMany(end, SHOTS, mulberry32(TALLY_SEED)) }),
     [end],
@@ -98,6 +120,15 @@ export function Step2Gates() {
           title="Append an H gate to the wire"
         >
           <span className="font-mono text-accent2">H</span> mix
+        </button>
+        <button
+          type="button"
+          className="btn !px-2.5 !py-1 text-xs disabled:opacity-40"
+          disabled={gates.length >= MAX_SLOTS}
+          onClick={() => add("Z")}
+          title="Append a Z gate — a sign flip that does nothing you can SEE yet"
+        >
+          <span className="font-mono text-accent2">Z</span> sign flip
         </button>
         {gates.length >= MAX_SLOTS && (
           <span className="text-[10px] text-mute">wire full — remove one to add</span>
@@ -149,8 +180,14 @@ export function Step2Gates() {
           )}
         </div>
         <div className="flex flex-col items-center mx-auto">
-          <Dial value={p1} size={150} />
-          <div className="text-[10px] text-mute -mt-1">end of the wire</div>
+          <CircleState state={end} size={150} label="end of the wire" />
+          <div className="text-[10px] text-mute mt-0.5 max-w-[190px] text-center leading-snug flex items-start gap-1">
+            <span>
+              from 0, every X/H/Z recipe lands on one of these four compass
+              points — never in between
+            </span>
+            <TipIcon hint={gloss("amplitude")} size={10} />
+          </div>
         </div>
       </div>
 
