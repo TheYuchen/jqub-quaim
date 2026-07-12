@@ -178,6 +178,13 @@ interface AppState {
    */
   theaterOpen: boolean;
   setTheaterOpen: (v: boolean) => void;
+
+  /** Guided-lessons overlay (components/LessonCard.tsx): open/closed.
+   *  Entry points: TopBar "Learn", the board's empty state, tour
+   *  slide 5 — all far from where the card mounts (App), hence a
+   *  store flag instead of prop drilling. */
+  lessonsOpen: boolean;
+  setLessonsOpen: (v: boolean) => void;
   /**
    * Theater overlay comparison (marker: theater-overlay). When two
    * archived runs of the SAME configuration both carry sampled traces,
@@ -457,6 +464,8 @@ export const useApp = create<AppState>((set) => ({
       theaterOpen: v,
       ...(v ? {} : { theaterOverlayIds: null }),
     }),
+  lessonsOpen: false,
+  setLessonsOpen: (v) => set({ lessonsOpen: v }),
   theaterOverlayIds: null,
   setTheaterOverlay: (ids) =>
     set({ theaterOverlayIds: ids, ...(ids ? { theaterOpen: true } : {}) }),

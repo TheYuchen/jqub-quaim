@@ -23,6 +23,7 @@ import { EvidenceTheater } from "./components/EvidenceTheater";
 import { CircuitPicker } from "./components/CircuitPicker";
 import { MobileDrawer } from "./components/MobileDrawer";
 import { WelcomeTour, useFirstVisitTour } from "./components/WelcomeTour";
+import { LessonCard } from "./components/LessonCard";
 import { activateScenario } from "./lib/scenarios";
 
 // ---------------------------------------------------------------------------
@@ -555,6 +556,10 @@ export default function App() {
         </div>
       )}
       <WelcomeTour open={tourOpen} onClose={() => setTourOpen(false)} />
+      {/* Guided lessons overlay — small bottom-right card (z-40); not a
+          mode, floats over whichever view the active lesson step drove
+          the app into (store flag lessonsOpen; see LessonCard). */}
+      <LessonCard />
       <GlobalToastHost />
       {!ready && (
         // z-50: the boot overlay must paint over EVERYTHING (board

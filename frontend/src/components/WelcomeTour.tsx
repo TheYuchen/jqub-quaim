@@ -551,6 +551,20 @@ function TrySlide({ onDone }: { onDone: () => void }) {
         Prefer a guided start? Append <span className="font-mono">?scenario=F0</span>{" "}
         to the URL for the streaming-evidence teaser.
       </p>
+      <p className="mt-1 text-[11px] text-mute">
+        New to quantum experiments?{" "}
+        <button
+          type="button"
+          className="underline decoration-dotted hover:text-ink"
+          onClick={() => {
+            useApp.getState().setLessonsOpen(true);
+            onDone();
+          }}
+        >
+          Learn the basics
+        </button>{" "}
+        — four guided micro-lessons, also under "Learn" in the top bar.
+      </p>
     </SlideShell>
   );
 }

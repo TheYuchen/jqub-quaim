@@ -29,8 +29,10 @@ import { ensureDemoArchive } from "./demoArchive";
 
 // -- graph builders ----------------------------------------------------------
 
-/** Left-to-right chain layout, same spacing the presets use. */
-function chain(
+/** Left-to-right chain layout, same spacing the presets use.
+ *  Exported for lib/lessons.ts — guided lessons build their step
+ *  graphs with the same helper so layouts can't drift. */
+export function chain(
   nodes: { k: string; p?: Record<string, unknown> }[],
 ): SharePayload {
   return {
@@ -56,7 +58,10 @@ function chain(
  *  (a) scenario runs land in the same multiverse/timeline group as
  *  the demo cards, and (b) pinning an archived record's root_seed
  *  replays that record's exact numbers. */
-const QUCAD_GRAPH: SharePayload = {
+// Exported for lib/lessons.ts (lesson L3 re-uses the exact demo graph
+// + pinned seed, so its "what did the optimizer do" claim reproduces
+// the bundled record bit-for-bit).
+export const QUCAD_GRAPH: SharePayload = {
   v: 1,
   n: [
     { i: "n1", k: "input_circuit", x: 40, y: 140 },
@@ -383,7 +388,9 @@ async function pickTopTwoRunIds(): Promise<string[]> {
   // pair must be found even when it has aged past any display window.
   const all = await listRuns(Infinity);
   // Scenario-boot records are scripted figure states, not evidence —
-  // the same exclusion pickOverlayPairRunIds (F7) applies. And when
+  // the same exclusion pickOverlayPairRunIds (F7) applies. The tag
+  // also carries guided-lesson runs (scenario "L1"…"L4",
+  // lib/lessons.ts): teaching artifacts, equally excluded. And when
   // demo-flagged records exist, prefer them EXCLUSIVELY: on a well-used
   // browser the user's own configurations can out-replicate the bundled
   // groups and silently swap which pair F6/F8 select — the documented
@@ -433,7 +440,9 @@ async function pickOverlayPairRunIds(): Promise<string[]> {
   const byHash = new Map<string, Array<{ r: (typeof runs)[number]; req: number }>>();
   for (const r of runs) {
     // Scenario-boot records are scripted figure states, not evidence —
-    // never let an accumulated F0 group hijack the F7 pair.
+    // never let an accumulated F0 group hijack the F7 pair. Guided-
+    // lesson runs ("L1"…"L4", lib/lessons.ts) ride the same tag and
+    // are equally excluded.
     if (!r.ok || r.scenario != null) continue;
     const req = tracedBudget(r);
     if (req === 0) continue;

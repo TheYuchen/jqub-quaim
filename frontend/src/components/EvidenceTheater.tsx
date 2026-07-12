@@ -1181,9 +1181,10 @@ export function EvidenceTheater() {
       .then((rs) => {
         if (cancelled) return;
         // Honest pool: scenario-boot records are scripted figure
-        // states, not prior evidence, and exact replays are counted
-        // once (dedupeDraws — the same rule the difference funnel
-        // applies).
+        // states and guided-lesson runs (scenario "L1"…"L4",
+        // lib/lessons.ts) are teaching artifacts — neither is prior
+        // evidence — and exact replays are counted once (dedupeDraws
+        // — the same rule the difference funnel applies).
         const evs = dedupeDraws(
           rs
             .filter(

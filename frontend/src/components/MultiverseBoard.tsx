@@ -49,6 +49,7 @@ import {
   ChevronDown,
   ChevronUp,
   GitCompare,
+  GraduationCap,
   HelpCircle,
   Play,
   Plus,
@@ -906,16 +907,26 @@ export function MultiverseBoard() {
                 Pipeline editor, define and run a configuration (try the
                 ×5 replicate runner), then come back here to compare.
               </p>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  requestNewConfig();
-                  setWorkspaceMode("compose");
-                }}
-              >
-                <Workflow className="w-3.5 h-3.5" /> Define a configuration
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    requestNewConfig();
+                    setWorkspaceMode("compose");
+                  }}
+                >
+                  <Workflow className="w-3.5 h-3.5" /> Define a configuration
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  title="Four guided micro-experiments — each runs one pipeline and points at the evidence it produced"
+                  onClick={() => useApp.getState().setLessonsOpen(true)}
+                >
+                  <GraduationCap className="w-3.5 h-3.5" /> Learn the basics
+                </button>
+              </div>
             </div>
           </div>
         ) : (

@@ -312,7 +312,9 @@ export function buildRunRecord(args: {
   forkedFrom: string | null;
   /** Optional-stopping target the request was sent with. */
   precisionTarget?: number | null;
-  /** Scenario key when this run is a scenario boot's auto-run. */
+  /** Scenario key when this run is a scenario boot's auto-run —
+   *  or a guided-lesson run ("L1"…"L4", lib/lessons.ts), which rides
+   *  the same tag and the same evidence-pool exclusions. */
   scenario?: string | null;
 }): RunRecord {
   const { response } = args;

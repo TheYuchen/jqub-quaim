@@ -1,5 +1,5 @@
 import { useApp } from "../lib/store";
-import { Activity, Compass, PanelLeft, PanelRight, Zap } from "lucide-react";
+import { Activity, Compass, GraduationCap, PanelLeft, PanelRight, Zap } from "lucide-react";
 import { APP_NAME, APP_TAGLINE } from "../lib/anon";
 import { ClaimsMapButton } from "./ClaimsMap";
 import { ThemeSwitcher } from "./ThemeSwitcher";
@@ -141,6 +141,16 @@ export function TopBar({
             <span className="hidden sm:inline">Tour</span>
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => useApp.getState().setLessonsOpen(true)}
+          className="btn-ghost"
+          title="Learn the basics — four guided micro-experiments (sampling, noise, optimizer diffs, seeds)"
+          aria-label="Open guided lessons"
+        >
+          <GraduationCap className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Learn</span>
+        </button>
         <ClaimsMapButton />
         <ThemeSwitcher />
         {mobile && onOpenRightDrawer && (
