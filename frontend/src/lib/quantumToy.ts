@@ -121,6 +121,33 @@ export function applyCX(s: State2, control: 0 | 1 = 0, target: 0 | 1 = 1): State
   return control === 0 ? [s[0], s[1], s[3], s[2]] : [s[0], s[3], s[2], s[1]];
 }
 
+/** The Deutsch game's four hidden coin rules (learn track step 8): a
+ *  one-bit function f(x). "always0"/"always1" answer the same for both
+ *  questions (constant — "same kind"); "copy"/"flip" answer
+ *  differently (balanced — "different kind"). */
+export type DeutschRule = "always0" | "always1" | "copy" | "flip";
+
+/** The Deutsch oracle as a real two-qubit gate: |x⟩|y⟩ → |x⟩|y⊕f(x)⟩
+ *  (q0 carries the question, q1 the scratch answer). All four rules
+ *  are permutation matrices — real entries only, so the toy's exact
+ *  real-amplitude subset keeps its honesty stance (see header): the
+ *  learn track's Deutsch run is EXACT quantum mechanics, and its
+ *  verdict (q0 after the H·oracle·H⊗H sandwich on |0⟩|1⟩ reads
+ *  whether f's two answers differ) is certain, not sampled —
+ *  asserted for all four rules in scripts/check_quantum_toy.test.ts. */
+export function deutschOracle(rule: DeutschRule): (s: State2) => State2 {
+  switch (rule) {
+    case "always0":
+      return (s) => [...s]; // f ≡ 0: y ⊕ 0 — the box does nothing
+    case "always1":
+      return (s) => applyX2(s, 1); // f ≡ 1: always flip the answer bit
+    case "copy":
+      return (s) => applyCX(s, 0, 1); // f(x) = x: flip it where x = 1
+    case "flip":
+      return (s) => applyX2(applyCX(s, 0, 1), 1); // f(x) = opposite of x
+  }
+}
+
 /** Outcome probabilities: amplitude², index order of the state. */
 export function probs(state: number[]): number[] {
   return state.map((a) => a * a);

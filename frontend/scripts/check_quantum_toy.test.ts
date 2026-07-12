@@ -15,7 +15,9 @@ import {
   applyH2,
   applyReadoutNoise,
   applyX1,
+  applyX2,
   applyZ1,
+  deutschOracle,
   leanState,
   measureMany,
   measureOnce,
@@ -24,6 +26,8 @@ import {
   stateAngle,
   zero1,
   zero2,
+  type DeutschRule,
+  type State2,
 } from "../src/lib/quantumToy.ts";
 import { wilson95 } from "../src/lib/stats.ts";
 
@@ -227,6 +231,61 @@ const close = (a: number, b: number, eps = 1e-12) =>
     [...angles].sort((x, y) => x - y),
     [0, 90, 180, 270],
   );
+}
+
+// -- step 5's ghost arrows: two routes into each outcome, summing exactly ----
+// The interference step draws H's action as ghost route-arrows: into
+// |0⟩ the routes agree (+½ +½), into |1⟩ they point against each other
+// (+½ −½) and cancel. The ghosts must SUM to the real arrow, and a Z
+// between the H's must swap which side cancels (certain 1 — H·Z·H = X).
+{
+  const R2 = Math.SQRT1_2;
+  const [a, b] = applyH1(zero1()); // the state between the two H's
+  close(R2 * a + R2 * b, 1); // routes into 0 agree → the whole arrow
+  close(R2 * a - R2 * b, 0); // routes into 1 cancel → no arrow at all
+  const [az, bz] = applyZ1(applyH1(zero1()));
+  close(R2 * az + R2 * bz, 0); // Z in between: now 0's routes cancel…
+  close(R2 * az - R2 * bz, 1); // …and 1's agree — a certain 1, exactly
+}
+
+// -- step 8's game: the Deutsch oracle and the one-question verdict ----------
+// All four hidden rules must (1) act as |x⟩|y⟩ → |x⟩|y ⊕ f(x)⟩ on the
+// computational basis and (2) drive the real circuit (|0⟩|1⟩, H⊗H,
+// oracle, H on q0, read q0) to the CORRECT verdict with certainty —
+// the UI claims "certain, in one question", so p must be exactly 0/1.
+{
+  const fs: Record<DeutschRule, (x: 0 | 1) => 0 | 1> = {
+    always0: () => 0,
+    always1: () => 1,
+    copy: (x) => x,
+    flip: (x) => (x === 0 ? 1 : 0),
+  };
+  for (const rule of ["always0", "always1", "copy", "flip"] as const) {
+    const oracle = deutschOracle(rule);
+    const f = fs[rule];
+    for (const x of [0, 1] as const) {
+      for (const y of [0, 1] as const) {
+        const basis: State2 = [0, 0, 0, 0];
+        basis[x * 2 + y] = 1;
+        const out = oracle(basis);
+        const want = x * 2 + (y ^ f(x));
+        out.forEach((amp, i) => close(amp, i === want ? 1 : 0));
+      }
+    }
+    // the full Deutsch run — deterministic, correct, single question
+    let s = applyX2(zero2(), 1); // |0⟩|1⟩
+    s = applyH2(s, 0);
+    s = applyH2(s, 1);
+    s = oracle(s);
+    s = applyH2(s, 0);
+    const p = probs(s);
+    const balanced = rule === "copy" || rule === "flip";
+    close(p[2] + p[3], balanced ? 1 : 0); // q0 reads 1 iff different kind
+    // and a seeded tally never wavers — certainty draw by draw
+    const tally = measureMany(s, 300, mulberry32(8));
+    for (const bits of Object.keys(tally))
+      assert.equal(bits[0], balanced ? "1" : "0");
+  }
 }
 
 console.log("check_quantum_toy: all assertions passed");
