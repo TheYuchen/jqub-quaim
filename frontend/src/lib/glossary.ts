@@ -13,6 +13,8 @@ export const GLOSSARY = {
     "Shots = number of repeated measurements of the circuit. More shots → narrower uncertainty intervals, slower runs.",
   qubit:
     "Qubit = one quantum bit, the basic unit the circuit operates on. More qubits → larger, harder-to-simulate circuits.",
+  measurement:
+    "Measurement = asking the qubit for a definite answer. It always comes back 0 or 1, drawn with the lean's odds — and the lean itself is gone once you have looked.",
   fidelity:
     "Fidelity = similarity between the noisy result and the ideal (noise-free) result, from 0 to 1. Higher is better.",
   backend:

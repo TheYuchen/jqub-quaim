@@ -23,6 +23,7 @@ import { CircuitPicker } from "./components/CircuitPicker";
 import { MobileDrawer } from "./components/MobileDrawer";
 import { WelcomeTour, useFirstVisitTour } from "./components/WelcomeTour";
 import { LessonCard } from "./components/LessonCard";
+import { LearnLab } from "./components/LearnLab";
 import { activateScenario } from "./lib/scenarios";
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,7 @@ export default function App() {
   const running = useApp((s) => s.running);
   const workspaceMode = useApp((s) => s.workspaceMode);
   const theaterOpen = useApp((s) => s.theaterOpen);
+  const learnLabOpen = useApp((s) => s.learnLabOpen);
   const [ready, setReady] = useState(false);
   const isDesktop = useIsDesktop();
   const isWide = useMediaQuery(WIDE_QUERY);
@@ -446,6 +448,15 @@ export default function App() {
                 <EvidenceTheater />
               </div>
             )}
+            {/* Learn-from-zero overlay (marker: learn-lab) — same
+                center-column pattern; mounted LAST so it paints above
+                the theater when both are up (equal z-30, later DOM
+                order wins). Toy sim only — nothing underneath runs. */}
+            {learnLabOpen && (
+              <div className="absolute inset-0 z-30 bg-canvas flex flex-col min-h-0">
+                <LearnLab />
+              </div>
+            )}
           </main>
           {!rightStrip && (
             <PaneResizer
@@ -531,6 +542,15 @@ export default function App() {
             {theaterOpen && (
               <div className="absolute inset-0 z-30 bg-canvas flex flex-col min-h-0">
                 <EvidenceTheater />
+              </div>
+            )}
+            {/* Learn-from-zero overlay (marker: learn-lab) — same
+                center-column pattern; mounted LAST so it paints above
+                the theater when both are up (equal z-30, later DOM
+                order wins). Toy sim only — nothing underneath runs. */}
+            {learnLabOpen && (
+              <div className="absolute inset-0 z-30 bg-canvas flex flex-col min-h-0">
+                <LearnLab />
               </div>
             )}
           </main>

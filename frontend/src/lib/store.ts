@@ -185,6 +185,13 @@ interface AppState {
    *  store flag instead of prop drilling. */
   lessonsOpen: boolean;
   setLessonsOpen: (v: boolean) => void;
+  /** Learn-from-zero overlay (components/LearnLab.tsx, marker
+   *  learn-lab): the beginner track that precedes the guided lessons —
+   *  a full center-column overlay on the toy simulator, no backend.
+   *  Store flag for the same reason as lessonsOpen: entry points (the
+   *  TopBar Learn menu) live far from the App mount. */
+  learnLabOpen: boolean;
+  setLearnLabOpen: (v: boolean) => void;
   /**
    * Theater overlay comparison (marker: theater-overlay). When two
    * archived runs of the SAME configuration both carry sampled traces,
@@ -440,6 +447,8 @@ export const useApp = create<AppState>((set) => ({
     }),
   lessonsOpen: false,
   setLessonsOpen: (v) => set({ lessonsOpen: v }),
+  learnLabOpen: false,
+  setLearnLabOpen: (v) => set({ learnLabOpen: v }),
   theaterOverlayIds: null,
   setTheaterOverlay: (ids) =>
     set({ theaterOverlayIds: ids, ...(ids ? { theaterOpen: true } : {}) }),

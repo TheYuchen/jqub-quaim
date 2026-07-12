@@ -1,9 +1,11 @@
+import { useCallback, useRef, useState } from "react";
 import { useApp } from "../lib/store";
 import { Activity, Compass, GraduationCap, PanelLeft, PanelRight, Zap } from "lucide-react";
 import { APP_NAME, APP_TAGLINE } from "../lib/anon";
 import { ClaimsMapButton } from "./ClaimsMap";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { TipIcon } from "./TipIcon";
+import { useDismissOn } from "../lib/useDismissOn";
 
 /**
  * Top application bar — deliberately minimal since Wave P (the system
@@ -19,6 +21,76 @@ import { TipIcon } from "./TipIcon";
  * Mobile: the two side panes are swapped for drawers, so we surface two
  * edge buttons (PanelLeft / PanelRight) for toggling them.
  */
+/** "Learn" — a two-item dropdown (the standard popover idiom:
+ *  useDismissOn + right-anchored menu, viewport-pinned below sm like
+ *  the ThemeSwitcher). Two tracks, one entry: "Start from zero"
+ *  (LearnLab, marker learn-lab) teaches what a qubit even IS on the
+ *  toy simulator; "Guided experiments" (LessonCard) runs the real
+ *  pipeline. The from-zero track lists first because it is the one a
+ *  reader with no background needs first. */
+function LearnMenu() {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
+  const pick = (which: "zero" | "lessons") => {
+    const app = useApp.getState();
+    if (which === "zero") app.setLearnLabOpen(true);
+    else app.setLessonsOpen(true);
+    setOpen(false);
+  };
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="btn-ghost"
+        title="Learn — from zero (what a qubit is) or guided experiments in the real pipeline"
+        aria-label="Open learn menu"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <GraduationCap className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Learn</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Learn"
+          className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-full sm:mt-1 rounded-lg border border-edge bg-surface shadow-xl z-40 p-1.5 flex flex-col gap-0.5 w-[min(19rem,calc(100vw-1.5rem))]"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => pick("zero")}
+            className="w-full text-left px-2 py-1.5 rounded-md hover:bg-surfaceAlt transition-colors"
+          >
+            <span className="block text-xs text-ink font-medium">
+              Start from zero
+            </span>
+            <span className="block text-[10px] text-mute leading-snug">
+              What a qubit even is — six tiny interactives, nothing assumed.
+            </span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => pick("lessons")}
+            className="w-full text-left px-2 py-1.5 rounded-md hover:bg-surfaceAlt transition-colors"
+          >
+            <span className="block text-xs text-ink font-medium">
+              Guided experiments
+            </span>
+            <span className="block text-[10px] text-mute leading-snug">
+              Four micro-experiments in the real pipeline — sampling, noise,
+              diffs, seeds.
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TopBar({
   mobile = false,
   onOpenLeftDrawer,
@@ -141,16 +213,7 @@ export function TopBar({
             <span className="hidden sm:inline">Tour</span>
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => useApp.getState().setLessonsOpen(true)}
-          className="btn-ghost"
-          title="Learn the basics — four guided micro-experiments (sampling, noise, optimizer diffs, seeds)"
-          aria-label="Open guided lessons"
-        >
-          <GraduationCap className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Learn</span>
-        </button>
+        <LearnMenu />
         <ClaimsMapButton />
         <ThemeSwitcher />
         {mobile && onOpenRightDrawer && (

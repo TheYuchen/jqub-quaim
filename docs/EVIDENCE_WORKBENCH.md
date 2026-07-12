@@ -1074,6 +1074,27 @@ itself only via APP_NAME, so anon builds show the neutral codename).
    tour slide 5. Small dismissable card, bottom-right z-40; question →
    [Run it] → what-to-look-for once historyVersion bumps; progress in
    localStorage `quda.lessonsDone`; glossary terms carry TipIcons.
+   *Learn from zero (2026-07-12, marker `learn-lab`):* the track
+   BEFORE the guided lessons, for readers who do not know what a
+   qubit is. Six steps (framework + steps 0-2 shipped; 3-5 in the
+   second pass: CX/Bell, readout noise, shots→wilson95) as a full
+   center-column overlay (components/LearnLab.tsx, same pattern as
+   board/theater; step components in components/learn/; progress in
+   localStorage `quda.learnLabStep`). It never touches the pipeline:
+   everything runs on lib/quantumToy.ts, an EXACT tiny simulator over
+   REAL amplitudes — exact for the lesson gate set X/H/CX (H·H|0⟩
+   returns |0⟩ by sign cancellation; Bell is exactly half/half),
+   asserted in scripts/check_quantum_toy.test.ts. Honesty stance:
+   complex phases are real physics we DEFER, not deny (the gate set
+   never needs them), and the UI shows no formula either way — the
+   qubit is a dial that leans, measurement snaps the needle to 0/1
+   drawn with the lean's odds (the system's tallies-not-truths
+   premise, planted in step 1), gates steer the lean on a wire. One
+   bold idea sentence + one guiding line + one interactive per step;
+   percentages only; TipIcons where qubit/measurement/shots first
+   appear. Entry: the TopBar "Learn" button is now a two-item
+   dropdown — "Start from zero" (this track) and "Guided
+   experiments" (the LessonCard track above).
 2. **GMU theme removed entirely** — theme.ts (ThemeKey = light|dark),
    index.css token block, vite.config.ts %THEME_KEYS% (now always
    ["dark"]) and the anon CSS-stripping generateBundle hook (nothing
