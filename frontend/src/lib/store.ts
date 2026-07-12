@@ -192,6 +192,13 @@ interface AppState {
    *  TopBar Learn menu) live far from the App mount. */
   learnLabOpen: boolean;
   setLearnLabOpen: (v: boolean) => void;
+  /** One-shot bridge from the learn-from-zero handoff into the guided
+   *  lessons: LearnLab step 5 (Step5Certainty) sets a LessonKey here
+   *  before flipping lessonsOpen; LessonCard consumes and clears it,
+   *  opening directly on that lesson instead of the list. Plain
+   *  string so the store never imports lib/lessons. */
+  pendingLessonKey: string | null;
+  setPendingLessonKey: (k: string | null) => void;
   /**
    * Theater overlay comparison (marker: theater-overlay). When two
    * archived runs of the SAME configuration both carry sampled traces,
@@ -449,6 +456,8 @@ export const useApp = create<AppState>((set) => ({
   setLessonsOpen: (v) => set({ lessonsOpen: v }),
   learnLabOpen: false,
   setLearnLabOpen: (v) => set({ learnLabOpen: v }),
+  pendingLessonKey: null,
+  setPendingLessonKey: (k) => set({ pendingLessonKey: k }),
   theaterOverlayIds: null,
   setTheaterOverlay: (ids) =>
     set({ theaterOverlayIds: ids, ...(ids ? { theaterOpen: true } : {}) }),

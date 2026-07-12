@@ -1,11 +1,12 @@
 import { useCallback, useRef, useState } from "react";
 import { useApp } from "../lib/store";
-import { Activity, Compass, GraduationCap, PanelLeft, PanelRight, Zap } from "lucide-react";
+import { Activity, Check, Compass, GraduationCap, PanelLeft, PanelRight, Zap } from "lucide-react";
 import { APP_NAME, APP_TAGLINE } from "../lib/anon";
 import { ClaimsMapButton } from "./ClaimsMap";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { TipIcon } from "./TipIcon";
 import { useDismissOn } from "../lib/useDismissOn";
+import { areLessonsDone, isLearnLabDone } from "../lib/learnProgress";
 
 /**
  * Top application bar — deliberately minimal since Wave P (the system
@@ -27,11 +28,16 @@ import { useDismissOn } from "../lib/useDismissOn";
  *  (LearnLab, marker learn-lab) teaches what a qubit even IS on the
  *  toy simulator; "Guided experiments" (LessonCard) runs the real
  *  pipeline. The from-zero track lists first because it is the one a
- *  reader with no background needs first. */
+ *  reader with no background needs first. Completed tracks carry a ✓
+ *  (lib/learnProgress flags, re-read every time the menu opens). */
 function LearnMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   useDismissOn(open, rootRef, useCallback(() => setOpen(false), []));
+  // Completion ticks — read on open (localStorage is the source of
+  // truth; step 5 / the last lesson write it, possibly this session).
+  const zeroDone = open && isLearnLabDone();
+  const lessonsDone = open && areLessonsDone();
   const pick = (which: "zero" | "lessons") => {
     const app = useApp.getState();
     if (which === "zero") app.setLearnLabOpen(true);
@@ -64,8 +70,11 @@ function LearnMenu() {
             onClick={() => pick("zero")}
             className="w-full text-left px-2 py-1.5 rounded-md hover:bg-surfaceAlt transition-colors"
           >
-            <span className="block text-xs text-ink font-medium">
+            <span className="flex items-center gap-1 text-xs text-ink font-medium">
               Start from zero
+              {zeroDone && (
+                <Check className="w-3 h-3 text-ok" aria-label="completed" />
+              )}
             </span>
             <span className="block text-[10px] text-mute leading-snug">
               What a qubit even is — six tiny interactives, nothing assumed.
@@ -77,8 +86,11 @@ function LearnMenu() {
             onClick={() => pick("lessons")}
             className="w-full text-left px-2 py-1.5 rounded-md hover:bg-surfaceAlt transition-colors"
           >
-            <span className="block text-xs text-ink font-medium">
+            <span className="flex items-center gap-1 text-xs text-ink font-medium">
               Guided experiments
+              {lessonsDone && (
+                <Check className="w-3 h-3 text-ok" aria-label="completed" />
+              )}
             </span>
             <span className="block text-[10px] text-mute leading-snug">
               Four micro-experiments in the real pipeline — sampling, noise,

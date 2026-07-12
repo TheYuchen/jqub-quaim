@@ -9,8 +9,9 @@ import { useCallback, useRef, useState } from "react";
  * - `onChange` present → draggable (pointer capture; the whole svg is
  *   the hit target) and keyboard-adjustable (role=slider, arrows ±5pp).
  *   Absent → a read-only display dial (step 2's wire-end readout).
- * - `snapped` (0|1) overrides the needle to a pole with a FAST
- *   transition — step 1's measurement collapse. The tinted arc keeps
+ * - `snapped` (0|1) overrides the needle to a pole with a snap
+ *   transition (~200ms — the track-wide collapse timing, shared with
+ *   step 3's pair of dials) — measurement collapse. The tinted arc keeps
  *   showing the lean underneath, so collapse reads as "the needle
  *   left the lean", not "the lean changed".
  * - Needle motion is one CSS transform transition (disabled while
@@ -150,7 +151,7 @@ export function Dial({
             transition: dragging
               ? "none"
               : snapped != null
-                ? "transform 120ms cubic-bezier(.3,.9,.4,1)"
+                ? "transform 200ms cubic-bezier(.3,.9,.4,1)"
                 : "transform 240ms cubic-bezier(.2,.8,.3,1)",
           }}
         >
@@ -172,7 +173,7 @@ export function Dial({
                 snapped != null
                   ? "rgb(var(--color-warn))"
                   : "rgb(var(--color-accent))",
-              transition: "fill 120ms linear",
+              transition: "fill 200ms linear",
             }}
           />
         </g>

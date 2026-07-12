@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { gloss } from "../lib/glossary";
+import { LESSONS_DONE_LS as DONE_LS } from "../lib/learnProgress";
 import { LESSONS, type Lesson, type LessonKey } from "../lib/lessons";
 import { listRuns } from "../lib/runStore";
 import { useApp } from "../lib/store";
@@ -32,8 +33,6 @@ import { TipIcon } from "./TipIcon";
  * root_seed feed L2's comparison selection and L4's seed replay).
  * Progress persists in localStorage "quda.lessonsDone".
  */
-
-const DONE_LS = "quda.lessonsDone";
 
 function loadDone(): Set<LessonKey> {
   try {
@@ -78,6 +77,18 @@ export function LessonCard() {
     setPhase("ask");
     lessonRuns.current = [];
   };
+
+  // Handoff bridge: the learn-from-zero track asks us to open directly
+  // on a lesson (Step5Certainty sets pendingLessonKey before flipping
+  // lessonsOpen). Consume-and-clear, one shot.
+  const pendingKey = useApp((s) => s.pendingLessonKey);
+  useEffect(() => {
+    if (!open || pendingKey == null) return;
+    if (LESSONS.some((l) => l.key === pendingKey))
+      pickLesson(pendingKey as LessonKey);
+    useApp.getState().setPendingLessonKey(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pendingKey]);
 
   const launch = (l: Lesson, idx: number) => {
     const step = l.steps[idx];
@@ -213,6 +224,14 @@ export function LessonCard() {
         </div>
       ) : (
         <div className="p-3">
+          {/* back-pointer for learn-from-zero graduates: L1 is the
+              designed landing spot of the step-5 handoff */}
+          {lesson.key === "L1" && (
+            <p className="text-[10px] text-mute mb-1">
+              Fresh from the basics? This one runs the real thing — a live
+              pipeline, archived like any run.
+            </p>
+          )}
           <p className="text-[11px] leading-snug text-ink">{lesson.question}</p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {lesson.terms.map((t) => (

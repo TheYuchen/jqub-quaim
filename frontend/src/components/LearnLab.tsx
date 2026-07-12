@@ -1,9 +1,13 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { ChevronLeft, ChevronRight, Sparkles, X } from "lucide-react";
+import { markLearnLabDone } from "../lib/learnProgress";
 import { useApp } from "../lib/store";
 import { Step0Lean } from "./learn/Step0Lean";
 import { Step1Measure } from "./learn/Step1Measure";
 import { Step2Gates } from "./learn/Step2Gates";
+import { Step3Bell } from "./learn/Step3Bell";
+import { Step4Noise } from "./learn/Step4Noise";
+import { Step5Certainty } from "./learn/Step5Certainty";
 
 /**
  * Learn from zero (marker: learn-lab) — the beginner track that sits
@@ -24,11 +28,15 @@ import { Step2Gates } from "./learn/Step2Gates";
  * guiding line (≤25 words), then the interactive. Task language, no
  * formulas, percentages only; glossary TipIcons where a quantum term
  * first appears (qubit → step 0, measurement → step 1, shots/gates →
- * step 2).
+ * step 2, entanglement → 3, noise/fidelity → 4, interval → 5).
  *
- * Steps 3–5 are stubs for the second implementation pass (planned:
- * two qubits + CX; readout noise via applyReadoutNoise; how many
- * shots is enough, reusing lib/stats.ts wilson95).
+ * Steps 3–5 (second pass; marker learn-complete lives in step 5):
+ * the Bell pair with a break-the-link contrast (Step3Bell), readout
+ * noise + the agreement score (Step4Noise), and how-many-looks with
+ * live wilson95 intervals in the theater's funnel grammar
+ * (Step5Certainty). Step 5 completes the track: quda.learnLabDone is
+ * set (TopBar shows a ✓) and the handoff either opens the guided
+ * lessons directly on L1 (store bridge pendingLessonKey) or closes.
  */
 const STEP_LS = "quda.learnLabStep";
 
@@ -45,14 +53,6 @@ interface LearnStep {
   /** ONE guiding line — ≤25 words, task language. */
   guide: string;
   Comp: ComponentType<StepProps>;
-}
-
-function StepStub() {
-  return (
-    <div className="panel-alt p-6 text-center text-sm text-mute">
-      This step is still being written — the earlier ones work today.
-    </div>
-  );
 }
 
 const STEPS: LearnStep[] = [
@@ -77,24 +77,26 @@ const STEPS: LearnStep[] = [
       "Put X and H gates on the wire and watch the dial at the end respond. Try H twice.",
     Comp: Step2Gates,
   },
-  // --- steps 3-5: second pass fills these (keep titles in sync) -----
   {
     title: "Two qubits, one fate",
-    idea: "Two qubits can be linked so one answer decides both.",
-    guide: "Coming up next.",
-    Comp: StepStub,
+    idea: "Linked qubits answer together — see one, know the other.",
+    guide:
+      "Measure the pre-wired pair: both needles always land on the same side. Then break the link and watch all four cells fill.",
+    Comp: Step3Bell,
   },
   {
     title: "Real machines misread",
-    idea: "Hardware sometimes reads a 0 as a 1 — noise blurs every tally.",
-    guide: "Coming up next.",
-    Comp: StepStub,
+    idea: "Noise makes machines misread — fidelity is the honesty score.",
+    guide:
+      "Measure on the perfect machine, then switch to the noisy one — watch 01 and 10 leak in. Slide the noise to feel the dose.",
+    Comp: Step4Noise,
   },
   {
     title: "How many looks is enough?",
-    idea: "More looks buy narrower uncertainty — evidence has a price.",
-    guide: "Coming up next.",
-    Comp: StepStub,
+    idea: "More looks buy narrower certainty — buy only what you need.",
+    guide:
+      "Buy looks in batches of 50 and watch the band narrow — or let auto-stop call it at ±2 points.",
+    Comp: Step5Certainty,
   },
 ];
 
@@ -225,7 +227,12 @@ export function LearnLab() {
               <button
                 type="button"
                 className="btn text-xs"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  // Reaching the last step and leaving through this
+                  // button counts as completing the track too.
+                  markLearnLabDone();
+                  setOpen(false);
+                }}
               >
                 Done — back to the workbench
               </button>

@@ -55,6 +55,7 @@ import {
   Plus,
   Repeat,
   RotateCcw,
+  Sparkles,
   Workflow,
   X,
 } from "lucide-react";
@@ -921,10 +922,19 @@ export function MultiverseBoard() {
                 <button
                   type="button"
                   className="btn"
+                  title="Six tiny interactives on a toy simulator — nothing assumed, not even what a qubit is"
+                  onClick={() => useApp.getState().setLearnLabOpen(true)}
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> New to quantum? Start
+                  from zero
+                </button>
+                <button
+                  type="button"
+                  className="btn"
                   title="Four guided micro-experiments — each runs one pipeline and points at the evidence it produced"
                   onClick={() => useApp.getState().setLessonsOpen(true)}
                 >
-                  <GraduationCap className="w-3.5 h-3.5" /> Learn the basics
+                  <GraduationCap className="w-3.5 h-3.5" /> Guided experiments
                 </button>
               </div>
             </div>

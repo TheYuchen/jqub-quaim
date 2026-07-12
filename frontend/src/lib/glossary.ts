@@ -25,6 +25,10 @@ export const GLOSSARY = {
     "Depth = the longest sequence of operations that must run one after another. Deeper circuits accumulate more noise.",
   gates:
     "Gates = the individual operations in the circuit (like instructions in a program).",
+  entanglement:
+    "Entanglement = a link between qubits prepared together: measure one and the other's answer is fixed too. Two-qubit gates like the controlled flip (CX) create it.",
+  noise:
+    "Noise = the small random errors a real machine adds \u2014 misfired operations, misread qubits. It blurs every tally; the agreement (fidelity) score says how much survives.",
   seed:
     "Seed = the number that fixes all random draws in a run. Re-running with the same (pinned) seed reproduces the result bit-exactly.",
   ci:

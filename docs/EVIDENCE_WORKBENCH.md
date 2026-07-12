@@ -1076,8 +1076,7 @@ itself only via APP_NAME, so anon builds show the neutral codename).
    localStorage `quda.lessonsDone`; glossary terms carry TipIcons.
    *Learn from zero (2026-07-12, marker `learn-lab`):* the track
    BEFORE the guided lessons, for readers who do not know what a
-   qubit is. Six steps (framework + steps 0-2 shipped; 3-5 in the
-   second pass: CX/Bell, readout noise, shots→wilson95) as a full
+   qubit is. Six steps, complete since the second pass, as a full
    center-column overlay (components/LearnLab.tsx, same pattern as
    board/theater; step components in components/learn/; progress in
    localStorage `quda.learnLabStep`). It never touches the pipeline:
@@ -1091,10 +1090,33 @@ itself only via APP_NAME, so anon builds show the neutral codename).
    drawn with the lean's odds (the system's tallies-not-truths
    premise, planted in step 1), gates steer the lean on a wire. One
    bold idea sentence + one guiding line + one interactive per step;
-   percentages only; TipIcons where qubit/measurement/shots first
-   appear. Entry: the TopBar "Learn" button is now a two-item
-   dropdown — "Start from zero" (this track) and "Guided
-   experiments" (the LessonCard track above).
+   percentages only; TipIcons where qubit/measurement/shots/
+   entanglement/noise/fidelity/interval first appear. Steps 3-5
+   (marker `learn-complete`): step 3 measures the pre-wired Bell
+   recipe — both needles snap TOGETHER, only 00/11 populate the 2×2
+   PairGrid, and "break the link" swaps CX for H⊗H (NOT mere
+   deletion, which would pin q1 at 0 — see BellRecipe.tsx) so all
+   four cells fill as the honest independent contrast; step 4 adds a
+   perfect/noisy machine switch (applyReadoutNoise, eps slider
+   0-15%) — 01/10 leak warn-tinted counts and the live agreement
+   score (reported pair == drawn pair; ≈88% at 6% noise, both bits
+   must survive) is fidelity in miniature, bridged explicitly to the
+   Noisy simulator block; step 5 plots that score as a LIVE mini
+   funnel in the theater's exact grammar (per-batch wilson95
+   interval bars + convergence envelope + point path, fixed axis,
+   460×200) with "look ×50" and "auto to ±2pp" optional stopping
+   (stop line + "the rest of the budget is yours to keep"). All
+   step 3-5 claims are asserted in scripts/check_quantum_toy.test.ts
+   (Bell tally certainty, H⊗H contrast, agreement ≈ (1−eps)²,
+   deterministic stop batch). Handoff design: step 5's footer marks
+   localStorage `quda.learnLabDone` and either closes or opens the
+   guided lessons DIRECTLY on L1 (store bridge `pendingLessonKey`;
+   L1's card carries the back-pointer "fresh from the basics? this
+   one runs the real thing"). Entry points: the TopBar "Learn"
+   dropdown — "Start from zero" / "Guided experiments", each with a
+   ✓ once its track completes (lib/learnProgress.ts) — plus the
+   board's empty state ("New to quantum? Start from zero" before the
+   guided-experiments button) and tour slide 5 (both tracks).
 2. **GMU theme removed entirely** — theme.ts (ThemeKey = light|dark),
    index.css token block, vite.config.ts %THEME_KEYS% (now always
    ["dark"]) and the anon CSS-stripping generateBundle hook (nothing

@@ -554,7 +554,18 @@ function TrySlide({ onDone }: { onDone: () => void }) {
         to the URL for the streaming-evidence teaser.
       </p>
       <p className="mt-1 text-[11px] text-mute">
-        New to quantum experiments?{" "}
+        New to quantum?{" "}
+        <button
+          type="button"
+          className="underline decoration-dotted hover:text-ink"
+          onClick={() => {
+            useApp.getState().setLearnLabOpen(true);
+            onDone();
+          }}
+        >
+          Start from zero
+        </button>{" "}
+        — six tiny interactives, nothing assumed. Then{" "}
         <button
           type="button"
           className="underline decoration-dotted hover:text-ink"
@@ -563,9 +574,10 @@ function TrySlide({ onDone }: { onDone: () => void }) {
             onDone();
           }}
         >
-          Learn the basics
+          Guided experiments
         </button>{" "}
-        — four guided micro-lessons, also under "Learn" in the top bar.
+        — four micro-lessons in the real pipeline. Both live under "Learn"
+        in the top bar.
       </p>
     </SlideShell>
   );
