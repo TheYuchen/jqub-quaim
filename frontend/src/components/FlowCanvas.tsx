@@ -14,6 +14,7 @@ import {
   type EdgeTypes,
   type Node,
   type NodeTypes,
+  type FinalConnectionState,
   type OnConnect,
 } from "@xyflow/react";
 import {
@@ -43,7 +44,11 @@ import {
   PRESET_BY_KEY,
   buildPresetGraph,
 } from "../lib/presets";
-import { autoConnect } from "../lib/autoConnect";
+import {
+  autoConnect,
+  nextFamilies,
+  type Family,
+} from "../lib/autoConnect";
 import { useApp } from "../lib/store";
 import { api } from "../lib/api";
 import { getUserId } from "../lib/userId";
@@ -80,6 +85,7 @@ import { EmptyCanvas } from "./EmptyCanvas";
 import { MoreMenu } from "./MoreMenu";
 import { FigureExportButton } from "./FigureExportButton";
 import { BlockPicker } from "./BlockPicker";
+import { CanvasInsertMenu } from "./CanvasInsertMenu";
 
 /** One-shot feedback surfaced as a toast at the bottom of the canvas.
  *
@@ -439,6 +445,153 @@ export function FlowCanvas() {
   const onConnect: OnConnect = useCallback(
     (c: Connection) => setEdges((eds) => addEdge(c, eds)),
     [setEdges],
+  );
+
+  // ---- Grammar-aware canvas insertion (marker: canvas-insert-menu) --
+  //
+  // Two openers, one mini chooser:
+  //   (a) onConnectEnd — a connection drag from a node's SOURCE handle
+  //       released over EMPTY pane. The menu lists ONLY blocks whose
+  //       family can legally FOLLOW the dragged-from node's family per
+  //       auto-connect's canonical ordering (nextFamilies: algorithm
+  //       chains onto algorithm, source/backend never repeat, sink is
+  //       terminal). Picking creates the block at the release point
+  //       AND wires the pending connection to it.
+  //   (b) double-click on empty pane — same menu, unfiltered, no
+  //       wiring (zoomOnDoubleClick is off so the gestures don't
+  //       fight).
+  // Neither path touches the drag-from-popover splice logic below
+  // (that reads dataTransfer + dropTargetEdgeId) nor normal onConnect
+  // (a release ON a handle never passes the empty-pane checks here).
+  // Both respect the running authoring lock.
+  const [insertMenu, setInsertMenu] = useState<{
+    /** Menu position inside the canvas wrapper, clamped to fit. */
+    px: number;
+    py: number;
+    /** Flow coords captured at open time — where the block lands. */
+    flowX: number;
+    flowY: number;
+    /** Node to wire FROM (connect-end path); null for double-click. */
+    sourceId: string | null;
+    /** Allowed families; null = unfiltered (double-click). */
+    families: Family[] | null;
+  } | null>(null);
+
+  const openInsertMenu = useCallback(
+    (
+      clientX: number,
+      clientY: number,
+      sourceId: string | null,
+      families: Family[] | null,
+    ) => {
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      // A release outside the canvas (over a side pane, the toolbar)
+      // is an abandoned drag, not an insertion request.
+      if (
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      )
+        return;
+      const flow = screenToFlowPosition({ x: clientX, y: clientY });
+      // Clamp so the ~240px menu never clips against the pane edges.
+      const MENU_W = 244;
+      const MENU_H = 300;
+      setInsertMenu({
+        px: Math.max(4, Math.min(clientX - rect.left, rect.width - MENU_W)),
+        py: Math.max(4, Math.min(clientY - rect.top, rect.height - MENU_H)),
+        flowX: flow.x,
+        flowY: flow.y,
+        sourceId,
+        families,
+      });
+    },
+    [screenToFlowPosition],
+  );
+
+  const onCanvasConnectEnd = useCallback(
+    (
+      event: MouseEvent | TouchEvent,
+      connectionState: FinalConnectionState,
+    ) => {
+      // A drop that made a connection is onConnect's business; only a
+      // release with no valid target is an insertion request.
+      if (connectionState.isValid) return;
+      const fromNode = connectionState.fromNode;
+      if (!fromNode || connectionState.fromHandle?.type !== "source") return;
+      if (running) return;
+      const { clientX, clientY } =
+        "changedTouches" in event ? event.changedTouches[0] : event;
+      // Must be over EMPTY pane. elementFromPoint rather than
+      // event.target: touchend targets the element the touch STARTED
+      // on, and a mouse release over a node body must not offer to
+      // stack a block on top of it.
+      const under = document.elementFromPoint(clientX, clientY);
+      if (!under || !under.classList.contains("react-flow__pane")) return;
+      const fam = resolveNodeSpec(
+        (fromNode.data as QNodeData | undefined)?.kind as NodeKind,
+        useApp.getState().plugins,
+      )?.family;
+      // Unknown kind (stale share link / missing plugin): no grammar
+      // to consult — offer the full catalog rather than nothing.
+      const fams = fam ? nextFamilies(fam) : null;
+      if (fams && fams.length === 0) return; // sink is terminal
+      openInsertMenu(clientX, clientY, fromNode.id, fams);
+    },
+    [running, openInsertMenu],
+  );
+
+  const onWrapperDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (running) return;
+      // Only the empty pane — nodes, edges, controls, minimap and the
+      // toolbar all keep their own double-click semantics.
+      if (!(e.target as HTMLElement).classList?.contains("react-flow__pane"))
+        return;
+      openInsertMenu(e.clientX, e.clientY, null, null);
+    },
+    [running, openInsertMenu],
+  );
+
+  const handleInsertPick = useCallback(
+    (kind: NodeKind) => {
+      const menu = insertMenu;
+      setInsertMenu(null);
+      if (!menu) return;
+      const plugins = useApp.getState().plugins;
+      const spec = resolveNodeSpec(kind, plugins);
+      if (!spec) return;
+      const id = freshNodeId();
+      const node: RFNode = {
+        id,
+        type: "qnode",
+        // Nudge so the block centers roughly on the release point
+        // (default footprint ~200×56).
+        position: { x: menu.flowX - 40, y: menu.flowY - 28 },
+        data: {
+          kind,
+          params: { ...((spec.defaultData as Record<string, unknown>) ?? {}) },
+        },
+      };
+      setNodes((ns) => ns.concat(node));
+      if (menu.sourceId) {
+        // Complete the pending connection the drag started. Plain
+        // edge — if it happens to be a backend→algorithm noise
+        // sidechain, Auto-connect's next pass restyles it.
+        const sourceId = menu.sourceId;
+        setEdges((es) =>
+          es.concat({
+            id: `e${id}-in`,
+            source: sourceId,
+            target: id,
+            animated: !prefersReducedMotion,
+          }),
+        );
+      }
+    },
+    [insertMenu, setNodes, setEdges, prefersReducedMotion],
   );
 
   // Drag-to-insert: when the user drags a block from the palette and
@@ -1851,6 +2004,7 @@ export function FlowCanvas() {
         onDragOver={onDragOver}
         onDrop={onDrop}
         onDragLeave={onDragLeave}
+        onDoubleClick={onWrapperDoubleClick}
       >
         <ReactFlow
           nodes={nodes}
@@ -1858,6 +2012,7 @@ export function FlowCanvas() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onConnectEnd={onCanvasConnectEnd}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
@@ -1868,6 +2023,10 @@ export function FlowCanvas() {
           // 4-block chain in a ~500px-wide center column fits at ~0.3;
           // the old 0.4 floor clipped it).
           fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
+          zoomOnDoubleClick={
+            false /* pane double-click opens the insert menu (wrapper
+                     onDoubleClick) — RF's default zoom would fight it */
+          }
           minZoom={0.15}
           maxZoom={1.6}
           defaultEdgeOptions={{ animated: !prefersReducedMotion }}
@@ -1898,6 +2057,16 @@ export function FlowCanvas() {
         </ReactFlow>
         {nodes.length === 0 && <EmptyCanvas />}
         {run && nodes.length > 0 && <RibbonLegend />}
+        {insertMenu && (
+          <CanvasInsertMenu
+            left={insertMenu.px}
+            top={insertMenu.py}
+            families={insertMenu.families}
+            hasSource={insertMenu.sourceId != null}
+            onPick={handleInsertPick}
+            onClose={() => setInsertMenu(null)}
+          />
+        )}
         {notice && (
           <CanvasToast notice={notice} onDismiss={() => setNotice(null)} />
         )}

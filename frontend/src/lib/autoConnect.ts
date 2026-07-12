@@ -43,7 +43,7 @@ import {
 } from "./nodeCatalog";
 import type { PluginManifest } from "./api";
 
-type Family = NodeSpec["family"];
+export type Family = NodeSpec["family"];
 
 // Canonical execution order of the pipeline families. Keep this list
 // stable: the Auto-connect algorithm and the visual left-to-right layout
@@ -55,6 +55,34 @@ const FAMILY_ORDER: Family[] = [
   "metric",
   "sink",
 ];
+
+/**
+ * Which families may legally FOLLOW a block of `family` in a chain —
+ * the grammar the canvas insert menu (marker canvas-insert-menu)
+ * filters by. Derived from how autoConnect itself builds chains, not
+ * from taste:
+ *
+ *   - The flatten step strings the non-empty family buckets together
+ *     in FAMILY_ORDER, so any LATER family can be the direct
+ *     successor when the buckets between are empty (source → sink is
+ *     a legal, if spartan, chain).
+ *   - Same-family succession is family-specific. algorithm →
+ *     algorithm is the normal way to stack transforms (multiple
+ *     algorithms chain in x-order with no warning), and metric →
+ *     metric just measures more than one thing. source → source and
+ *     backend → backend DO occur in a flattened chain, but they are
+ *     exactly the shapes autoConnect's advisory warnings flag
+ *     ("duplicate summary rows" / "only the rightmost one is used") —
+ *     an insert menu must not OFFER to build a warned-about shape.
+ *   - sink is terminal: nothing follows the evidence collector. The
+ *     follow set is empty and callers skip the menu entirely.
+ */
+export function nextFamilies(family: Family): Family[] {
+  const later = FAMILY_ORDER.slice(FAMILY_ORDER.indexOf(family) + 1);
+  return family === "algorithm" || family === "metric"
+    ? [family, ...later]
+    : later;
+}
 
 // Per-algorithm dependency on an upstream backend, derived from the
 // runtime handlers in backend/app/services/workflow_service.py. Three
