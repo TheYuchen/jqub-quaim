@@ -6,14 +6,18 @@ import { Step0Lean } from "./learn/Step0Lean";
 import { Step1Measure } from "./learn/Step1Measure";
 import { Step2Gates } from "./learn/Step2Gates";
 import { Step3Phase } from "./learn/Step3Phase";
+import { Step4Interference } from "./learn/Step4Interference";
 import { Step3Bell } from "./learn/Step3Bell";
+import { Step6Scale } from "./learn/Step6Scale";
+import { Step7Deutsch } from "./learn/Step7Deutsch";
 import { Step4Noise } from "./learn/Step4Noise";
 import { Step5Certainty } from "./learn/Step5Certainty";
 
 /**
  * Learn from zero (marker: learn-lab) — the beginner track that sits
- * BEFORE the guided lessons (LessonCard/lib/lessons.ts): seven tiny
- * interactives that assume nothing, not even what a qubit is. Unlike
+ * BEFORE the guided lessons (LessonCard/lib/lessons.ts): a ten-step
+ * ladder of tiny interactives assuming nothing, not even what a
+ * qubit is. Unlike
  * the lessons, this track never touches the real pipeline; everything
  * runs on lib/quantumToy.ts (exact toy simulator, seeded rng), so
  * every interaction is instant, offline and honest — see the honesty
@@ -29,17 +33,19 @@ import { Step5Certainty } from "./learn/Step5Certainty";
  * guiding line (≤25 words), then the interactive. Task language, no
  * formulas, percentages only; glossary TipIcons where a quantum term
  * first appears (qubit → frame step 1, measurement → 2, shots/gates/
- * amplitude → 3, phase → 4, entanglement → 5, noise/fidelity → 6,
- * interval → 7, 1-based as displayed).
+ * amplitude → 3, phase → 4, interference → 5, entanglement → 6,
+ * noise/fidelity → 9, interval → 10, 1-based as displayed).
  *
  * NOTE ON NAMES: step component FILES keep their original stage
  * names (Step3Bell was written when Bell was the fourth step); the
- * frame's STEPS array below is the only source of ORDER. The third
- * pass inserted "The hidden direction" (Step3Phase) between gates
- * and Bell, so the display numbering shifted — quda.learnLabStep
+ * frame's STEPS array below is the only source of ORDER. Part B
+ * settled the ladder at ten: lean / measure / gates / phase /
+ * interference (Step4Interference, NEW) / Bell (moved, unchanged) /
+ * scale (Step6Scale, NEW, marker learn-scale) / Deutsch
+ * (Step7Deutsch, NEW) / noise / certainty — quda.learnLabStep
  * stores a plain index and loadStep clamps to STEPS.length, so old
- * stored positions stay valid (they may point one step earlier than
- * where the reader left off, which is harmless).
+ * stored positions stay valid (they may point a few steps earlier
+ * than where the reader left off, which is harmless).
  *
  * Later steps (marker learn-complete lives in the last step): the
  * Bell pair with a break-the-link contrast (Step3Bell), readout
@@ -56,6 +62,9 @@ interface StepProps {
   /** The lean is owned here so step 0's dial position IS step 1's. */
   lean: number;
   setLean: (p: number) => void;
+  /** Frame navigation, for cross-link chips (the scale step points
+   *  back at interference and ahead at Deutsch). Plain index. */
+  goToStep?: (i: number) => void;
 }
 
 interface LearnStep {
@@ -96,22 +105,33 @@ const STEPS: LearnStep[] = [
       "Measure both circles a hundred times — twin tallies. Then apply H to both and watch them split, with certainty.",
     Comp: Step3Phase,
   },
-  // COMING (learn track, part B) — two more steps slot in here when
-  // built, keeping this array the single source of order:
-  //   { title: "Waves that cancel", ... }            // interference:
-  //     amplitudes add with signs; paths can erase each other
-  //   { title: "One question instead of two", ... }  // Deutsch's
-  //     shortcut, the payoff of phase + interference
-  // Planned positions: both directly after "The hidden direction",
-  // before the Bell step. quda.learnLabStep stores a plain index and
-  // loadStep clamps to STEPS.length, so inserting steps only ever
-  // shifts positions — it never breaks stored state.
+  {
+    title: "Waves that cancel",
+    idea: "Quantum adds arrows, not odds — arrows can point against each other and cancel.",
+    guide:
+      "Step through the story with ‹ › — then flip the hidden sign: choreograph the cancelling and only wrong answers disappear.",
+    Comp: Step4Interference,
+  },
   {
     title: "Two qubits, one fate",
     idea: "Linked qubits answer together — see one, know the other.",
     guide:
       "Measure the pre-wired pair: both needles always land on the same side. Then break the link and watch all four cells fill.",
     Comp: Step3Bell,
+  },
+  {
+    title: "Every qubit doubles the arrows",
+    idea: "Each new qubit doubles the arrows a classical computer must track.",
+    guide:
+      "Slide the count up and the wall doubles; slide it down and it halves — then see how few bits one look returns.",
+    Comp: Step6Scale,
+  },
+  {
+    title: "One question instead of two",
+    idea: "One quantum question settles what classically takes two — structure made the difference.",
+    guide:
+      "Play the classical round first — two questions, no shortcut. Then run the one quantum question and replay it: certainty, not luck.",
+    Comp: Step7Deutsch,
   },
   {
     title: "Real machines misread",
@@ -240,7 +260,7 @@ export function LearnLab() {
           </p>
           <p className="mt-1 text-sm text-mute leading-snug">{cur.guide}</p>
           <div className="mt-5">
-            <Comp lean={lean} setLean={setLean} />
+            <Comp lean={lean} setLean={setLean} goToStep={setStep} />
           </div>
           <div className="mt-6 flex justify-end">
             {step < STEPS.length - 1 ? (

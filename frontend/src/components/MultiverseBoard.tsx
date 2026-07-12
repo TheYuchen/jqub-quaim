@@ -922,7 +922,7 @@ export function MultiverseBoard() {
                 <button
                   type="button"
                   className="btn"
-                  title="Six tiny interactives on a toy simulator — nothing assumed, not even what a qubit is"
+                  title="A ladder of tiny interactives on a toy simulator — nothing assumed, not even what a qubit is"
                   onClick={() => useApp.getState().setLearnLabOpen(true)}
                 >
                   <Sparkles className="w-3.5 h-3.5" /> New to quantum? Start

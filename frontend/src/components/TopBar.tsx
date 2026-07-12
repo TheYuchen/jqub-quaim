@@ -77,7 +77,7 @@ function LearnMenu() {
               )}
             </span>
             <span className="block text-[10px] text-mute leading-snug">
-              What a qubit even is — six tiny interactives, nothing assumed.
+              What a qubit even is — a ladder of tiny interactives, nothing assumed.
             </span>
           </button>
           <button

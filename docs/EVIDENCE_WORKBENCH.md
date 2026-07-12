@@ -1076,10 +1076,10 @@ itself only via APP_NAME, so anon builds show the neutral codename).
    localStorage `quda.lessonsDone`; glossary terms carry TipIcons.
    *Learn from zero (2026-07-12, marker `learn-lab`):* the track
    BEFORE the guided lessons, for readers who do not know what a
-   qubit is. Seven steps since the third pass (which inserted the
-   phase step after gates and renumbered the frame; part B adds
-   "Waves that cancel" and "One question instead of two" next —
-   titled stubs sit as comments in the STEPS array), as a full
+   qubit is. Ten steps since part B settled the ladder — lean,
+   measure, gates, phase, interference, Bell, scale, Deutsch, noise,
+   certainty (the Bell component moved unchanged; marker
+   `learn-scale` sits on the scale step) — as a full
    center-column overlay (components/LearnLab.tsx, same pattern as
    board/theater; step components in components/learn/ — file names
    are stage names, the STEPS array is the only source of order;
@@ -1118,9 +1118,47 @@ itself only via APP_NAME, so anon builds show the neutral codename).
    (the system's tallies-not-truths premise), gates steer the lean
    on a wire. One bold idea sentence + one guiding line + one
    interactive per step; percentages only; TipIcons where qubit/
-   measurement/shots/amplitude/phase/entanglement/noise/fidelity/
-   interval first appear. The last three steps
-   (marker `learn-complete`): the Bell step measures the pre-wired Bell
+   measurement/shots/amplitude/phase/interference/entanglement/
+   noise/fidelity/interval first appear.
+   *Part B (marker `learn-scale`)* adds the three middle steps.
+   "Waves that cancel" (frame step 5, Step4Interference.tsx) walks
+   H·H on |0⟩ as a ‹ ›-stepped three-frame story — never autoplay —
+   over SIGNED amplitude bars (learn/AmpBars.tsx: up = plus,
+   down = minus, height = |amplitude|, with the odds as a separate
+   thin bar + % so arrows ≠ odds stays visible on screen); the last
+   frame overlays ghost route-arrows (the two routes into 1 cancel,
+   the routes into 0 agree — each ghost pair sums exactly to the
+   real bar, asserted in the node lane), and a Z toggle between the
+   H's swaps which side cancels, snapping the outcome to a certain 1
+   (glossary gains `interference`). "Every qubit doubles the arrows"
+   (frame step 7, Step6Scale.tsx, the `learn-scale` marker) is a
+   1–30 qubit stepper: up to 5 qubits the wall draws the actual 2^n
+   arrow slots; beyond, a log-scale bar plus the plain count with
+   deliberately modest anchors (10: "a thousand — a spreadsheet",
+   20: "a million — a photo's pixels", 30: "a billion — more numbers
+   than a laptop's RAM holds comfortably as amplitudes" — no
+   atoms-in-the-universe hype), then the honesty turn gets its own
+   graphic: a readout funnel (2^n arrows in, n bits out per look —
+   the art is the cancelling, choreographed so the readable bits
+   carry the answer), with cross-link chips jumping to steps 5 and 8
+   (StepProps gained an optional goToStep). "One question instead of
+   two" (frame step 8, Step7Deutsch.tsx) is the payoff game: a
+   seeded mystery coin-rule box (always-0 / always-1 / copy / flip,
+   redrawn per round); classically the same-kind/different-kind
+   verdict unlocks only after TWO queries (after one, the buttons
+   stay disabled: "you can't know yet — one answer isn't enough");
+   the quantum act runs the REAL Deutsch circuit on the toy sim
+   (|0⟩|1⟩, H⊗H, oracle as a real permutation matrix —
+   quantumToy.ts `deutschOracle`, truth-table plus
+   deterministic-verdict asserted for all four rules in the node
+   lane — H on q0, read q0: 0 = same kind, 1 = different kind,
+   certain in ONE question), staged over the 4-slot AmpBars with
+   ghost routes on the q0 mix showing the cancel at work; replay
+   reruns the identical round (not luck), and a prominent honesty
+   card scopes the claim: the trick needed the question to have
+   structure — molecules, search, factoring, and your laptop keeps
+   its job. The Bell, noise and certainty steps
+   (marker `learn-complete` on the last): the Bell step measures the pre-wired Bell
    recipe — both needles snap TOGETHER, only 00/11 populate the 2×2
    PairGrid, and "break the link" swaps CX for H⊗H (NOT mere
    deletion, which would pin q1 at 0 — see BellRecipe.tsx) so all

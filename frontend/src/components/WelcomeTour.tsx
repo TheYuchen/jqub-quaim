@@ -565,7 +565,7 @@ function TrySlide({ onDone }: { onDone: () => void }) {
         >
           Start from zero
         </button>{" "}
-        — six tiny interactives, nothing assumed. Then{" "}
+        — tiny interactives, nothing assumed. Then{" "}
         <button
           type="button"
           className="underline decoration-dotted hover:text-ink"
